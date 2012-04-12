@@ -1,0 +1,4 @@
+@author Loïc Hoguin <essen@ninenines.eu>
+@copyright 2011-2012 Loïc Hoguin
+@version HEAD
+@title Socket acceptor pool for TCP protocols.
