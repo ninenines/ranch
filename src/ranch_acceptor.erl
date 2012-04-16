@@ -15,8 +15,12 @@
 %% @private
 -module(ranch_acceptor).
 
--export([start_link/6]). %% API.
--export([acceptor/7]). %% Internal.
+%% API.
+-export([start_link/6]).
+
+%% Internal.
+-export([init/6]).
+-export([acceptor/6]).
 
 %% API.
 
@@ -24,34 +28,58 @@
 	pid(), pid()) -> {ok, pid()}.
 start_link(LSocket, Transport, Protocol, Opts,
 		ListenerPid, ConnsSup) ->
-	Pid = spawn_link(?MODULE, acceptor,
-		[LSocket, Transport, Protocol, Opts, 1, ListenerPid, ConnsSup]),
+	%% @todo We don't actually want to give Opts here either.
+	%% It can change if the process dies after it has been upgraded.
+	Pid = spawn_link(?MODULE, init,
+		[LSocket, Transport, Protocol, Opts, ListenerPid, ConnsSup]),
 	{ok, Pid}.
 
 %% Internal.
 
--spec acceptor(inet:socket(), module(), module(), any(),
-	non_neg_integer(), pid(), pid()) -> no_return().
-acceptor(LSocket, Transport, Protocol, Opts, OptsVsn, ListenerPid, ConnsSup) ->
-	Res = case Transport:accept(LSocket, 2000) of
-		{ok, CSocket} ->
-			{ok, Pid} = supervisor:start_child(ConnsSup,
+-spec init(inet:socket(), module(), module(), any(), pid(), pid())
+	-> no_return().
+init(LSocket, Transport, Protocol, Opts, ListenerPid, ConnsSup) ->
+	ranch_listener:acceptor_init_ack(ListenerPid),
+	acceptor(LSocket, Transport, Protocol, Opts, ListenerPid, ConnsSup).
+
+-spec acceptor(inet:socket(), module(), module(), any(), pid(), pid())
+	-> no_return().
+acceptor(LSocket, Transport, Protocol, Opts, ListenerPid, ConnsSup) ->
+	async_accept(LSocket, Transport, self()),
+	receive
+		{accept, CSocket} ->
+			{ok, ConnPid} = supervisor:start_child(ConnsSup,
 				[ListenerPid, CSocket, Transport, Protocol, Opts]),
-			Transport:controlling_process(CSocket, Pid),
-			ranch_listener:add_connection(ListenerPid,
-				default, Pid, OptsVsn);
-		{error, timeout} ->
-			ranch_listener:check_upgrades(ListenerPid, OptsVsn);
-		{error, _Reason} ->
-			%% @todo Probably do something here. If the socket was closed,
-			%%       we may want to try and listen again on the port?
-			ok
-	end,
-	case Res of
-		ok ->
+			Transport:controlling_process(CSocket, ConnPid),
+			ranch_listener:add_connection(ListenerPid, default, ConnPid),
+			ConnPid ! {shoot, ListenerPid},
+			%% We want to suspend before accepting another connection.
+			receive suspend ->
+				receive resume -> flush() end
+			after 0 ->
+				ok
+			end,
 			?MODULE:acceptor(LSocket, Transport, Protocol,
-				Opts, OptsVsn, ListenerPid, ConnsSup);
-		{upgrade, Opts2, OptsVsn2} ->
+				Opts, ListenerPid, ConnsSup);
+		{upgrade, Opts2} ->
 			?MODULE:acceptor(LSocket, Transport, Protocol,
-				Opts2, OptsVsn2, ListenerPid, ConnsSup)
+				Opts2, ListenerPid, ConnsSup)
+	end.
+
+-spec async_accept(inet:socket(), module(), pid()) -> ok.
+async_accept(LSocket, Transport, AcceptorPid) ->
+	_ = spawn_link(fun() ->
+		{ok, CSocket} = Transport:accept(LSocket, infinity),
+		Transport:controlling_process(CSocket, AcceptorPid),
+		AcceptorPid ! {accept, CSocket}
+	end),
+	ok.
+
+-spec flush() -> ok.
+flush() ->
+	receive
+		suspend -> flush();
+		resume -> flush()
+	after 0 ->
+		ok
 	end.
