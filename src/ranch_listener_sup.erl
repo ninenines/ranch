@@ -32,10 +32,10 @@ start_link(NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	{ok, ConnsPid} = supervisor:start_child(SupPid,
 		{ranch_conns_sup, {ranch_conns_sup, start_link, []},
 		 permanent, 5000, supervisor, [ranch_conns_sup]}),
-	{ok, _PoolPid} = supervisor:start_child(SupPid,
+	{ok, _} = supervisor:start_child(SupPid,
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link, [
 			NbAcceptors, Transport, TransOpts,
-			Protocol, ProtoOpts, ListenerPid, ConnsPid
+			Protocol, ListenerPid, ConnsPid
 		]}, permanent, 5000, supervisor, [ranch_acceptors_sup]}),
 	{ok, SupPid}.
 

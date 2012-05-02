@@ -16,7 +16,7 @@
 -module(ranch_acceptor).
 
 %% API.
--export([start_link/6]).
+-export([start_link/5]).
 
 %% Internal.
 -export([init/6]).
@@ -24,12 +24,10 @@
 
 %% API.
 
--spec start_link(inet:socket(), module(), module(), any(),
-	pid(), pid()) -> {ok, pid()}.
-start_link(LSocket, Transport, Protocol, Opts,
-		ListenerPid, ConnsSup) ->
-	%% @todo We don't actually want to give Opts here either.
-	%% It can change if the process dies after it has been upgraded.
+-spec start_link(inet:socket(), module(), module(), pid(), pid())
+	-> {ok, pid()}.
+start_link(LSocket, Transport, Protocol, ListenerPid, ConnsSup) ->
+	{ok, Opts} = ranch_listener:get_protocol_options(ListenerPid),
 	Pid = spawn_link(?MODULE, init,
 		[LSocket, Transport, Protocol, Opts, ListenerPid, ConnsSup]),
 	{ok, Pid}.

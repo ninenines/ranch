@@ -16,17 +16,17 @@
 -module(ranch_acceptors_sup).
 -behaviour(supervisor).
 
--export([start_link/7]). %% API.
+-export([start_link/6]). %% API.
 -export([init/1]). %% supervisor.
 
 %% API.
 
 -spec start_link(non_neg_integer(), module(), any(),
-	module(), any(), pid(), pid()) -> {ok, pid()}.
+	module(), pid(), pid()) -> {ok, pid()}.
 start_link(NbAcceptors, Transport, TransOpts,
-		Protocol, ProtoOpts, ListenerPid, ConnsPid) ->
+		Protocol, ListenerPid, ConnsPid) ->
 	supervisor:start_link(?MODULE, [NbAcceptors, Transport, TransOpts,
-		Protocol, ProtoOpts, ListenerPid, ConnsPid]).
+		Protocol, ListenerPid, ConnsPid]).
 
 %% supervisor.
 
@@ -37,12 +37,11 @@ start_link(NbAcceptors, Transport, TransOpts,
 	'supervisor' | 'worker',
 	'dynamic' | [atom() | tuple()]}]
 }}.
-init([NbAcceptors, Transport, TransOpts,
-		Protocol, ProtoOpts, ListenerPid, ConnsPid]) ->
+init([NbAcceptors, Transport, TransOpts, Protocol, ListenerPid, ConnsPid]) ->
 	{ok, LSocket} = Transport:listen(TransOpts),
-	Procs = [{{acceptor, self(), N}, {ranch_acceptor, start_link, [
-				LSocket, Transport, Protocol, ProtoOpts,
-				ListenerPid, ConnsPid
-      ]}, permanent, brutal_kill, worker, []}
-		|| N <- lists:seq(1, NbAcceptors)],
+	Procs = [
+		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
+			LSocket, Transport, Protocol, ListenerPid, ConnsPid
+		]}, permanent, brutal_kill, worker, []}
+			|| N <- lists:seq(1, NbAcceptors)],
 	{ok, {{one_for_one, 10, 10}, Procs}}.
