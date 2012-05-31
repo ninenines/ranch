@@ -16,8 +16,12 @@
 -module(ranch_conns_sup).
 -behaviour(supervisor).
 
--export([start_link/0, start_protocol/5]). %% API.
--export([init/1]). %% supervisor.
+%% API.
+-export([start_link/0]).
+-export([start_protocol/5]).
+
+%% supervisor.
+-export([init/1]).
 
 %% API.
 
@@ -32,13 +36,6 @@ start_protocol(ListenerPid, Socket, Transport, Protocol, Opts) ->
 
 %% supervisor.
 
--spec init([]) -> {'ok', {{'simple_one_for_one', 0, 1}, [{
-	any(), {atom() | tuple(), atom(), 'undefined' | [any()]},
-	'permanent' | 'temporary' | 'transient',
-	'brutal_kill' | 'infinity' | non_neg_integer(),
-	'supervisor' | 'worker',
-	'dynamic' | [atom() | tuple()]}]
-}}.
 init([]) ->
 	{ok, {{simple_one_for_one, 0, 1}, [{?MODULE, {?MODULE, start_protocol, []},
 		temporary, brutal_kill, worker, [?MODULE]}]}}.

@@ -16,20 +16,18 @@
 -module(ranch_app).
 -behaviour(application).
 
--export([start/2, stop/1, profile_output/0]). %% API.
-
--type application_start_type() :: normal
-	| {takeover, node()} | {failover, node()}.
+%% API.
+-export([start/2]).
+-export([stop/1]).
+-export([profile_output/0]).
 
 %% API.
 
--spec start(application_start_type(), any()) -> {ok, pid()}.
-start(_Type, _Args) ->
+start(_, _) ->
 	consider_profiling(),
 	ranch_sup:start_link().
 
--spec stop(any()) -> ok.
-stop(_State) ->
+stop(_) ->
 	ok.
 
 -spec profile_output() -> ok.

@@ -15,8 +15,11 @@
 %% @private
 -module(ranch_acceptor).
 
--export([start_link/6]). %% API.
--export([acceptor/7]). %% Internal.
+%% API.
+-export([start_link/6]).
+
+%% Internal.
+-export([acceptor/7]).
 
 %% API.
 

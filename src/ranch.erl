@@ -15,8 +15,12 @@
 %% @doc Ranch API to start and stop listeners.
 -module(ranch).
 
--export([start_listener/6, stop_listener/1, child_spec/6, accept_ack/1,
-	get_protocol_options/1, set_protocol_options/2]).
+-export([start_listener/6]).
+-export([stop_listener/1]).
+-export([child_spec/6]).
+-export([accept_ack/1]).
+-export([get_protocol_options/1]).
+-export([set_protocol_options/2]).
 
 %% @doc Start a listener for the given transport and protocol.
 %%

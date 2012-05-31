@@ -16,8 +16,11 @@
 -module(ranch_listener_sup).
 -behaviour(supervisor).
 
--export([start_link/5]). %% API.
--export([init/1]). %% supervisor.
+%% API.
+-export([start_link/5]).
+
+%% supervisor.
+-export([init/1]).
 
 %% API.
 
@@ -41,6 +44,5 @@ start_link(NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 
 %% supervisor.
 
--spec init([]) -> {ok, {{one_for_all, 10, 10}, []}}.
 init([]) ->
 	{ok, {{one_for_all, 10, 10}, []}}.

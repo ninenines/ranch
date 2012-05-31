@@ -16,11 +16,23 @@
 -module(ranch_listener).
 -behaviour(gen_server).
 
--export([start_link/2, stop/1,
-	add_connection/4, move_connection/3, remove_connection/2, check_upgrades/2,
-	get_protocol_options/1, set_protocol_options/2]). %% API.
--export([init/1, handle_call/3, handle_cast/2,
-	handle_info/2, terminate/2, code_change/3]). %% gen_server.
+%% API.
+-export([start_link/2]).
+-export([stop/1]).
+-export([add_connection/4]).
+-export([move_connection/3]).
+-export([remove_connection/2]).
+-export([check_upgrades/2]).
+-export([get_protocol_options/1]).
+-export([set_protocol_options/2]).
+
+%% gen_server.
+-export([init/1]).
+-export([handle_call/3]).
+-export([handle_cast/2]).
+-export([handle_info/2]).
+-export([terminate/2]).
+-export([code_change/3]).
 
 -type pools() :: [{atom(), non_neg_integer()}].
 
@@ -103,7 +115,6 @@ set_protocol_options(ServerPid, ProtoOpts) ->
 %% gen_server.
 
 %% @private
--spec init(list()) -> {ok, #state{}}.
 init([MaxConns, ProtoOpts]) ->
 	ConnsTable = ets:new(connections_table, [set, private]),
 	Queue = queue:new(),
@@ -111,8 +122,6 @@ init([MaxConns, ProtoOpts]) ->
 		proto_opts=ProtoOpts, queue=Queue}}.
 
 %% @private
--spec handle_call(_, _, State)
-	-> {reply, ignored, State} | {stop, normal, stopped, State}.
 handle_call({add_connection, Pool, ConnPid, AccOptsVsn}, From, State=#state{
 		conn_pools=Pools, conns_table=ConnsTable,
 		queue=Queue, max_conns=MaxConns,
@@ -145,7 +154,6 @@ handle_call(_, _From, State) ->
 	{reply, ignored, State}.
 
 %% @private
--spec handle_cast(_, State) -> {noreply, State}.
 handle_cast({move_connection, DestPool, ConnPid}, State=#state{
 		conn_pools=Pools, conns_table=ConnsTable}) ->
 	Pools2 = move_pid(ConnPid, DestPool, Pools, ConnsTable),
@@ -158,7 +166,6 @@ handle_cast(_Msg, State) ->
 	{noreply, State}.
 
 %% @private
--spec handle_info(_, State) -> {noreply, State}.
 handle_info({'DOWN', _Ref, process, Pid, _Info}, State=#state{
 		conn_pools=Pools, conns_table=ConnsTable, queue=Queue}) ->
 	{Pools2, Queue2} = remove_pid(Pid, Pools, ConnsTable, Queue),
@@ -167,12 +174,10 @@ handle_info(_Info, State) ->
 	{noreply, State}.
 
 %% @private
--spec terminate(_, _) -> ok.
 terminate(_Reason, _State) ->
 	ok.
 
 %% @private
--spec code_change(_, State, _) -> {ok, State}.
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 

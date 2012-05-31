@@ -16,8 +16,11 @@
 -module(ranch_acceptors_sup).
 -behaviour(supervisor).
 
--export([start_link/7]). %% API.
--export([init/1]). %% supervisor.
+%% API.
+-export([start_link/7]).
+
+%% supervisor.
+-export([init/1]).
 
 %% API.
 
@@ -30,13 +33,6 @@ start_link(NbAcceptors, Transport, TransOpts,
 
 %% supervisor.
 
--spec init([any()]) -> {'ok', {{'one_for_one', 10, 10}, [{
-	any(), {atom() | tuple(), atom(), 'undefined' | [any()]},
-	'permanent' | 'temporary' | 'transient',
-	'brutal_kill' | 'infinity' | non_neg_integer(),
-	'supervisor' | 'worker',
-	'dynamic' | [atom() | tuple()]}]
-}}.
 init([NbAcceptors, Transport, TransOpts,
 		Protocol, ProtoOpts, ListenerPid, ConnsPid]) ->
 	{ok, LSocket} = Transport:listen(TransOpts),

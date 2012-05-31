@@ -19,8 +19,18 @@
 %% @see gen_tcp
 -module(ranch_tcp).
 
--export([name/0, messages/0, listen/1, accept/2, recv/3, send/2, setopts/2,
-	controlling_process/2, peername/1, close/1, sockname/1]).
+-export([name/0]).
+-export([messages/0]).
+-export([connect/3]).
+-export([listen/1]).
+-export([accept/2]).
+-export([recv/3]).
+-export([send/2]).
+-export([setopts/2]).
+-export([controlling_process/2]).
+-export([peername/1]).
+-export([close/1]).
+-export([sockname/1]).
 
 %% @doc Name of this transport API, <em>tcp</em>.
 -spec name() -> tcp.
@@ -32,6 +42,13 @@ name() -> tcp.
 %% data in active mode.
 -spec messages() -> {tcp, tcp_closed, tcp_error}.
 messages() -> {tcp, tcp_closed, tcp_error}.
+
+%% @private
+-spec connect(string(), inet:port_number(), any())
+	-> {ok, inet:socket()} | {error, atom()}.
+connect(Host, Port, Opts) when is_list(Host), is_integer(Port) ->
+	gen_tcp:connect(Host, Port,
+		Opts ++ [binary, {active, false}, {packet, raw}]).
 
 %% @doc Setup a socket to listen on the given port on the local host.
 %%

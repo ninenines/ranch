@@ -16,8 +16,11 @@
 -module(ranch_sup).
 -behaviour(supervisor).
 
--export([start_link/0]). %% API.
--export([init/1]). %% supervisor.
+%% API.
+-export([start_link/0]).
+
+%% supervisor.
+-export([init/1]).
 
 -define(SUPERVISOR, ?MODULE).
 
@@ -29,12 +32,5 @@ start_link() ->
 
 %% supervisor.
 
--spec init([]) -> {'ok', {{'one_for_one', 10, 10}, [{
-	any(), {atom() | tuple(), atom(), 'undefined' | [any()]},
-	'permanent' | 'temporary' | 'transient',
-	'brutal_kill' | 'infinity' | non_neg_integer(),
-	'supervisor' | 'worker',
-	'dynamic' | [atom() | tuple()]}]
-}}.
 init([]) ->
 	{ok, {{one_for_one, 10, 10}, []}}.
