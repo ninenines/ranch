@@ -21,6 +21,7 @@
 -export([accept_ack/1]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
+-export([get_child_pids/0]).
 
 %% @doc Start a listener for the given transport and protocol.
 %%
@@ -104,6 +105,15 @@ get_protocol_options(Ref) ->
 set_protocol_options(Ref, ProtoOpts) ->
 	ListenerPid = ref_to_listener_pid(Ref),
 	ok = ranch_listener:set_protocol_options(ListenerPid, ProtoOpts).
+
+%%doc Get pid's underneath the ranch_conns_sup supervisor
+-spec get_child_pids() -> list(pid()).
+get_child_pids() ->
+      [Pid2 ||
+        {{ranch_listener_sup, _}, Pid, _Type, _Modules} <-
+            supervisor:which_children(ranch_sup), is_pid(Pid),
+        {ranch_conns_sup,Pid1,_,_} <- supervisor:which_children(Pid),
+        {_,Pid2,_,_} <- supervisor:which_children(Pid1)].
 
 %% Internal.
 
