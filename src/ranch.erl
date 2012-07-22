@@ -19,6 +19,7 @@
 -export([stop_listener/1]).
 -export([child_spec/6]).
 -export([accept_ack/1]).
+-export([get_port/1]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
 
@@ -87,6 +88,13 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 -spec accept_ack(pid()) -> ok.
 accept_ack(ListenerPid) ->
 	receive {shoot, ListenerPid} -> ok end.
+
+%% @doc Return the listener's port.
+-spec get_port(any()) -> inet:port_number().
+get_port(Ref) ->
+	ListenerPid = ref_to_listener_pid(Ref),
+	{ok, Port} = ranch_listener:get_port(ListenerPid),
+	Port.
 
 %% @doc Return the current protocol options for the given listener.
 -spec get_protocol_options(any()) -> any().

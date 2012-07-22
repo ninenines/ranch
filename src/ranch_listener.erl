@@ -23,6 +23,8 @@
 -export([move_connection/3]).
 -export([remove_connection/2]).
 -export([check_upgrades/2]).
+-export([get_port/1]).
+-export([set_port/2]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
 
@@ -41,6 +43,7 @@
 	conns_table :: ets:tid(),
 	queue = undefined :: queue(),
 	max_conns = undefined :: non_neg_integer(),
+	port = undefined :: undefined | inet:port_number(),
 	proto_opts :: any(),
 	proto_opts_vsn = 1 :: non_neg_integer()
 }).
@@ -102,6 +105,16 @@ remove_connection(ServerPid, ConnPid) ->
 check_upgrades(ServerPid, OptsVsn) ->
 	gen_server:call(ServerPid, {check_upgrades, OptsVsn}).
 
+%% @doc Return the listener's port.
+-spec get_port(pid()) -> {ok, inet:port_number()}.
+get_port(ServerPid) ->
+	gen_server:call(ServerPid, get_port).
+
+%% @private
+-spec set_port(pid(), inet:port_number()) -> ok.
+set_port(ServerPid, Port) ->
+	gen_server:cast(ServerPid, {set_port, Port}).
+
 %% @doc Return the current protocol options.
 -spec get_protocol_options(pid()) -> {ok, any()}.
 get_protocol_options(ServerPid) ->
@@ -143,6 +156,8 @@ handle_call({check_upgrades, AccOptsVsn}, _From, State=#state{
 		true ->
 			{reply, ok, State}
 	end;
+handle_call(get_port, _From, State=#state{port=Port}) ->
+	{reply, {ok, Port}, State};
 handle_call(get_protocol_options, _From, State=#state{proto_opts=ProtoOpts}) ->
 	{reply, {ok, ProtoOpts}, State};
 handle_call({set_protocol_options, ProtoOpts}, _From,
@@ -154,6 +169,8 @@ handle_call(_, _From, State) ->
 	{reply, ignored, State}.
 
 %% @private
+handle_cast({set_port, Port}, State) ->
+	{noreply, State#state{port=Port}};
 handle_cast({move_connection, DestPool, ConnPid}, State=#state{
 		conn_pools=Pools, conns_table=ConnsTable}) ->
 	Pools2 = move_pid(ConnPid, DestPool, Pools, ConnsTable),

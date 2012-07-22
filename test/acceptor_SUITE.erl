@@ -39,11 +39,10 @@ end_per_suite(_) ->
 %% tcp.
 
 tcp_echo(_) ->
-	%% @todo Don't use a fixed port. start_listener should return the port used?
 	{ok, _} = ranch:start_listener(tcp_echo, 1,
-		ranch_tcp, [{port, 33333}],
-		echo_protocol, []),
-	{ok, Socket} = gen_tcp:connect("localhost", 33333,
+		ranch_tcp, [{port, 0}], echo_protocol, []),
+	Port = ranch:get_port(tcp_echo),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
 		[binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket, <<"Ranch is working!">>),
 	{ok, <<"Ranch is working!">>} = gen_tcp:recv(Socket, 0, 1000),

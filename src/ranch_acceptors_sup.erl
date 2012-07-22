@@ -36,6 +36,8 @@ start_link(NbAcceptors, Transport, TransOpts,
 init([NbAcceptors, Transport, TransOpts,
 		Protocol, ProtoOpts, ListenerPid, ConnsPid]) ->
 	{ok, LSocket} = Transport:listen(TransOpts),
+	{ok, {_, Port}} = Transport:sockname(LSocket),
+	ranch_listener:set_port(ListenerPid, Port),
 	Procs = [{{acceptor, self(), N}, {ranch_acceptor, start_link, [
 				LSocket, Transport, Protocol, ProtoOpts,
 				ListenerPid, ConnsPid

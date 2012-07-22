@@ -14,7 +14,7 @@
 
 {application, ranch, [
 	{description, "Socket acceptor pool for TCP protocols."},
-	{vsn, "0.2.1"},
+	{vsn, git},
 	{modules, []},
 	{registered, [ranch_sup]},
 	{applications, [
