@@ -17,21 +17,22 @@
 -behaviour(supervisor).
 
 %% API.
--export([start_link/5]).
+-export([start_link/6]).
 
 %% supervisor.
 -export([init/1]).
 
 %% API.
 
--spec start_link(non_neg_integer(), module(), any(), module(), any())
+-spec start_link(any(), non_neg_integer(), module(), any(), module(), any())
 	-> {ok, pid()}.
-start_link(NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
+start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	MaxConns = proplists:get_value(max_connections, TransOpts, 1024),
 	{ok, SupPid} = supervisor:start_link(?MODULE, []),
 	{ok, ListenerPid} = supervisor:start_child(SupPid,
 		{ranch_listener, {ranch_listener, start_link, [MaxConns, ProtoOpts]},
 		 permanent, 5000, worker, [ranch_listener]}),
+	ok = ranch_server:insert_listener(Ref, ListenerPid),
 	{ok, ConnsPid} = supervisor:start_child(SupPid,
 		{ranch_conns_sup, {ranch_conns_sup, start_link, []},
 		 permanent, 5000, supervisor, [ranch_conns_sup]}),

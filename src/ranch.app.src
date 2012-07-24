@@ -16,7 +16,7 @@
 	{description, "Socket acceptor pool for TCP protocols."},
 	{vsn, git},
 	{modules, []},
-	{registered, [ranch_sup]},
+	{registered, [ranch_sup, ranch_server]},
 	{applications, [
 		kernel,
 		stdlib

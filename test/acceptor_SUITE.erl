@@ -81,6 +81,8 @@ ssl_echo(Config) ->
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(ssl_echo),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(ssl_echo) end,
 	ok.
 
 %% tcp.
@@ -95,4 +97,6 @@ tcp_echo(_) ->
 	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(tcp_echo),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(tcp_echo) end,
 	ok.

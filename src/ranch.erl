@@ -78,7 +78,7 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
-		NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
+		Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
 	]}, permanent, 5000, supervisor, [ranch_listener_sup]}.
 
 %% @doc Acknowledge the accepted connection.
@@ -92,14 +92,14 @@ accept_ack(ListenerPid) ->
 %% @doc Return the listener's port.
 -spec get_port(any()) -> inet:port_number().
 get_port(Ref) ->
-	ListenerPid = ref_to_listener_pid(Ref),
+	ListenerPid = ranch_server:lookup_listener(Ref),
 	{ok, Port} = ranch_listener:get_port(ListenerPid),
 	Port.
 
 %% @doc Return the current protocol options for the given listener.
 -spec get_protocol_options(any()) -> any().
 get_protocol_options(Ref) ->
-	ListenerPid = ref_to_listener_pid(Ref),
+	ListenerPid = ranch_server:lookup_listener(Ref),
 	{ok, ProtoOpts} = ranch_listener:get_protocol_options(ListenerPid),
 	ProtoOpts.
 
@@ -110,17 +110,5 @@ get_protocol_options(Ref) ->
 %% no effect on the currently opened connections.
 -spec set_protocol_options(any(), any()) -> ok.
 set_protocol_options(Ref, ProtoOpts) ->
-	ListenerPid = ref_to_listener_pid(Ref),
+	ListenerPid = ranch_server:lookup_listener(Ref),
 	ok = ranch_listener:set_protocol_options(ListenerPid, ProtoOpts).
-
-%% Internal.
-
--spec ref_to_listener_pid(any()) -> pid().
-ref_to_listener_pid(Ref) ->
-	Children = supervisor:which_children(ranch_sup),
-	{_, ListenerSupPid, _, _} = lists:keyfind(
-		{ranch_listener_sup, Ref}, 1, Children),
-	ListenerSupChildren = supervisor:which_children(ListenerSupPid),
-	{_, ListenerPid, _, _} = lists:keyfind(
-		ranch_listener, 1, ListenerSupChildren),
-	ListenerPid.
