@@ -117,8 +117,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 -spec remove_process(key(), reference(), pid(), Monitors)
 	-> Monitors when Monitors::monitors() .
-remove_process(Key = {listener, _}, MonitorRef, Pid, Monitors) ->
+remove_process(Key = {listener, Ref}, MonitorRef, Pid, Monitors) ->
 	true = ets:delete(?TAB, Key),
+	true = ets:delete(?TAB, {acceptors, Ref}),
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors);
 remove_process(Key = {acceptors, _}, MonitorRef, Pid, Monitors) ->
 	Acceptors = ets:lookup_element(?TAB, Key, 2),

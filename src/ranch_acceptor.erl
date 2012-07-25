@@ -16,17 +16,17 @@
 -module(ranch_acceptor).
 
 %% API.
--export([start_link/7]).
+-export([start_link/6]).
 
 %% Internal.
 -export([acceptor/7]).
 
 %% API.
 
--spec start_link(any(), inet:socket(), module(), module(), any(),
-	pid(), pid()) -> {ok, pid()}.
-start_link(Ref, LSocket, Transport, Protocol, Opts,
-		ListenerPid, ConnsSup) ->
+-spec start_link(any(), inet:socket(), module(), module(), pid(), pid())
+	-> {ok, pid()}.
+start_link(Ref, LSocket, Transport, Protocol, ListenerPid, ConnsSup) ->
+	{ok, Opts} = ranch_listener:get_protocol_options(ListenerPid),
 	Pid = spawn_link(?MODULE, acceptor,
 		[LSocket, Transport, Protocol, Opts, 1, ListenerPid, ConnsSup]),
 	ok = ranch_server:add_acceptor(Ref, Pid),
