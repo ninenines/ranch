@@ -16,19 +16,20 @@
 -module(ranch_acceptor).
 
 %% API.
--export([start_link/6]).
+-export([start_link/7]).
 
 %% Internal.
 -export([acceptor/7]).
 
 %% API.
 
--spec start_link(inet:socket(), module(), module(), any(),
+-spec start_link(any(), inet:socket(), module(), module(), any(),
 	pid(), pid()) -> {ok, pid()}.
-start_link(LSocket, Transport, Protocol, Opts,
+start_link(Ref, LSocket, Transport, Protocol, Opts,
 		ListenerPid, ConnsSup) ->
 	Pid = spawn_link(?MODULE, acceptor,
 		[LSocket, Transport, Protocol, Opts, 1, ListenerPid, ConnsSup]),
+	ok = ranch_server:add_acceptor(Ref, Pid),
 	{ok, Pid}.
 
 %% Internal.

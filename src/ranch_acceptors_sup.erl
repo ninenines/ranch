@@ -17,29 +17,29 @@
 -behaviour(supervisor).
 
 %% API.
--export([start_link/7]).
+-export([start_link/8]).
 
 %% supervisor.
 -export([init/1]).
 
 %% API.
 
--spec start_link(non_neg_integer(), module(), any(),
+-spec start_link(any(), non_neg_integer(), module(), any(),
 	module(), any(), pid(), pid()) -> {ok, pid()}.
-start_link(NbAcceptors, Transport, TransOpts,
+start_link(Ref, NbAcceptors, Transport, TransOpts,
 		Protocol, ProtoOpts, ListenerPid, ConnsPid) ->
-	supervisor:start_link(?MODULE, [NbAcceptors, Transport, TransOpts,
+	supervisor:start_link(?MODULE, [Ref, NbAcceptors, Transport, TransOpts,
 		Protocol, ProtoOpts, ListenerPid, ConnsPid]).
 
 %% supervisor.
 
-init([NbAcceptors, Transport, TransOpts,
+init([Ref, NbAcceptors, Transport, TransOpts,
 		Protocol, ProtoOpts, ListenerPid, ConnsPid]) ->
 	{ok, LSocket} = Transport:listen(TransOpts),
 	{ok, {_, Port}} = Transport:sockname(LSocket),
 	ranch_listener:set_port(ListenerPid, Port),
 	Procs = [{{acceptor, self(), N}, {ranch_acceptor, start_link, [
-				LSocket, Transport, Protocol, ProtoOpts,
+				Ref, LSocket, Transport, Protocol, ProtoOpts,
 				ListenerPid, ConnsPid
       ]}, permanent, brutal_kill, worker, []}
 		|| N <- lists:seq(1, NbAcceptors)],

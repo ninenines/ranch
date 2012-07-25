@@ -20,6 +20,8 @@
 -export([start_link/0]).
 -export([insert_listener/2]).
 -export([lookup_listener/1]).
+-export([add_acceptor/2]).
+-export([send_to_acceptors/2]).
 
 %% gen_server.
 -export([init/1]).
@@ -31,9 +33,10 @@
 
 -define(TAB, ?MODULE).
 
--type key() :: {listener, any()}.
+-type key() :: {listener | acceptors, any()}.
+-type monitors() :: [{{reference(), pid()}, key()}].
 -record(state, {
-	monitors = [] :: [{{reference(), pid()}, key()}]
+	monitors = [] :: monitors()
 }).
 
 %% API.
@@ -54,6 +57,18 @@ insert_listener(Ref, Pid) ->
 lookup_listener(Ref) ->
 	ets:lookup_element(?TAB, {listener, Ref}, 2).
 
+%% @doc Add an acceptor for the given listener.
+-spec add_acceptor(any(), pid()) -> ok.
+add_acceptor(Ref, Pid) ->
+	gen_server:cast(?MODULE, {add_acceptor, Ref, Pid}).
+
+%% @doc Send a message to all acceptors of the given listener.
+-spec send_to_acceptors(any(), any()) -> ok.
+send_to_acceptors(Ref, Msg) ->
+	Acceptors = ets:lookup_element(?TAB, {acceptors, Ref}, 2),
+	_ = [Pid ! Msg || Pid <- Acceptors],
+	ok.
+
 %% gen_server.
 
 %% @private
@@ -68,17 +83,24 @@ handle_call(_Request, _From, State) ->
 
 %% @private
 handle_cast({insert_listener, Ref, Pid}, State=#state{monitors=Monitors}) ->
+	true = ets:insert_new(?TAB, {{acceptors, Ref}, []}),
 	MonitorRef = erlang:monitor(process, Pid),
 	{noreply, State#state{
 		monitors=[{{MonitorRef, Pid}, {listener, Ref}}|Monitors]}};
+handle_cast({add_acceptor, Ref, Pid}, State=#state{monitors=Monitors}) ->
+	MonitorRef = erlang:monitor(process, Pid),
+	Acceptors = ets:lookup_element(?TAB, {acceptors, Ref}, 2),
+	true = ets:insert(?TAB, {{acceptors, Ref}, [Pid|Acceptors]}),
+	{noreply, State#state{
+		monitors=[{{MonitorRef, Pid}, {acceptors, Ref}}|Monitors]}};
 handle_cast(_Request, State) ->
 	{noreply, State}.
 
 %% @private
-handle_info({'DOWN', Ref, process, Pid, _}, State=#state{monitors=Monitors}) ->
-	{_, Key} = lists:keyfind({Ref, Pid}, 1, Monitors),
-	true = ets:delete(?TAB, Key),
-	Monitors2 = lists:keydelete({Ref, Pid}, 1, Monitors),
+handle_info({'DOWN', MonitorRef, process, Pid, _},
+		State=#state{monitors=Monitors}) ->
+	{_, Key} = lists:keyfind({MonitorRef, Pid}, 1, Monitors),
+	Monitors2 = remove_process(Key, MonitorRef, Pid, Monitors),
 	{noreply, State#state{monitors=Monitors2}};
 handle_info(_Info, State) ->
 	{noreply, State}.
@@ -90,3 +112,15 @@ terminate(_Reason, _State) ->
 %% @private
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
+
+%% Internal.
+
+-spec remove_process(key(), reference(), pid(), Monitors)
+	-> Monitors when Monitors::monitors() .
+remove_process(Key = {listener, _}, MonitorRef, Pid, Monitors) ->
+	true = ets:delete(?TAB, Key),
+	lists:keydelete({MonitorRef, Pid}, 1, Monitors);
+remove_process(Key = {acceptors, _}, MonitorRef, Pid, Monitors) ->
+	Acceptors = ets:lookup_element(?TAB, Key, 2),
+	true = ets:insert(?TAB, {Key, lists:delete(Pid, Acceptors)}),
+	lists:keydelete({MonitorRef, Pid}, 1, Monitors).
