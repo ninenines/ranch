@@ -111,7 +111,7 @@ listen(Opts) ->
 %% @see ssl:transport_accept/2
 %% @see ssl:ssl_accept/2
 -spec accept(ssl:sslsocket(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom()}.
+	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom() | tuple()}.
 accept(LSocket, Timeout) ->
 	case ssl:transport_accept(LSocket, Timeout) of
 		{ok, CSocket} ->
@@ -179,11 +179,11 @@ require([App|Tail]) ->
 	require(Tail).
 
 -spec ssl_accept(ssl:sslsocket(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom()}.
+	-> {ok, ssl:sslsocket()} | {error, {ssl_accept, atom()}}.
 ssl_accept(Socket, Timeout) ->
 	case ssl:ssl_accept(Socket, Timeout) of
 		ok ->
 			{ok, Socket};
 		{error, Reason} ->
-			{error, Reason}
+			{error, {ssl_accept, Reason}}
 	end.

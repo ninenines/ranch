@@ -46,6 +46,11 @@ init(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 	non_neg_integer(), any(), pid(), pid()) -> no_return().
 loop(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 	receive
+		%% We couldn't accept the socket but it's safe to continue.
+		{accept, continue} ->
+			?MODULE:init(LSocket, Transport, Protocol,
+				MaxConns, Opts, ListenerPid, ConnsSup);
+		%% Found my sockets!
 		{accept, CSocket} ->
 			{ok, ConnPid} = supervisor:start_child(ConnsSup,
 				[ListenerPid, CSocket, Transport, Protocol, Opts]),
@@ -55,6 +60,7 @@ loop(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 			maybe_wait(ListenerPid, MaxConns, NbConns),
 			?MODULE:init(LSocket, Transport, Protocol,
 				MaxConns, Opts, ListenerPid, ConnsSup);
+		%% Upgrade the protocol options.
 		{set_opts, Opts2} ->
 			?MODULE:loop(LSocket, Transport, Protocol,
 				MaxConns, Opts2, ListenerPid, ConnsSup)
@@ -72,9 +78,13 @@ maybe_wait(ListenerPid, MaxConns, _) ->
 async_accept(LSocket, Transport) ->
 	AcceptorPid = self(),
 	_ = spawn_link(fun() ->
-		%% @todo {error, closed} must be handled and other errors ignored.
-		{ok, CSocket} = Transport:accept(LSocket, infinity),
-		Transport:controlling_process(CSocket, AcceptorPid),
-		AcceptorPid ! {accept, CSocket}
+		case Transport:accept(LSocket, infinity) of
+			{ok, CSocket} ->
+				Transport:controlling_process(CSocket, AcceptorPid),
+				AcceptorPid ! {accept, CSocket};
+			%% We want to crash if the listening socket got closed.
+			{error, Reason} when Reason =/= closed ->
+				AcceptorPid ! {accept, continue}
+		end
 	end),
 	ok.

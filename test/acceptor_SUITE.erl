@@ -25,6 +25,7 @@
 -export([end_per_group/2]).
 
 %% ssl.
+-export([ssl_accept_error/1]).
 -export([ssl_echo/1]).
 
 %% tcp.
@@ -45,6 +46,7 @@ groups() ->
 		tcp_max_connections_and_beyond,
 		tcp_upgrade
 	]}, {ssl, [
+		ssl_accept_error,
 		ssl_echo
 	]}].
 
@@ -73,6 +75,21 @@ end_per_group(_, _) ->
 	ok.
 
 %% ssl.
+
+ssl_accept_error(Config) ->
+	{ok, _} = ranch:start_listener(ssl_accept_error, 1,
+		ranch_ssl, [{port, 0},
+			{certfile, ?config(data_dir, Config) ++ "cert.pem"}],
+		echo_protocol, []),
+	Port = ranch:get_port(ssl_accept_error),
+	[AcceptorPid] = ets:lookup_element(ranch_server,
+		{acceptors, ssl_accept_error}, 2),
+	true = is_process_alive(AcceptorPid),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:close(Socket),
+	receive after 500 -> ok end,
+	true = is_process_alive(AcceptorPid).
 
 ssl_echo(Config) ->
 	{ok, _} = ranch:start_listener(ssl_echo, 1,
