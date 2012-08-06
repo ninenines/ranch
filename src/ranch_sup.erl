@@ -33,6 +33,8 @@ start_link() ->
 %% supervisor.
 
 init([]) ->
+	ranch_server = ets:new(ranch_server, [
+		ordered_set, public, named_table, {write_concurrency, true}]),
 	Procs = [
 		{ranch_server, {ranch_server, start_link, []},
 			permanent, 5000, worker, [ranch_server]}

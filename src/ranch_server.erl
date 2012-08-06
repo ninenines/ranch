@@ -95,8 +95,6 @@ remove_connection(ListenerPid) ->
 
 %% @private
 init([]) ->
-	?TAB = ets:new(?TAB, [
-		ordered_set, public, named_table, {write_concurrency, true}]),
 	{ok, #state{}}.
 
 %% @private
