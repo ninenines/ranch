@@ -29,6 +29,9 @@
 
 %% tcp.
 -export([tcp_echo/1]).
+-export([tcp_max_connections/1]).
+-export([tcp_max_connections_and_beyond/1]).
+-export([tcp_upgrade/1]).
 
 %% ct.
 
@@ -37,7 +40,10 @@ all() ->
 
 groups() ->
 	[{tcp, [
-		tcp_echo
+		tcp_echo,
+		tcp_max_connections,
+		tcp_max_connections_and_beyond,
+		tcp_upgrade
 	]}, {ssl, [
 		ssl_echo
 	]}].
@@ -100,3 +106,62 @@ tcp_echo(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(tcp_echo) end,
 	ok.
+
+tcp_max_connections(_) ->
+	{ok, _} = ranch:start_listener(tcp_max_connections, 1,
+		ranch_tcp, [{port, 0}, {max_connections, 10}],
+		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
+	Port = ranch:get_port(tcp_max_connections),
+	%% @todo We'll probably want a more direct interface to count_connections.
+	ListenerPid = ranch_server:lookup_listener(tcp_max_connections),
+	ok = connect_loop(Port, 11, 150),
+	10 = ranch_server:count_connections(ListenerPid),
+	10 = receive_loop(connected, 400),
+	1 = receive_loop(connected, 1000).
+
+tcp_max_connections_and_beyond(_) ->
+	{ok, _} = ranch:start_listener(tcp_max_connections_and_beyond, 1,
+		ranch_tcp, [{port, 0}, {max_connections, 10}],
+		remove_conn_and_wait_protocol, [{remove, true}]),
+	Port = ranch:get_port(tcp_max_connections_and_beyond),
+	%% @todo We'll probably want a more direct interface to count_connections.
+	ListenerPid = ranch_server:lookup_listener(tcp_max_connections_and_beyond),
+	ok = connect_loop(Port, 10, 0),
+	0 = ranch_server:count_connections(ListenerPid),
+	ranch:set_protocol_options(tcp_max_connections_and_beyond,
+		[{remove, false}]),
+	receive after 500 -> ok end,
+	ok = connect_loop(Port, 10, 0),
+	receive after 500 -> ok end,
+	10 = ranch_server:count_connections(ListenerPid).
+
+tcp_upgrade(_) ->
+	receive after 20000 -> ok end,
+	{ok, _} = ranch:start_listener(tcp_upgrade, 1,
+		ranch_tcp, [{port, 0}],
+		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
+	Port = ranch:get_port(tcp_upgrade),
+	ok = connect_loop(Port, 1, 0),
+	receive connected -> ok after 1000 -> error(timeout) end,
+	ranch:set_protocol_options(tcp_upgrade, [{msg, upgraded}, {pid, self()}]),
+	ok = connect_loop(Port, 1, 0),
+	receive upgraded -> ok after 1000 -> error(timeout) end.
+
+%% Utility functions.
+
+connect_loop(_, 0, _) ->
+	ok;
+connect_loop(Port, N, Sleep) ->
+	{ok, _} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	receive after Sleep -> ok end,
+	connect_loop(Port, N - 1, Sleep).
+
+receive_loop(Message, Timeout) ->
+	receive_loop(Message, Timeout, 0).
+receive_loop(Message, Timeout, N) ->
+	receive Message ->
+		receive_loop(Message, Timeout, N + 1)
+	after Timeout ->
+		N
+	end.

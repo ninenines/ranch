@@ -22,6 +22,9 @@
 -export([lookup_listener/1]).
 -export([add_acceptor/2]).
 -export([send_to_acceptors/2]).
+-export([add_connection/1]).
+-export([count_connections/1]).
+-export([remove_connection/1]).
 
 %% gen_server.
 -export([init/1]).
@@ -69,12 +72,31 @@ send_to_acceptors(Ref, Msg) ->
 	_ = [Pid ! Msg || Pid <- Acceptors],
 	ok.
 
+%% @doc Add a connection to the connection pool.
+%%
+%% Also return the number of connections in the pool after this operation.
+-spec add_connection(pid()) -> non_neg_integer().
+add_connection(ListenerPid) ->
+	ets:update_counter(?TAB, {connections, ListenerPid}, 1).
+
+%% @doc Count the number of connections in the connection pool.
+-spec count_connections(pid()) -> non_neg_integer().
+count_connections(ListenerPid) ->
+	ets:update_counter(?TAB, {connections, ListenerPid}, 0).
+
+%% @doc Remove a connection from the connection pool.
+%%
+%% Also return the number of connections in the pool after this operation.
+-spec remove_connection(pid()) -> non_neg_integer().
+remove_connection(ListenerPid) ->
+	ets:update_counter(?TAB, {connections, ListenerPid}, -1).
+
 %% gen_server.
 
 %% @private
 init([]) ->
 	?TAB = ets:new(?TAB, [
-		ordered_set, public, named_table, {read_concurrency, true}]),
+		ordered_set, public, named_table, {write_concurrency, true}]),
 	{ok, #state{}}.
 
 %% @private
@@ -84,6 +106,7 @@ handle_call(_Request, _From, State) ->
 %% @private
 handle_cast({insert_listener, Ref, Pid}, State=#state{monitors=Monitors}) ->
 	true = ets:insert_new(?TAB, {{acceptors, Ref}, []}),
+	true = ets:insert_new(?TAB, {{connections, Pid}, 0}),
 	MonitorRef = erlang:monitor(process, Pid),
 	{noreply, State#state{
 		monitors=[{{MonitorRef, Pid}, {listener, Ref}}|Monitors]}};
@@ -93,6 +116,9 @@ handle_cast({add_acceptor, Ref, Pid}, State=#state{monitors=Monitors}) ->
 	true = ets:insert(?TAB, {{acceptors, Ref}, [Pid|Acceptors]}),
 	{noreply, State#state{
 		monitors=[{{MonitorRef, Pid}, {acceptors, Ref}}|Monitors]}};
+handle_cast({add_connection, Pid}, State) ->
+	_ = erlang:monitor(process, Pid),
+	{noreply, State};
 handle_cast(_Request, State) ->
 	{noreply, State}.
 
@@ -120,6 +146,7 @@ code_change(_OldVsn, State, _Extra) ->
 remove_process(Key = {listener, Ref}, MonitorRef, Pid, Monitors) ->
 	true = ets:delete(?TAB, Key),
 	true = ets:delete(?TAB, {acceptors, Ref}),
+	true = ets:delete(?TAB, {connections, Pid}),
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors);
 remove_process(Key = {acceptors, _}, MonitorRef, Pid, Monitors) ->
 	Acceptors = ets:lookup_element(?TAB, Key, 2),
