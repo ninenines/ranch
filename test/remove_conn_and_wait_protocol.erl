@@ -1,4 +1,5 @@
 -module(remove_conn_and_wait_protocol).
+
 -export([start_link/4]).
 -export([init/2]).
 

@@ -26,9 +26,11 @@
 
 %% ssl.
 -export([ssl_accept_error/1]).
+-export([ssl_active_echo/1]).
 -export([ssl_echo/1]).
 
 %% tcp.
+-export([tcp_active_echo/1]).
 -export([tcp_echo/1]).
 -export([tcp_max_connections/1]).
 -export([tcp_max_connections_and_beyond/1]).
@@ -41,12 +43,14 @@ all() ->
 
 groups() ->
 	[{tcp, [
+		tcp_active_echo,
 		tcp_echo,
 		tcp_max_connections,
 		tcp_max_connections_and_beyond,
 		tcp_upgrade
 	]}, {ssl, [
 		ssl_accept_error,
+		ssl_active_echo,
 		ssl_echo
 	]}].
 
@@ -91,6 +95,23 @@ ssl_accept_error(Config) ->
 	receive after 500 -> ok end,
 	true = is_process_alive(AcceptorPid).
 
+ssl_active_echo(Config) ->
+	{ok, _} = ranch:start_listener(ssl_active_echo, 1,
+		ranch_ssl, [{port, 0},
+			{certfile, ?config(data_dir, Config) ++ "cert.pem"}],
+		active_echo_protocol, []),
+	Port = ranch:get_port(ssl_active_echo),
+	{ok, Socket} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw},
+		{certfile, ?config(data_dir, Config) ++ "cert.pem"}]),
+	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
+	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(ssl_active_echo),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(ssl_active_echo) end,
+	ok.
+
 ssl_echo(Config) ->
 	{ok, _} = ranch:start_listener(ssl_echo, 1,
 		ranch_ssl, [{port, 0},
@@ -109,6 +130,20 @@ ssl_echo(Config) ->
 	ok.
 
 %% tcp.
+
+tcp_active_echo(_) ->
+	{ok, _} = ranch:start_listener(tcp_active_echo, 1,
+		ranch_tcp, [{port, 0}], active_echo_protocol, []),
+	Port = ranch:get_port(tcp_active_echo),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(tcp_active_echo),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(tcp_active_echo) end,
+	ok.
 
 tcp_echo(_) ->
 	{ok, _} = ranch:start_listener(tcp_echo, 1,
