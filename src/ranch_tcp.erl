@@ -18,113 +18,122 @@
 %%
 %% @see gen_tcp
 -module(ranch_tcp).
+-behaviour(ranch_transport).
 
 -export([name/0]).
 -export([messages/0]).
--export([connect/3]).
 -export([listen/1]).
 -export([accept/2]).
+-export([connect/3]).
 -export([recv/3]).
 -export([send/2]).
 -export([setopts/2]).
 -export([controlling_process/2]).
 -export([peername/1]).
--export([close/1]).
 -export([sockname/1]).
+-export([close/1]).
 
-%% @doc Name of this transport API, <em>tcp</em>.
--spec name() -> tcp.
+%% @doc Name of this transport, <em>tcp</em>.
 name() -> tcp.
 
-%% @doc Atoms used in the process messages sent by this API.
-%%
-%% They identify incoming data, closed connection and errors when receiving
-%% data in active mode.
--spec messages() -> {tcp, tcp_closed, tcp_error}.
+%% @doc Atoms used to identify messages in {active, once | true} mode.
 messages() -> {tcp, tcp_closed, tcp_error}.
 
-%% @private
--spec connect(string(), inet:port_number(), any())
-	-> {ok, inet:socket()} | {error, atom()}.
-connect(Host, Port, Opts) when is_list(Host), is_integer(Port) ->
-	gen_tcp:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}]).
-
-%% @doc Setup a socket to listen on the given port on the local host.
+%% @doc Listen for connections on the given port number.
+%%
+%% Calling this function returns a listening socket that can then
+%% be passed to accept/2 to accept connections.
 %%
 %% The available options are:
 %% <dl>
-%%  <dt>port</dt><dd>Mandatory. TCP port number to open.</dd>
 %%  <dt>backlog</dt><dd>Maximum length of the pending connections queue.
 %%   Defaults to 1024.</dd>
 %%  <dt>ip</dt><dd>Interface to listen on. Listen on all interfaces
 %%   by default.</dd>
+%%  <dt>port</dt><dd>TCP port number to open. Defaults to 0 (see below).</dd>
 %% </dl>
 %%
+%% You can listen to a random port by setting the port option to 0.
+%% It is then possible to retrieve this port number by calling
+%% sockname/1 on the listening socket. If you are using Ranch's
+%% listener API, then this port number can obtained through
+%% ranch:get_port/1 instead.
+%%
 %% @see gen_tcp:listen/2
--spec listen([{port, inet:port_number()} | {ip, inet:ip_address()}])
+-spec listen([{backlog, non_neg_integer()} | {ip, inet:ip_address()}
+	| {port, inet:port_number()}])
 	-> {ok, inet:socket()} | {error, atom()}.
 listen(Opts) ->
-	{port, Port} = lists:keyfind(port, 1, Opts),
-	Backlog = proplists:get_value(backlog, Opts, 1024),
-	ListenOpts0 = [binary, {active, false},
-		{backlog, Backlog}, {packet, raw}, {reuseaddr, true}],
-	ListenOpts =
-		case lists:keyfind(ip, 1, Opts) of
-			false -> ListenOpts0;
-			Ip -> [Ip|ListenOpts0]
-		end,
-	gen_tcp:listen(Port, ListenOpts).
+	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
+	%% We set the port to 0 because it is given in the Opts directly.
+	%% The port in the options takes precedence over the one in the
+	%% first argument.
+	gen_tcp:listen(0, ranch:filter_options(Opts2, [port, ip, backlog],
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
 
-%% @doc Accept an incoming connection on a listen socket.
+%% @doc Accept connections with the given listening socket.
 %% @see gen_tcp:accept/2
 -spec accept(inet:socket(), timeout())
 	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.
 accept(LSocket, Timeout) ->
 	gen_tcp:accept(LSocket, Timeout).
 
-%% @doc Receive a packet from a socket in passive mode.
+%% @private Experimental. Open a connection to the given host and port number.
+%% @see gen_tcp:connect/3
+%% @todo Probably filter Opts?
+-spec connect(string(), inet:port_number(), any())
+	-> {ok, inet:socket()} | {error, atom()}.
+connect(Host, Port, Opts) when is_list(Host), is_integer(Port) ->
+	gen_tcp:connect(Host, Port,
+		Opts ++ [binary, {active, false}, {packet, raw}]).
+
+%% @doc Receive data from a socket in passive mode.
 %% @see gen_tcp:recv/3
 -spec recv(inet:socket(), non_neg_integer(), timeout())
 	-> {ok, any()} | {error, closed | atom()}.
 recv(Socket, Length, Timeout) ->
 	gen_tcp:recv(Socket, Length, Timeout).
 
-%% @doc Send a packet on a socket.
+%% @doc Send data on a socket.
 %% @see gen_tcp:send/2
 -spec send(inet:socket(), iolist()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
 	gen_tcp:send(Socket, Packet).
 
-%% @doc Set one or more options for a socket.
+%% @doc Set options on the given socket.
 %% @see inet:setopts/2
+%% @todo Probably filter Opts?
 -spec setopts(inet:socket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
 	inet:setopts(Socket, Opts).
 
-%% @doc Assign a new controlling process <em>Pid</em> to <em>Socket</em>.
+%% @doc Give control of the socket to a new process.
+%%
+%% Must be called from the process currently controlling the socket,
+%% otherwise an {error, not_owner} tuple will be returned.
+%%
 %% @see gen_tcp:controlling_process/2
 -spec controlling_process(inet:socket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.
 controlling_process(Socket, Pid) ->
 	gen_tcp:controlling_process(Socket, Pid).
 
-%% @doc Return the address and port for the other end of a connection.
+%% @doc Return the remote address and port of the connection.
 %% @see inet:peername/1
 -spec peername(inet:socket())
 	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 peername(Socket) ->
 	inet:peername(Socket).
 
-%% @doc Close a TCP socket.
-%% @see gen_tcp:close/1
--spec close(inet:socket()) -> ok.
-close(Socket) ->
-	gen_tcp:close(Socket).
-
-%% @doc Get the local address and port of a socket
+%% @doc Return the local address and port of the connection.
 %% @see inet:sockname/1
 -spec sockname(inet:socket())
 	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 sockname(Socket) ->
 	inet:sockname(Socket).
+
+%% @doc Close the given socket.
+%% @see gen_tcp:close/1
+-spec close(inet:socket()) -> ok.
+close(Socket) ->
+	gen_tcp:close(Socket).

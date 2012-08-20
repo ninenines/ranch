@@ -22,6 +22,9 @@
 -export([get_port/1]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
+-export([filter_options/3]).
+-export([set_option_default/3]).
+-export([require/1]).
 
 %% @doc Start a listener for the given transport and protocol.
 %%
@@ -112,3 +115,38 @@ get_protocol_options(Ref) ->
 set_protocol_options(Ref, ProtoOpts) ->
 	ListenerPid = ranch_server:lookup_listener(Ref),
 	ok = ranch_listener:set_protocol_options(ListenerPid, ProtoOpts).
+
+%% @doc Filter a list of options and remove all unwanted values.
+%%
+%% It takes a list of options, a list of allowed keys and an accumulator.
+%% This accumulator can be used to set default options that should never
+%% be overriden.
+-spec filter_options([{atom(), any()}], [atom()], Acc)
+	-> Acc when Acc :: [any()].
+filter_options([], _, Acc) ->
+	Acc;
+filter_options([Opt = {Key, _}|Tail], AllowedKeys, Acc) ->
+	case lists:member(Key, AllowedKeys) of
+		true -> filter_options(Tail, AllowedKeys, [Opt|Acc]);
+		false -> filter_options(Tail, AllowedKeys, Acc)
+	end.
+
+%% @doc Add an option to a list, but only if it wasn't previously set.
+-spec set_option_default(Opts, atom(), any())
+	-> Opts when Opts :: [{atom(), any()}].
+set_option_default(Opts, Key, Value) ->
+	case lists:keymember(Key, 1, Opts) of
+		true -> Opts;
+		false -> [{Key, Value}|Opts]
+	end.
+
+%% @doc Start the given applications if they were not already started.
+-spec require(list(module())) -> ok.
+require([]) ->
+	ok;
+require([App|Tail]) ->
+	case application:start(App) of
+		ok -> ok;
+		{error, {already_started, App}} -> ok
+	end,
+	require(Tail).
