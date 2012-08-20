@@ -1,4 +1,5 @@
 -module(active_echo_protocol).
+-behaviour(ranch_protocol).
 
 -export([start_link/4]).
 -export([init/4]).
