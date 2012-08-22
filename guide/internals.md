@@ -1,0 +1,80 @@
+Internals
+=========
+
+This chapter may not apply to embedded Ranch as embedding allows you
+to use an architecture specific to your application, which may or may
+not be compatible with the description of the Ranch application.
+
+Architecture
+------------
+
+Ranch is an OTP application.
+
+Like all OTP applications, Ranch has a top supervisor. It is responsible
+for supervising the ```ranch_server``` process and all the listeners that
+will be started.
+
+The ```ranch_server``` gen_server is the central process keeping track of the
+listeners, the acceptors and the connection processes. It does so through
+the use of a public ets table called ```ranch_server``` too. This allows
+some operations to be sequential by going through the gen_server, while
+others just query the ets table directly, ensuring there is no bottleneck
+for the most common operations.
+
+Because the most common operation is keeping track of the number of
+connections currently being used for each listener, the ets table
+has ```write_concurrency``` enabled, allowing us to perform all these
+operations concurrently using ```ets:update_counter/3```. To read the number
+of connections we simply increment the counter by 0, which allows us
+to stay in a write context and still receive the counter's value.
+
+For increased fault tolerance, the owner of the ets table is
+```ranch_sup``` and not ```ranch_server``` as you could expect. This way,
+if the ```ranch_server``` gen_server fails, it doesn't lose any information
+and the restarted process can continue as if nothing happened. Note that
+this usage is not recommended by OTP.
+
+Listeners are grouped into the ```ranch_listener_sup``` supervisor and
+consist of three kinds of processes: the listener gen_server, the
+acceptor processes and the connection processes, both grouped under
+their own supervisor. All of these processes are registered to the
+```ranch_server``` gen_server with varying amount of information.
+
+All socket operations, including listening for connections, go through
+transport handlers. Accepted connections are given to the protocol handler.
+Transport handlers are simple callback modules for performing operations on
+sockets. Protocol handlers start a new process, which receives socket
+ownership, with no requirements on how the code should be written inside
+that new process.
+
+Efficiency considerations
+-------------------------
+
+Note that for everything related to efficiency and performance,
+you should perform the benchmarks yourself to get the numbers that
+matter to you. Generic benchmarks found on the web may or may not
+be of use to you, you can never know until you benchmark your own
+system.
+
+* * *
+
+The second argument to ```ranch:start_listener/6``` is the number of
+processes that will be accepting connections. Care should be taken
+when choosing this number.
+
+First of all, it should not be confused with the maximum number
+of connections. Acceptor processes are only used for accepting and
+have nothing else in common with connection processes. Therefore
+there is nothing to be gained from setting this number too high,
+in fact it can slow everything else down.
+
+Second, this number should be high enough to allow Ranch to accept
+connections concurrently. But the number of cores available doesn't
+seem to be the only factor for choosing this number, as we can
+observe faster accepts if we have more acceptors than cores. It
+might be entirely dependent on the protocol, however.
+
+Our observations suggest that using 100 acceptors on modern hardware
+is a good solution, as it's big enough to always have acceptors ready
+and it's low enough that it doesn't have a negative impact on the
+system's performances.
