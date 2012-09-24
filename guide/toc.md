@@ -9,6 +9,7 @@ Ranch User Guide
    *  Starting and stopping
    *  Listening on a random port
    *  Listening on privileged ports
+   *  Accepting connections on an existing socket
    *  Limiting the number of concurrent connections
    *  Upgrading
  *  [Transports](transports.md)

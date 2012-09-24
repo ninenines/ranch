@@ -59,8 +59,21 @@ start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		false ->
 			{error, badarg};
 		true ->
-			supervisor:start_child(ranch_sup, child_spec(Ref, NbAcceptors,
-				Transport, TransOpts, Protocol, ProtoOpts))
+			Res = supervisor:start_child(ranch_sup, child_spec(Ref, NbAcceptors,
+					Transport, TransOpts, Protocol, ProtoOpts)),
+			case proplists:get_value(socket, TransOpts) of
+				undefined ->
+					ok;
+				Socket ->
+					%% change the controlling process so the caller dying doesn't
+					%% close the port
+					ListenerPid = ranch_server:lookup_listener(Ref),
+					%%% Note: the catch is here because SSL crashes when you change
+					%%% the controlling process of a listen socket because of a bug.
+					%%% The bug will be fixed in R16.
+					catch(Transport:controlling_process(Socket, ListenerPid))
+			end,
+			Res
 	end.
 
 %% @doc Stop a listener identified by <em>Ref</em>.

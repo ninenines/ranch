@@ -35,7 +35,13 @@ start_link(Ref, NbAcceptors, Transport, TransOpts,
 
 init([Ref, NbAcceptors, Transport, TransOpts,
 		Protocol, ListenerPid, ConnsPid]) ->
-	{ok, LSocket} = Transport:listen(TransOpts),
+	LSocket = case proplists:get_value(socket, TransOpts) of
+		undefined ->
+			{ok, Socket} = Transport:listen(TransOpts),
+			Socket;
+		Socket ->
+			Socket
+	end,
 	{ok, {_, Port}} = Transport:sockname(LSocket),
 	ranch_listener:set_port(ListenerPid, Port),
 	Procs = [
