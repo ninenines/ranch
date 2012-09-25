@@ -64,6 +64,7 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %%   by default.</dd>
 %%  <dt>keyfile</dt><dd>Optional. Path to the file containing the user's
 %%   private PEM encoded key.</dd>
+%%  <dt>nodelay</dt><dd>Optional. Enable TCP_NODELAY. Enabled by default.</dd>
 %%  <dt>password</dt><dd>Optional. String containing the user's password.
 %%   All private keyfiles must be password protected currently.</dd>
 %%  <dt>port</dt><dd>TCP port number to open. Defaults to 0 (see below)</dd>
@@ -78,8 +79,8 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %% @see ssl:listen/2
 -spec listen([{backlog, non_neg_integer()} | {cacertfile, string()}
 	| {certfile, string()} | {ciphers, [ssl:erl_cipher_suite()] | string()}
-	| {ip, inet:ip_address()} | {keyfile, string()} | {password, string()}
-	| {port, inet:port_number()}])
+	| {ip, inet:ip_address()} | {keyfile, string()} | {nodelay, boolean()}
+	| {password, string()} | {port, inet:port_number()}])
 	-> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
 	ranch:require([crypto, public_key, ssl]),
@@ -89,8 +90,10 @@ listen(Opts) ->
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts2,
-		[backlog, cacertfile, certfile, ciphers, ip, keyfile, password, port],
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
+		[backlog, cacertfile, certfile, ciphers, ip,
+			keyfile, nodelay, password, port],
+		[binary, {active, false}, {packet, raw},
+			{reuseaddr, true}, {nodelay, true}])).
 
 %% @doc Accept connections with the given listening socket.
 %%

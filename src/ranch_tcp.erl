@@ -50,6 +50,7 @@ messages() -> {tcp, tcp_closed, tcp_error}.
 %%   Defaults to 1024.</dd>
 %%  <dt>ip</dt><dd>Interface to listen on. Listen on all interfaces
 %%   by default.</dd>
+%%  <dt>nodelay</dt><dd>Optional. Enable TCP_NODELAY. Enabled by default.</dd>
 %%  <dt>port</dt><dd>TCP port number to open. Defaults to 0 (see below).</dd>
 %% </dl>
 %%
@@ -61,15 +62,16 @@ messages() -> {tcp, tcp_closed, tcp_error}.
 %%
 %% @see gen_tcp:listen/2
 -spec listen([{backlog, non_neg_integer()} | {ip, inet:ip_address()}
-	| {port, inet:port_number()}])
+	| {nodelay, boolean()} | {port, inet:port_number()}])
 	-> {ok, inet:socket()} | {error, atom()}.
 listen(Opts) ->
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	gen_tcp:listen(0, ranch:filter_options(Opts2, [port, ip, backlog],
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
+	gen_tcp:listen(0, ranch:filter_options(Opts2, [backlog, ip, nodelay, port],
+		[binary, {active, false}, {packet, raw},
+			{reuseaddr, true}, {nodelay, true}])).
 
 %% @doc Accept connections with the given listening socket.
 %% @see gen_tcp:accept/2
