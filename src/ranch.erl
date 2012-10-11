@@ -16,8 +16,10 @@
 -module(ranch).
 
 -export([start_listener/6]).
+-export([start_listener/7]).
 -export([stop_listener/1]).
 -export([child_spec/6]).
+-export([child_spec/7]).
 -export([accept_ack/1]).
 -export([get_port/1]).
 -export([get_protocol_options/1]).
@@ -28,12 +30,29 @@
 
 %% @doc Start a listener for the given transport and protocol.
 %%
+%% @see start_listener/7
+-spec start_listener(any(), non_neg_integer(), module(), any(), module(), any())
+	-> {ok, pid()}.
+start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
+	start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts, []).
+
+%% @doc Start a listener for the given transport and protocol.
+%%
 %% A listener is effectively a pool of <em>NbAcceptors</em> acceptors.
 %% Acceptors accept connections on the given <em>Transport</em> and forward
 %% connections to the given <em>Protocol</em> handler. Both transport and
 %% protocol modules can be given options through the <em>TransOpts</em> and
 %% the <em>ProtoOpts</em> arguments. Available options are documented in the
 %% <em>listen</em> transport function and in the protocol module of your choice.
+%%
+%% Acceptors is being configured with <em>AccOpts</em> list. You may pass 
+%% <em>{sync_accept, true}</em> to constrain acceptor to synchronous accept
+%% process. And <em>{sync_handle, true}</em> to force acceptor handle protocol by
+%% thyself, without spawning additional process. The latter implies that acceptor
+%% will be busy handling protocol ANYTIME it accepts socket, thus big acceptor pool
+%% is strongly encouraged. These options should be used with extreme caution, but 
+%% on the other hand throughput will grow noticeably in some cases. One example is
+%% when you are serving huge number of short-lived HTTP requests.
 %%
 %% All acceptor and connection processes are supervised by the listener.
 %%
@@ -47,13 +66,13 @@
 %% of connections.
 %%
 %% <em>Ref</em> can be used to stop the listener later on.
--spec start_listener(any(), non_neg_integer(), module(), any(), module(), any())
+-spec start_listener(any(), non_neg_integer(), module(), any(), module(), any(), any())
 	-> {ok, pid()}.
-start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
+start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts, AccOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
 	supervisor:start_child(ranch_sup, child_spec(Ref, NbAcceptors,
-		Transport, TransOpts, Protocol, ProtoOpts)).
+		Transport, TransOpts, Protocol, ProtoOpts, AccOpts)).
 
 %% @doc Stop a listener identified by <em>Ref</em>.
 %%
@@ -70,18 +89,26 @@ stop_listener(Ref) ->
 
 %% @doc Return a child spec suitable for embedding.
 %%
-%% When you want to embed Ranch in another application, you can use this
-%% function to create a <em>ChildSpec</em> suitable for use in a supervisor.
-%% The parameters are the same as in <em>start_listener/6</em> but rather
-%% than hooking the listener to the Ranch internal supervisor, it just returns
-%% the spec.
+%% @see child_spec/7
 -spec child_spec(any(), non_neg_integer(), module(), any(), module(), any())
 	-> supervisor:child_spec().
-child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
+child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
+	child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts, []).
+
+%% @doc Return a child spec suitable for embedding.
+%%
+%% When you want to embed Ranch in another application, you can use this
+%% function to create a <em>ChildSpec</em> suitable for use in a supervisor.
+%% The parameters are the same as in <em>start_listener/7</em> but rather
+%% than hooking the listener to the Ranch internal supervisor, it just returns
+%% the spec.
+-spec child_spec(any(), non_neg_integer(), module(), any(), module(), any(), any())
+	-> supervisor:child_spec().
+child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts, AccOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
-		Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
+		Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts, AccOpts
 	]}, permanent, 5000, supervisor, [ranch_listener_sup]}.
 
 %% @doc Acknowledge the accepted connection.
