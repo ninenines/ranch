@@ -35,6 +35,8 @@
 -export([tcp_max_connections/1]).
 -export([tcp_max_connections_and_beyond/1]).
 -export([tcp_upgrade/1]).
+-export([tcp_sync_accept/1]).
+-export([tcp_sync_accept_handle/1]).
 
 %% ct.
 
@@ -47,7 +49,9 @@ groups() ->
 		tcp_echo,
 		tcp_max_connections,
 		tcp_max_connections_and_beyond,
-		tcp_upgrade
+		tcp_upgrade,
+		tcp_sync_accept,
+		tcp_sync_accept_handle
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_active_echo,
@@ -69,6 +73,8 @@ init_per_group(ssl, Config) ->
 	Config;
 init_per_group(_, Config) ->
 	Config.
+
+
 
 end_per_group(ssl, _) ->
 	application:stop(ssl),
@@ -157,6 +163,34 @@ tcp_echo(_) ->
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(tcp_echo) end,
+	ok.
+
+tcp_sync_accept(_) ->
+	{ok, _} = ranch:start_listener(tcp_sync_accept, 1,
+		ranch_tcp, [{port, 0}], echo_protocol, [], [{sync_accept, true}]),
+	Port = ranch:get_port(tcp_sync_accept),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch with sync accept is working!">>),
+	{ok, <<"TCP Ranch with sync accept is working!">>} = gen_tcp:recv(Socket, 21 + 17, 1000),
+	ok = ranch:stop_listener(tcp_sync_accept),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(tcp_sync_accept) end,
+	ok.
+
+tcp_sync_accept_handle(_) ->
+	{ok, _} = ranch:start_listener(tcp_sync_accept_handle, 1,
+		ranch_tcp, [{port, 0}], echo_protocol, [], [{sync_accept, true}, {sync_handle, true}]),
+	Port = ranch:get_port(tcp_sync_accept_handle),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch with sync accept and handle is working!">>),
+	{ok, <<"TCP Ranch with sync accept and handle is working!">>} = gen_tcp:recv(Socket, 21 + 17 + 11, 1000),
+	ok = ranch:stop_listener(tcp_sync_accept_handle),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(tcp_sync_accept_handle) end,
 	ok.
 
 tcp_max_connections(_) ->
