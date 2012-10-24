@@ -68,6 +68,8 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %%  <dt>password</dt><dd>Optional. String containing the user's password.
 %%   All private keyfiles must be password protected currently.</dd>
 %%  <dt>port</dt><dd>TCP port number to open. Defaults to 0 (see below)</dd>
+%%  <dt>verify</dt><dd>Optional. If set to verify_peer, performs an x509-path
+%%   validation and request the client for a certificate.</dd>
 %% </dl>
 %%
 %% You can listen to a random port by setting the port option to 0.
@@ -80,7 +82,8 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 -spec listen([{backlog, non_neg_integer()} | {cacertfile, string()}
 	| {certfile, string()} | {ciphers, [ssl:erl_cipher_suite()] | string()}
 	| {ip, inet:ip_address()} | {keyfile, string()} | {nodelay, boolean()}
-	| {password, string()} | {port, inet:port_number()}])
+	| {password, string()} | {port, inet:port_number()}
+	| {verify, ssl:verify_type()}])
 	-> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
 	ranch:require([crypto, public_key, ssl]),
@@ -91,7 +94,7 @@ listen(Opts) ->
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts2,
 		[backlog, cacertfile, certfile, ciphers, ip,
-			keyfile, nodelay, password, port],
+			keyfile, nodelay, password, port, verify],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 
