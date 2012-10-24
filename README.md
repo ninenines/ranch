@@ -28,11 +28,11 @@ duplicating efforts.
 Quick start
 -----------
 
-* Add Ranch as a rebar or agner dependency to your application.
+* Add Ranch as a rebar dependency to your application.
 * Start Ranch and add one or more listeners.
 * Write protocol handlers for your application.
 
-Getting Started
+Getting started
 ---------------
 
 * [Read the guide](https://github.com/extend/ranch/blob/master/guide/toc.md)
