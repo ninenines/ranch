@@ -160,6 +160,11 @@ remove_process(Key = {listener, Ref}, MonitorRef, Pid, Monitors) ->
 	true = ets:delete(?TAB, {connections, Pid}),
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors);
 remove_process(Key = {acceptors, _}, MonitorRef, Pid, Monitors) ->
-	Acceptors = ets:lookup_element(?TAB, Key, 2),
-	true = ets:insert(?TAB, {Key, lists:delete(Pid, Acceptors)}),
+	try
+		Acceptors = ets:lookup_element(?TAB, Key, 2),
+		true = ets:update_element(?TAB, Key, {2, lists:delete(Pid, Acceptors)})
+	catch
+		error:_ ->
+			ok
+	end,
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors).
