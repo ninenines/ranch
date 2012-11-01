@@ -41,10 +41,15 @@
 -export([tcp_max_connections_and_beyond/1]).
 -export([tcp_upgrade/1]).
 
+%% supervisor.
+-export([supervisor_clean_restart/1]).
+-export([supervisor_clean_child_restart/1]).
+-export([supervisor_conns_alive/1]).
+
 %% ct.
 
 all() ->
-	[{group, tcp}, {group, ssl}, {group, misc}].
+	[{group, tcp}, {group, ssl}, {group, misc}, {group, supervisor}].
 
 groups() ->
 	[{tcp, [
@@ -61,6 +66,10 @@ groups() ->
 		ssl_echo
 	]}, {misc, [
 		misc_bad_transport
+	]}, {supervisor, [
+		supervisor_clean_restart,
+		supervisor_clean_child_restart,
+		supervisor_conns_alive
 	]}].
 
 init_per_suite(Config) ->
@@ -260,6 +269,89 @@ tcp_upgrade(_) ->
 	ranch:set_protocol_options(tcp_upgrade, [{msg, upgraded}, {pid, self()}]),
 	ok = connect_loop(Port, 1, 0),
 	receive upgraded -> ok after 1000 -> error(timeout) end.
+
+%% Supervisor tests
+
+supervisor_clean_restart(_) ->
+	%% There we verify that mature listener death will not let
+	%% whole supervisor down and also the supervisor itself will
+	%% restart everything properly.
+	Ref = supervisor_clean_restart,
+	NbAcc = 4,
+	{ok, Pid} = ranch:start_listener(Ref,
+		NbAcc, ranch_tcp, [{port, 0}], echo_protocol, []),
+	%% Trace supervisor spawns.
+	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
+	ListenerPid0 = ranch_server:lookup_listener(Ref),
+	erlang:exit(ListenerPid0, kill),
+	receive after 1000 -> ok end,
+	%% Verify that supervisor is alive
+	true = is_process_alive(Pid),
+	%% ...but children are dead.
+	false = is_process_alive(ListenerPid0),
+	%% Receive traces from newly started children
+	ListenerPid = receive {trace, Pid, spawn, Pid1, _} -> Pid1 end,
+	_ConnSupPid = receive {trace, Pid, spawn, Pid2, _} -> Pid2 end,
+	AccSupPid = receive {trace, Pid, spawn, Pid3, _} -> Pid3 end,
+	%% ...and its acceptors.
+	[receive {trace, AccSupPid, spawn, _Pid, _} -> ok end ||
+		_ <- lists:seq(1, NbAcc)],
+	%% No more traces then.
+	receive
+		{trace, EPid, spawn, _, _} when EPid == Pid; EPid == AccSupPid ->
+			error(invalid_restart)
+	after 1000 -> ok end,
+	%% Verify that new children registered themselves properly.
+	ListenerPid = ranch_server:lookup_listener(Ref),
+	ok.
+
+supervisor_clean_child_restart(_) ->
+	%% Then we verify that only parts of the supervision tree
+	%% restarted in the case of failure.
+	Ref = supervisor_clean_child_restart,
+	{ok, Pid} = ranch:start_listener(Ref,
+		1, ranch_tcp, [{port, 0}], echo_protocol, []),
+	%% Trace supervisor spawns.
+	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
+	ListenerPid0 = ranch_server:lookup_listener(Ref),
+	%% Manually shut the listening socket down.
+	Port = lists:last(erlang:ports()),
+	ok = gen_tcp:close(Port),
+	receive after 1000 -> ok end,
+	%% Verify that supervisor and its first two children are alive.
+	true = is_process_alive(Pid),
+	true = is_process_alive(ListenerPid0),
+	%% Check that acceptors_sup is restarted properly.
+	AccSupPid = receive {trace, Pid, spawn, Pid1, _} -> Pid1 end,
+	AccPid = receive {trace, AccSupPid, spawn, Pid2, _} -> Pid2 end,
+	receive {trace, AccPid, spawn, _, _} -> ok end,
+	%% No more traces then.
+	receive
+		{trace, _, spawn, _, _} -> error(invalid_restart)
+	after 1000 -> ok end,
+	%% Verify that children still registered right.
+	ListenerPid0 = ranch_server:lookup_listener(Ref),
+	ok.
+
+supervisor_conns_alive(_) ->
+	%% And finally we make sure that in the case of partial failure
+	%% live connections are not being killed.
+	Ref = supervisor_conns_alive,
+	{ok, _} = ranch:start_listener(Ref,
+		1, ranch_tcp, [{port, 0}], remove_conn_and_wait_protocol, [{remove, false}]),
+	ok,
+	%% Get the listener socket
+	Port = lists:last(erlang:ports()),
+	TcpPort = ranch:get_port(Ref),
+	{ok, Socket} = gen_tcp:connect("localhost", TcpPort,
+		[binary, {active, true}, {packet, raw}]),
+	%% Shut the socket down
+	ok = gen_tcp:close(Port),
+	%% Assert that client is still viable.
+	receive {tcp_closed, _} -> error(closed) after 1500 -> ok end,
+	ok = gen_tcp:send(Socket, <<"poke">>),
+	receive {tcp_closed, _} -> ok end.
+
 
 %% Utility functions.
 
