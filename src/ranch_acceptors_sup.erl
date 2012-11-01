@@ -17,7 +17,7 @@
 -behaviour(supervisor).
 
 %% API.
--export([start_link/7]).
+-export([start_link/5]).
 
 %% supervisor.
 -export([init/1]).
@@ -25,16 +25,16 @@
 %% API.
 
 -spec start_link(any(), non_neg_integer(), module(), any(),
-	module(), pid(), pid()) -> {ok, pid()}.
-start_link(Ref, NbAcceptors, Transport, TransOpts,
-		Protocol, ListenerPid, ConnsPid) ->
+	module()) -> {ok, pid()}.
+start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol) ->
 	supervisor:start_link(?MODULE, [Ref, NbAcceptors, Transport, TransOpts,
-		Protocol, ListenerPid, ConnsPid]).
+		Protocol]).
 
 %% supervisor.
 
-init([Ref, NbAcceptors, Transport, TransOpts,
-		Protocol, ListenerPid, ConnsPid]) ->
+init([Ref, NbAcceptors, Transport, TransOpts, Protocol]) ->
+	ListenerPid = ranch_server:lookup_listener(Ref),
+	ConnsPid = ranch_server:lookup_connections_sup(Ref),
 	LSocket = case proplists:get_value(socket, TransOpts) of
 		undefined ->
 			{ok, Socket} = Transport:listen(TransOpts),
