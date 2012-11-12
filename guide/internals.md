@@ -11,34 +11,34 @@ Architecture
 Ranch is an OTP application.
 
 Like all OTP applications, Ranch has a top supervisor. It is responsible
-for supervising the ```ranch_server``` process and all the listeners that
+for supervising the `ranch_server` process and all the listeners that
 will be started.
 
-The ```ranch_server``` gen_server is the central process keeping track of the
+The `ranch_server` gen_server is the central process keeping track of the
 listeners, the acceptors and the connection processes. It does so through
-the use of a public ets table called ```ranch_server``` too. This allows
+the use of a public ets table called `ranch_server` too. This allows
 some operations to be sequential by going through the gen_server, while
 others just query the ets table directly, ensuring there is no bottleneck
 for the most common operations.
 
 Because the most common operation is keeping track of the number of
 connections currently being used for each listener, the ets table
-has ```write_concurrency``` enabled, allowing us to perform all these
-operations concurrently using ```ets:update_counter/3```. To read the number
+has `write_concurrency` enabled, allowing us to perform all these
+operations concurrently using `ets:update_counter/3`. To read the number
 of connections we simply increment the counter by 0, which allows us
 to stay in a write context and still receive the counter's value.
 
 For increased fault tolerance, the owner of the ets table is
-```ranch_sup``` and not ```ranch_server``` as you could expect. This way,
-if the ```ranch_server``` gen_server fails, it doesn't lose any information
+`ranch_sup` and not `ranch_server` as you could expect. This way,
+if the `ranch_server` gen_server fails, it doesn't lose any information
 and the restarted process can continue as if nothing happened. Note that
 this usage is not recommended by OTP.
 
-Listeners are grouped into the ```ranch_listener_sup``` supervisor and
+Listeners are grouped into the `ranch_listener_sup` supervisor and
 consist of three kinds of processes: the listener gen_server, the
 acceptor processes and the connection processes, both grouped under
 their own supervisor. All of these processes are registered to the
-```ranch_server``` gen_server with varying amount of information.
+`ranch_server` gen_server with varying amount of information.
 
 All socket operations, including listening for connections, go through
 transport handlers. Accepted connections are given to the protocol handler.
@@ -58,7 +58,7 @@ system.
 
 * * *
 
-The second argument to ```ranch:start_listener/6``` is the number of
+The second argument to `ranch:start_listener/6` is the number of
 processes that will be accepting connections. Care should be taken
 when choosing this number.
 

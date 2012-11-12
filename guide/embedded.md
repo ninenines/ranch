@@ -13,22 +13,22 @@ Embedding
 ---------
 
 To embed Ranch in your application you can simply add the child specs
-to your supervision tree. This can all be done in the ```init/1``` function
+to your supervision tree. This can all be done in the `init/1` function
 of one of your application supervisors.
 
 Ranch requires at the minimum two kinds of child specs for embedding.
-First, you need to add ```ranch_sup``` to your supervision tree, only once,
+First, you need to add `ranch_sup` to your supervision tree, only once,
 regardless of the number of listeners you will use. Then you need to
 add the child specs for each listener.
 
 Ranch has a convenience function for getting the listeners child specs
-called ```ranch:child_spec/6```, that works like ```ranch:start_listener/6```,
+called `ranch:child_spec/6`, that works like `ranch:start_listener/6`,
 except that it doesn't start anything, it only returns child specs.
 
-As for ```ranch_sup```, the child spec is simple enough to not require a
+As for `ranch_sup`, the child spec is simple enough to not require a
 convenience function.
 
-The following example adds both ```ranch_sup``` and one listener to another
+The following example adds both `ranch_sup` and one listener to another
 application's supervision tree.
 
 ``` erlang
@@ -43,8 +43,8 @@ init([]) ->
 ```
 
 Remember, you can add as many listener child specs as needed, but only
-one ```ranch_sup``` spec!
+one `ranch_sup` spec!
 
 It is recommended that your architecture makes sure that all listeners
-are restarted if ```ranch_sup``` fails. See the Ranch internals chapter for
+are restarted if `ranch_sup` fails. See the Ranch internals chapter for
 more details on how Ranch does it.
