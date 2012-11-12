@@ -118,9 +118,10 @@ accept(LSocket, Timeout) ->
 %% @private Experimental. Open a connection to the given host and port number.
 %% @see ssl:connect/3
 %% @todo Probably filter Opts?
--spec connect(string(), inet:port_number(), any())
+-spec connect(inet:ip_address() | inet:hostname(),
+	inet:port_number(), any())
 	-> {ok, inet:socket()} | {error, atom()}.
-connect(Host, Port, Opts) when is_list(Host), is_integer(Port) ->
+connect(Host, Port, Opts) when is_integer(Port) ->
 	ssl:connect(Host, Port,
 		Opts ++ [binary, {active, false}, {packet, raw}]).
 
