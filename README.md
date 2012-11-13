@@ -28,13 +28,13 @@ duplicating efforts.
 Quick start
 -----------
 
-* Add Ranch as a rebar dependency to your application.
-* Start Ranch and add one or more listeners.
-* Write protocol handlers for your application.
+ *  Add Ranch as a rebar dependency to your application
+ *  Start Ranch and add one or more listeners
+ *  Write protocol handlers for your application
 
 Getting started
 ---------------
 
-* [Read the guide](https://github.com/extend/ranch/blob/master/guide/toc.md)
-* Look at the examples in the ```examples/``` directory
-* Build API documentation with ```make docs```; open ```doc/index.html```
+ *  [Read the guide](http://ninenines.eu/docs/en/ranch/HEAD/guide/introduction)
+ *  Look at the examples in the `examples/` directory
+ *  Build API documentation with `make docs`; open `doc/index.html`
