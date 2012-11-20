@@ -55,7 +55,7 @@ groups() ->
 	]}].
 
 init_per_suite(Config) ->
-	application:start(ranch),
+	ok = application:start(ranch),
 	Config.
 
 end_per_suite(_) ->
