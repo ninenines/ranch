@@ -20,6 +20,11 @@ Ranch User Guide
  *  [Protocols](protocols.md)
    *  Purpose
    *  Writing a protocol handler
+ *  [SSL client authentication](ssl_auth.md)
+   *  Purpose
+   *  Obtaining client certificates
+   *  Transport configuration
+   *  Authentication
  *  [Embedded mode](embedded.md)
    *  Purpose
    *  Embedding
