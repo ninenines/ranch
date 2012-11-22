@@ -100,7 +100,8 @@ certificate, you can again use the `public_key:pkix_issuer_id/2` to
 extract the `IssuerID` value.
 
 The following function returns the `IssuerID` or `false` if no client
-certificate was found.
+certificate was found. This snippet is intended to be used from your
+protocol code.
 
 ``` erlang
 socket_to_issuer_id(Socket) ->
