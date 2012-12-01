@@ -32,6 +32,7 @@
 -export([connect/3]).
 -export([recv/3]).
 -export([send/2]).
+-export([sendfile/2]).
 -export([setopts/2]).
 -export([controlling_process/2]).
 -export([peername/1]).
@@ -137,6 +138,34 @@ recv(Socket, Length, Timeout) ->
 -spec send(ssl:sslsocket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
 	ssl:send(Socket, Packet).
+
+%% @doc Send a file on a socket.
+%%
+%% Unlike with TCP, no syscall can be used here, so sending files
+%% through SSL will be much slower in comparison.
+%%
+%% @see file:sendfile/2
+-spec sendfile(ssl:sslsocket(), file:name())
+	-> {ok, non_neg_integer()} | {error, atom()}.
+sendfile(Socket, Filepath) ->
+	{ok, IoDevice} = file:open(Filepath, [read, binary, raw]),
+	sendfile(Socket, IoDevice, 0).
+
+-spec sendfile(ssl:sslsocket(), file:io_device(), non_neg_integer())
+	-> {ok, non_neg_integer()} | {error, atom()}.
+sendfile(Socket, IoDevice, Sent) ->
+	case file:read(IoDevice, 16#1FFF) of
+		eof ->
+			ok = file:close(IoDevice),
+			{ok, Sent};
+		{ok, Bin} ->
+			case send(Socket, Bin) of
+				ok ->
+					sendfile(Socket, IoDevice, Sent + byte_size(Bin));
+				{error, Reason} ->
+					{error, Reason}
+			end
+	end.
 
 %% @doc Set options on the given socket.
 %% @see ssl:setopts/2

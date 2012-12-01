@@ -27,6 +27,7 @@
 -export([connect/3]).
 -export([recv/3]).
 -export([send/2]).
+-export([sendfile/2]).
 -export([setopts/2]).
 -export([controlling_process/2]).
 -export([peername/1]).
@@ -102,6 +103,18 @@ recv(Socket, Length, Timeout) ->
 -spec send(inet:socket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
 	gen_tcp:send(Socket, Packet).
+
+%% @doc Send a file on a socket.
+%%
+%% This is the optimal way to send files using TCP. It uses a syscall
+%% which means there is no context switch between opening the file
+%% and writing its contents on the socket.
+%%
+%% @see file:sendfile/2
+-spec sendfile(inet:socket(), file:name())
+	-> {ok, non_neg_integer()} | {error, atom()}.
+sendfile(Socket, Filename) ->
+	file:sendfile(Filename, Socket).
 
 %% @doc Set options on the given socket.
 %% @see inet:setopts/2
