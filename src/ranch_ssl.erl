@@ -134,7 +134,7 @@ recv(Socket, Length, Timeout) ->
 
 %% @doc Send data on a socket.
 %% @see ssl:send/2
--spec send(ssl:sslsocket(), iolist()) -> ok | {error, atom()}.
+-spec send(ssl:sslsocket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
 	ssl:send(Socket, Packet).
 

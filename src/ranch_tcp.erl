@@ -99,7 +99,7 @@ recv(Socket, Length, Timeout) ->
 
 %% @doc Send data on a socket.
 %% @see gen_tcp:send/2
--spec send(inet:socket(), iolist()) -> ok | {error, atom()}.
+-spec send(inet:socket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
 	gen_tcp:send(Socket, Packet).
 
