@@ -102,9 +102,11 @@ Port = ranch:get_port(tcp_echo).
 Listening on a port =< 1024
 ---------------------------
 
-This is currently not possible. We recommend the use of load balancing
-or NAT firewall rules if the need arise. Proxies can sometimes also be
-used although that's a less efficient solution.
+This isn't currently possible without some advanced operating systems
+knowledge. We may recommend the use of load balancing or NAT firewall
+rules if the need arises. Proxies may be an option however it's not a
+particularly efficient solution. A further explanation is outside the 
+scope of this guide. 
 
 Limiting the number of concurrent connections
 ---------------------------------------------
