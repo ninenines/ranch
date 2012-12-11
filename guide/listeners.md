@@ -99,7 +99,7 @@ argument is the name of the listener you gave in `ranch:start_listener/6`.
 Port = ranch:get_port(tcp_echo).
 ```
 
-Listening on priveleged ports
+Listening on privileged ports
 -----------------------------
 
 Please be aware that it is common for many UNIX-like operating systems to prohibit non-privileged users
