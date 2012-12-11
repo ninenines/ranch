@@ -99,12 +99,17 @@ argument is the name of the listener you gave in `ranch:start_listener/6`.
 Port = ranch:get_port(tcp_echo).
 ```
 
-Listening on a port =< 1024
----------------------------
+Listening on priveleged ports
+-----------------------------
 
-This is currently not possible. We recommend the use of load balancing
-or NAT firewall rules if the need arise. Proxies can sometimes also be
-used although that's a less efficient solution.
+Please be aware that it is common for many UNIX-like operating systems to prohibit non-privileged users
+to listen on ports below 1024 as a security measure. If this is the case, you will get an `{error,eacces}` error.
+
+Depending on the target system, there are various ways to get around this limitation. For more information, please
+consult these and other documents:
+
+* [binding to privileged ports @ yaws](http://yaws.hyber.org/privbind.yaws)
+* [relevant question at StackOverflow](http://stackoverflow.com/questions/413807/is-there-a-way-for-non-root-processes-to-bind-to-privileged-ports-1024-on-l)
 
 Limiting the number of concurrent connections
 ---------------------------------------------
