@@ -111,6 +111,9 @@ consult these and other documents:
 * [binding to privileged ports @ yaws](http://yaws.hyber.org/privbind.yaws)
 * [relevant question at StackOverflow](http://stackoverflow.com/questions/413807/is-there-a-way-for-non-root-processes-to-bind-to-privileged-ports-1024-on-l)
 
+It is recommended to use the least invasive circumvention method, if possible. For example, it could be a rule in the firewall
+configuration that will redirect the privileged port in question to the one listened by a ranch listener.
+
 Limiting the number of concurrent connections
 ---------------------------------------------
 
