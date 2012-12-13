@@ -8,7 +8,7 @@ Ranch User Guide
    *  Purpose
    *  Starting and stopping
    *  Listening on a random port
-   *  Listening on a port =< 1024
+   *  Listening on privileged ports
    *  Limiting the number of concurrent connections
    *  Upgrading
  *  [Transports](transports.md)

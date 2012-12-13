@@ -99,12 +99,19 @@ argument is the name of the listener you gave in `ranch:start_listener/6`.
 Port = ranch:get_port(tcp_echo).
 ```
 
-Listening on a port =< 1024
----------------------------
+Listening on privileged ports
+-----------------------------
 
-This is currently not possible. We recommend the use of load balancing
-or NAT firewall rules if the need arise. Proxies can sometimes also be
-used although that's a less efficient solution.
+Some systems limit access to ports below 1024 for security reasons.
+This can easily be identified by an `{error, eacces}` error when trying
+to open a listening socket on such a port.
+
+The methods for listening on privileged ports vary between systems,
+please refer to your system's documentation for more information.
+
+We recommend the use of port rewriting for systems with a single server,
+and load balancing for systems with multiple servers. Documenting these
+solutions is however out of the scope of this guide.
 
 Limiting the number of concurrent connections
 ---------------------------------------------
