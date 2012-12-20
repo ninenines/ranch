@@ -24,6 +24,9 @@
 -export([init_per_group/2]).
 -export([end_per_group/2]).
 
+%% misc.
+-export([misc_bad_transport/1]).
+
 %% ssl.
 -export([ssl_accept_error/1]).
 -export([ssl_active_echo/1]).
@@ -39,7 +42,7 @@
 %% ct.
 
 all() ->
-	[{group, tcp}, {group, ssl}].
+	[{group, tcp}, {group, ssl}, {group, misc}].
 
 groups() ->
 	[{tcp, [
@@ -52,6 +55,8 @@ groups() ->
 		ssl_accept_error,
 		ssl_active_echo,
 		ssl_echo
+	]}, {misc, [
+		misc_bad_transport
 	]}].
 
 init_per_suite(Config) ->
@@ -76,6 +81,14 @@ end_per_group(ssl, _) ->
 	application:stop(crypto),
 	ok;
 end_per_group(_, _) ->
+	ok.
+
+%% misc.
+
+misc_bad_transport(_) ->
+	{error, badarg} = ranch:start_listener(misc_bad_transport, 1,
+		bad_transport, [{port, 0}],
+		echo_protocol, []),
 	ok.
 
 %% ssl.

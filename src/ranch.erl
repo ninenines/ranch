@@ -47,13 +47,21 @@
 %% of connections.
 %%
 %% <em>Ref</em> can be used to stop the listener later on.
+%%
+%% This function will return `{error, badarg}` if and only if the transport
+%% module given doesn't appear to be correct.
 -spec start_listener(any(), non_neg_integer(), module(), any(), module(), any())
-	-> {ok, pid()}.
+	-> {ok, pid()} | {error, badarg}.
 start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
-	supervisor:start_child(ranch_sup, child_spec(Ref, NbAcceptors,
-		Transport, TransOpts, Protocol, ProtoOpts)).
+	case erlang:function_exported(Transport, name, 0) of
+		false ->
+			{error, badarg};
+		true ->
+			supervisor:start_child(ranch_sup, child_spec(Ref, NbAcceptors,
+				Transport, TransOpts, Protocol, ProtoOpts))
+	end.
 
 %% @doc Stop a listener identified by <em>Ref</em>.
 %%
