@@ -113,6 +113,24 @@ We recommend the use of port rewriting for systems with a single server,
 and load balancing for systems with multiple servers. Documenting these
 solutions is however out of the scope of this guide.
 
+Accepting connections on an existing socket
+-------------------------------------------
+
+If you want to accept connections on an existing socket, you can use the
+`socket` transport option, which should just be the relevant data returned
+from the connect() function for the undelying socket library
+(gen_tcp:connect(), ssl:connect()). accept() will be then be called on the
+passed in socket. You should connect() the socket in {active, false} mode, as
+well.
+
+Note, however, that because of a bug in SSL, you cannot change ownership of an
+SSL listen socket prior to R16. Ranch will catch the error thrown, but the
+owner of the SSL socket will remain as whatever process created the socket.
+However, this will not affect accept() behaviour unless the owner process dies,
+in which case the socket is closed. Therefore, to use this feature with SSL
+with an erlang release prior to R16, ensure that the SSL socket is opened in a
+persistant process.
+
 Limiting the number of concurrent connections
 ---------------------------------------------
 
