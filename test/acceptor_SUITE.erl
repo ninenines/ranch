@@ -29,10 +29,12 @@
 
 %% ssl.
 -export([ssl_accept_error/1]).
+-export([ssl_accept_socket/1]).
 -export([ssl_active_echo/1]).
 -export([ssl_echo/1]).
 
 %% tcp.
+-export([tcp_accept_socket/1]).
 -export([tcp_active_echo/1]).
 -export([tcp_echo/1]).
 -export([tcp_max_connections/1]).
@@ -46,6 +48,7 @@ all() ->
 
 groups() ->
 	[{tcp, [
+		tcp_accept_socket,
 		tcp_active_echo,
 		tcp_echo,
 		tcp_max_connections,
@@ -53,6 +56,7 @@ groups() ->
 		tcp_upgrade
 	]}, {ssl, [
 		ssl_accept_error,
+		ssl_accept_socket,
 		ssl_active_echo,
 		ssl_echo
 	]}, {misc, [
@@ -108,6 +112,26 @@ ssl_accept_error(Config) ->
 	receive after 500 -> ok end,
 	true = is_process_alive(AcceptorPid).
 
+ssl_accept_socket(Config) ->
+	%%% XXX we can't do the spawn to test the controlling process change
+	%%% because of the bug in ssl
+	{ok, S} = ssl:listen(0,
+		[{certfile, ?config(data_dir, Config) ++ "cert.pem"}, binary,
+			{active, false}, {packet, raw}, {reuseaddr, true}]),
+	{ok, _} = ranch:start_listener(ssl_accept_socket, 1,
+		ranch_ssl, [{socket, S}], echo_protocol, []),
+	Port = ranch:get_port(ssl_accept_socket),
+	{ok, Socket} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw},
+		{certfile, ?config(data_dir, Config) ++ "cert.pem"}]),
+	ok = ssl:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(ssl_accept_socket),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(ssl_accept_socket) end,
+	ok.
+
 ssl_active_echo(Config) ->
 	{ok, _} = ranch:start_listener(ssl_active_echo, 1,
 		ranch_ssl, [{port, 0},
@@ -143,6 +167,31 @@ ssl_echo(Config) ->
 	ok.
 
 %% tcp.
+
+tcp_accept_socket(_) ->
+	Ref = make_ref(),
+	Parent = self(),
+	spawn(fun() ->
+				{ok, S} = gen_tcp:listen(0, [binary, {active, false}, {packet, raw},
+						{reuseaddr, true}]),
+				{ok, _} = ranch:start_listener(tcp_accept_socket, 1,
+					ranch_tcp, [{socket, S}], echo_protocol, []),
+				Parent ! Ref
+		end),
+	receive
+		Ref -> ok
+	end,
+
+	Port = ranch:get_port(tcp_accept_socket),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(tcp_accept_socket),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(tcp_accept_socket) end,
+	ok.
 
 tcp_active_echo(_) ->
 	{ok, _} = ranch:start_listener(tcp_active_echo, 1,
