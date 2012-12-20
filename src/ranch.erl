@@ -55,6 +55,7 @@
 start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
+	_ = code:ensure_loaded(Transport),
 	case erlang:function_exported(Transport, name, 0) of
 		false ->
 			{error, badarg};
