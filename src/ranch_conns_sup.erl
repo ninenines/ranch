@@ -17,7 +17,7 @@
 -behaviour(supervisor).
 
 %% API.
--export([start_link/0]).
+-export([start_link/1]).
 -export([start_protocol/5]).
 
 %% supervisor.
@@ -25,9 +25,9 @@
 
 %% API.
 
--spec start_link() -> {ok, pid()}.
-start_link() ->
-	supervisor:start_link(?MODULE, []).
+-spec start_link(any()) -> {ok, pid()}.
+start_link(Ref) ->
+	supervisor:start_link(?MODULE, Ref).
 
 -spec start_protocol(pid(), inet:socket(), module(), module(), any())
 	-> {ok, pid()}.
@@ -36,6 +36,7 @@ start_protocol(ListenerPid, Socket, Transport, Protocol, Opts) ->
 
 %% supervisor.
 
-init([]) ->
+init(Ref) ->
+	ok = ranch_server:set_connections_sup(Ref, self()),
 	{ok, {{simple_one_for_one, 0, 1}, [{?MODULE, {?MODULE, start_protocol, []},
 		temporary, brutal_kill, worker, [?MODULE]}]}}.
