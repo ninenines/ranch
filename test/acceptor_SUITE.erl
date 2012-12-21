@@ -303,20 +303,29 @@ supervisor_clean_restart(_) ->
 	after 1000 -> ok end,
 	%% Verify that new children registered themselves properly.
 	ListenerPid = ranch_server:lookup_listener(Ref),
-	ok.
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces().
 
 supervisor_clean_child_restart(_) ->
 	%% Then we verify that only parts of the supervision tree
 	%% restarted in the case of failure.
 	Ref = supervisor_clean_child_restart,
+	%% Trace socket allocations.
+	_ = erlang:trace(new, true, [call]),
+	1 = erlang:trace_pattern({ranch_tcp, listen, 1}, [{'_', [], [{return_trace}]}], [global]),
 	{ok, Pid} = ranch:start_listener(Ref,
 		1, ranch_tcp, [{port, 0}], echo_protocol, []),
 	%% Trace supervisor spawns.
 	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
 	ListenerPid0 = ranch_server:lookup_listener(Ref),
 	%% Manually shut the listening socket down.
-	Port = lists:last(erlang:ports()),
-	ok = gen_tcp:close(Port),
+	LSocket = receive
+		{trace, _, return_from, {ranch_tcp, listen, 1}, {ok, Socket}} ->
+			Socket
+	after 0 ->
+		error(lsocket_unknown)
+	end,
+	ok = gen_tcp:close(LSocket),
 	receive after 1000 -> ok end,
 	%% Verify that supervisor and its first two children are alive.
 	true = is_process_alive(Pid),
@@ -331,27 +340,48 @@ supervisor_clean_child_restart(_) ->
 	after 1000 -> ok end,
 	%% Verify that children still registered right.
 	ListenerPid0 = ranch_server:lookup_listener(Ref),
+	_ = erlang:trace_pattern({ranch_tcp, listen, 1}, false, []),
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces(),
 	ok.
 
 supervisor_conns_alive(_) ->
 	%% And finally we make sure that in the case of partial failure
 	%% live connections are not being killed.
 	Ref = supervisor_conns_alive,
+	_ = erlang:trace(new, true, [call]),
+	1 = erlang:trace_pattern({ranch_tcp, listen, 1}, [{'_', [], [{return_trace}]}], [global]),
 	{ok, _} = ranch:start_listener(Ref,
 		1, ranch_tcp, [{port, 0}], remove_conn_and_wait_protocol, [{remove, false}]),
 	ok,
 	%% Get the listener socket
-	Port = lists:last(erlang:ports()),
+	LSocket = receive
+		{trace, _, return_from, {ranch_tcp, listen, 1}, {ok, S}} ->
+			S
+	after 0 ->
+		error(lsocket_unknown)
+	end,
 	TcpPort = ranch:get_port(Ref),
 	{ok, Socket} = gen_tcp:connect("localhost", TcpPort,
 		[binary, {active, true}, {packet, raw}]),
 	%% Shut the socket down
-	ok = gen_tcp:close(Port),
+	ok = gen_tcp:close(LSocket),
 	%% Assert that client is still viable.
 	receive {tcp_closed, _} -> error(closed) after 1500 -> ok end,
 	ok = gen_tcp:send(Socket, <<"poke">>),
-	receive {tcp_closed, _} -> ok end.
+	receive {tcp_closed, _} -> ok end,
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces().
 
+clean_traces() ->
+	receive
+		{trace, _, _, _} ->
+			clean_traces();
+		{trace, _, _, _, _} ->
+			clean_traces()
+	after 0 ->
+		ok
+	end.
 
 %% Utility functions.
 
