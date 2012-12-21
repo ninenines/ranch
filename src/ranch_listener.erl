@@ -101,6 +101,7 @@ set_protocol_options(ServerPid, ProtoOpts) ->
 
 %% @private
 init([Ref, MaxConns, ProtoOpts]) ->
+	ok = ranch_server:insert_listener(Ref, self()),
 	{ok, #state{ref=Ref, max_conns=MaxConns, proto_opts=ProtoOpts}}.
 
 %% @private

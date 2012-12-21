@@ -20,6 +20,8 @@
 -export([start_link/0]).
 -export([insert_listener/2]).
 -export([lookup_listener/1]).
+-export([set_connections_sup/2]).
+-export([lookup_connections_sup/1]).
 -export([add_acceptor/2]).
 -export([send_to_acceptors/2]).
 -export([add_connection/1]).
@@ -52,13 +54,24 @@ start_link() ->
 %% @doc Insert a listener into the database.
 -spec insert_listener(any(), pid()) -> ok.
 insert_listener(Ref, Pid) ->
-	true = ets:insert_new(?TAB, {{listener, Ref}, Pid}),
+	true = ets:insert_new(?TAB, {{listener, Ref}, Pid, undefined}),
 	gen_server:cast(?MODULE, {insert_listener, Ref, Pid}).
 
 %% @doc Lookup a listener in the database.
 -spec lookup_listener(any()) -> pid().
 lookup_listener(Ref) ->
 	ets:lookup_element(?TAB, {listener, Ref}, 2).
+
+%% @doc Set a connection supervisor associated with specific listener.
+-spec set_connections_sup(any(), pid()) -> ok.
+set_connections_sup(Ref, Pid) ->
+	true = ets:update_element(?TAB, {listener, Ref}, {3, Pid}),
+	ok.
+
+%% @doc Lookup a connection supervisor used by specific listener.
+-spec lookup_connections_sup(any()) -> pid() | undefined.
+lookup_connections_sup(Ref) ->
+	ets:lookup_element(?TAB, {listener, Ref}, 3).
 
 %% @doc Add an acceptor for the given listener.
 -spec add_acceptor(any(), pid()) -> ok.
@@ -147,6 +160,11 @@ remove_process(Key = {listener, Ref}, MonitorRef, Pid, Monitors) ->
 	true = ets:delete(?TAB, {connections, Pid}),
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors);
 remove_process(Key = {acceptors, _}, MonitorRef, Pid, Monitors) ->
-	Acceptors = ets:lookup_element(?TAB, Key, 2),
-	true = ets:insert(?TAB, {Key, lists:delete(Pid, Acceptors)}),
+	try
+		Acceptors = ets:lookup_element(?TAB, Key, 2),
+		true = ets:update_element(?TAB, Key, {2, lists:delete(Pid, Acceptors)})
+	catch
+		error:_ ->
+			ok
+	end,
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors).
