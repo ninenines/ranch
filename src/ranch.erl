@@ -55,7 +55,7 @@
 start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
-	case erlang:function_exported(Transport, name, 0) of
+	case is_valid_transport(Transport) of
 		false ->
 			{error, badarg};
 		true ->
@@ -75,6 +75,23 @@ start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 			end,
 			Res
 	end.
+
+-spec is_valid_transport(atom()) -> boolean().
+is_valid_transport(Module) ->
+    is_module_loaded(Module, module_loaded(Module)).
+
+is_module_loaded(Module, false) ->
+    could_be_loaded(Module, code:ensure_loaded(Module));
+is_module_loaded(Module, true) ->
+    is_name_exported(Module).
+
+could_be_loaded(Module, {module, Module}) ->
+    is_name_exported(Module);
+could_be_loaded(_Module, {error, _What}) ->
+    false.
+
+is_name_exported(Module) ->
+    erlang:function_exported(Module, name, 0).
 
 %% @doc Stop a listener identified by <em>Ref</em>.
 %%
