@@ -13,11 +13,6 @@ are not ordered.
     Examples should be commented. They may or may not be
     used for writing the user guides.
 
-*   Write user guides.
-
-    We currently have good API documentation, but no step
-    by step user guides.
-
 *   Continuous performance testing.
 
     Initially dubbed the Horse project, Ranch could benefit
@@ -39,7 +34,7 @@ are not ordered.
 
 *   Add Transport:secure/0.
 
-    Currently Cowboy checks if a connection is secure by
+    Currently Ranch checks if a connection is secure by
     checking if its name is 'ssl'. This isn't a very modular
     solution,  adding an API function that returns whether
     a connection is secure would fix that issue.
