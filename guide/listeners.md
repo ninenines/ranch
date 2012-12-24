@@ -172,6 +172,16 @@ ranch_listener:remove_connection(ListenerPid).
 As seen in the chapter covering protocols, this pid is received as the
 first argument of the protocol's `start_link/4` callback.
 
+You can modify the `max_connections` value on a running listener by
+using the `ranch:set_max_connections/2` function, with the name of the
+listener as first argument and the new value as the second.
+
+``` erlang
+ranch:set_max_connections(tcp_echo, MaxConns).
+```
+
+The change will occur immediately.
+
 Upgrading
 ---------
 

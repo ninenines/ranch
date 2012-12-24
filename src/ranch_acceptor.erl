@@ -57,22 +57,31 @@ loop(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 			Transport:controlling_process(CSocket, ConnPid),
 			ConnPid ! {shoot, ListenerPid},
 			NbConns = ranch_listener:add_connection(ListenerPid, ConnPid),
-			maybe_wait(ListenerPid, MaxConns, NbConns),
+			{ok, MaxConns2} = maybe_wait(ListenerPid, MaxConns, NbConns),
 			?MODULE:init(LSocket, Transport, Protocol,
-				MaxConns, Opts, ListenerPid, ConnsSup);
+				MaxConns2, Opts, ListenerPid, ConnsSup);
+		%% Upgrade the max number of connections allowed concurrently.
+		{set_max_conns, MaxConns2} ->
+			?MODULE:loop(LSocket, Transport, Protocol,
+				MaxConns2, Opts, ListenerPid, ConnsSup);
 		%% Upgrade the protocol options.
 		{set_opts, Opts2} ->
 			?MODULE:loop(LSocket, Transport, Protocol,
 				MaxConns, Opts2, ListenerPid, ConnsSup)
 	end.
 
--spec maybe_wait(pid(), non_neg_integer(), non_neg_integer()) -> ok.
+-spec maybe_wait(pid(), non_neg_integer(), non_neg_integer())
+	-> {ok, non_neg_integer()}.
 maybe_wait(_, MaxConns, NbConns) when MaxConns > NbConns ->
-	ok;
-maybe_wait(ListenerPid, MaxConns, _) ->
-	erlang:yield(),
-	NbConns2 = ranch_server:count_connections(ListenerPid),
-	maybe_wait(ListenerPid, MaxConns, NbConns2).
+	{ok, MaxConns};
+maybe_wait(ListenerPid, MaxConns, NbConns) ->
+	receive
+		{set_max_conns, MaxConns2} ->
+			maybe_wait(ListenerPid, MaxConns2, NbConns)
+	after 0 ->
+		NbConns2 = ranch_server:count_connections(ListenerPid),
+		maybe_wait(ListenerPid, MaxConns, NbConns2)
+	end.
 
 -spec async_accept(inet:socket(), module()) -> ok.
 async_accept(LSocket, Transport) ->

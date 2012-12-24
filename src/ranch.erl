@@ -20,6 +20,8 @@
 -export([child_spec/6]).
 -export([accept_ack/1]).
 -export([get_port/1]).
+-export([get_max_connections/1]).
+-export([set_max_connections/2]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
 -export([filter_options/3]).
@@ -120,6 +122,19 @@ get_port(Ref) ->
 	ListenerPid = ranch_server:lookup_listener(Ref),
 	{ok, Port} = ranch_listener:get_port(ListenerPid),
 	Port.
+
+%% @doc Return the max number of connections allowed concurrently.
+-spec get_max_connections(any()) -> non_neg_integer().
+get_max_connections(Ref) ->
+	ListenerPid = ranch_server:lookup_listener(Ref),
+	{ok, MaxConnections} = ranch_listener:get_max_connections(ListenerPid),
+	MaxConnections.
+
+%% @doc Set the max number of connections allowed concurrently.
+-spec set_max_connections(any(), non_neg_integer()) -> ok.
+set_max_connections(Ref, MaxConnections) ->
+	ListenerPid = ranch_server:lookup_listener(Ref),
+	ok = ranch_listener:set_max_connections(ListenerPid, MaxConnections).
 
 %% @doc Return the current protocol options for the given listener.
 -spec get_protocol_options(any()) -> any().

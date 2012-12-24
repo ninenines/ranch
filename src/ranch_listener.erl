@@ -24,6 +24,7 @@
 -export([get_port/1]).
 -export([set_port/2]).
 -export([get_max_connections/1]).
+-export([set_max_connections/2]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
 
@@ -82,10 +83,14 @@ set_port(ServerPid, Port) ->
 	gen_server:cast(ServerPid, {set_port, Port}).
 
 %% @doc Return the max number of connections allowed concurrently.
-%% @todo Add set_max_connections.
 -spec get_max_connections(pid()) -> {ok, non_neg_integer()}.
 get_max_connections(ServerPid) ->
 	gen_server:call(ServerPid, get_max_connections).
+
+%% @doc Set the max number of connections allowed concurrently.
+-spec set_max_connections(pid(), non_neg_integer()) -> ok.
+set_max_connections(ServerPid, MaxConnections) ->
+	gen_server:call(ServerPid, {set_max_connections, MaxConnections}).
 
 %% @doc Return the current protocol options.
 -spec get_protocol_options(pid()) -> {ok, any()}.
@@ -109,6 +114,10 @@ handle_call(get_port, _From, State=#state{port=Port}) ->
 	{reply, {ok, Port}, State};
 handle_call(get_max_connections, _From, State=#state{max_conns=MaxConns}) ->
 	{reply, {ok, MaxConns}, State};
+handle_call({set_max_connections, MaxConnections}, _From,
+		State=#state{ref=Ref}) ->
+	ranch_server:send_to_acceptors(Ref, {set_max_conns, MaxConnections}),
+	{reply, ok, State#state{max_conns=MaxConnections}};
 handle_call(get_protocol_options, _From, State=#state{proto_opts=ProtoOpts}) ->
 	{reply, {ok, ProtoOpts}, State};
 handle_call({set_protocol_options, ProtoOpts}, _From, State=#state{ref=Ref}) ->
