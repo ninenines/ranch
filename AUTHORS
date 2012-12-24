@@ -1,6 +1,14 @@
 Ranch is available thanks to the work of:
 
 Loïc Hoguin
+Andrew Majorov
+Andrew Thompson
+
+The Ranch code was initially part of Cowboy. Before it was
+split into a separate project, the following people worked
+on the code that then became Ranch:
+
+Loïc Hoguin
 Ali Sabil
 Andrew Thompson
 DeadZen
