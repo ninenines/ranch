@@ -19,22 +19,16 @@ into **pools**, each pool having a different configurable limit.
 Ranch also allows you to **upgrade** the acceptor pool without having
 to close any of the currently opened sockets.
 
-The project is currently in early development. Comments and suggestions are
-more than welcome. To contribute, either open bug reports, or fork the project
-and send us pull requests with new or improved functionality. You should
-discuss your plans with us before doing any serious work, though, to avoid
-duplicating efforts.
-
-Quick start
------------
-
- *  Add Ranch as a rebar dependency to your application
- *  Start Ranch and add one or more listeners
- *  Write protocol handlers for your application
-
 Getting started
 ---------------
 
  *  [Read the guide](http://ninenines.eu/docs/en/ranch/HEAD/guide/introduction)
  *  Look at the examples in the `examples/` directory
  *  Build API documentation with `make docs`; open `doc/index.html`
+
+Support
+-------
+
+ *  Official IRC Channel: #ninenines on irc.freenode.net
+ *  [Mailing Lists](http://lists.ninenines.eu)
+ *  [Commercial Support](http://ninenines.eu/support)
