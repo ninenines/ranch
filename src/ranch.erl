@@ -28,6 +28,9 @@
 -export([set_option_default/3]).
 -export([require/1]).
 
+-type max_conns() :: non_neg_integer() | infinity.
+-export_type([max_conns/0]).
+
 %% @doc Start a listener for the given transport and protocol.
 %%
 %% A listener is effectively a pool of <em>NbAcceptors</em> acceptors.
@@ -124,14 +127,14 @@ get_port(Ref) ->
 	Port.
 
 %% @doc Return the max number of connections allowed concurrently.
--spec get_max_connections(any()) -> non_neg_integer().
+-spec get_max_connections(any()) -> max_conns().
 get_max_connections(Ref) ->
 	ListenerPid = ranch_server:lookup_listener(Ref),
 	{ok, MaxConnections} = ranch_listener:get_max_connections(ListenerPid),
 	MaxConnections.
 
 %% @doc Set the max number of connections allowed concurrently.
--spec set_max_connections(any(), non_neg_integer()) -> ok.
+-spec set_max_connections(any(), max_conns()) -> ok.
 set_max_connections(Ref, MaxConnections) ->
 	ListenerPid = ranch_server:lookup_listener(Ref),
 	ok = ranch_listener:set_max_connections(ListenerPid, MaxConnections).

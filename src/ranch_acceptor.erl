@@ -43,7 +43,7 @@ init(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 	loop(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup).
 
 -spec loop(inet:socket(), module(), module(),
-	non_neg_integer(), any(), pid(), pid()) -> no_return().
+	ranch:max_conns(), any(), pid(), pid()) -> no_return().
 loop(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 	receive
 		%% We couldn't accept the socket but it's safe to continue.
@@ -70,8 +70,8 @@ loop(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 				MaxConns, Opts2, ListenerPid, ConnsSup)
 	end.
 
--spec maybe_wait(pid(), non_neg_integer(), non_neg_integer())
-	-> {ok, non_neg_integer()}.
+-spec maybe_wait(pid(), MaxConns, non_neg_integer())
+	-> {ok, MaxConns} when MaxConns::ranch:max_conns().
 maybe_wait(_, MaxConns, NbConns) when MaxConns > NbConns ->
 	{ok, MaxConns};
 maybe_wait(ListenerPid, MaxConns, NbConns) ->

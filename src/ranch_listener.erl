@@ -38,7 +38,7 @@
 
 -record(state, {
 	ref :: any(),
-	max_conns = undefined :: non_neg_integer(),
+	max_conns = undefined :: ranch:max_conns(),
 	port = undefined :: undefined | inet:port_number(),
 	proto_opts = undefined :: any(),
 	rm_diff = 0 :: non_neg_integer()
@@ -83,12 +83,12 @@ set_port(ServerPid, Port) ->
 	gen_server:cast(ServerPid, {set_port, Port}).
 
 %% @doc Return the max number of connections allowed concurrently.
--spec get_max_connections(pid()) -> {ok, non_neg_integer()}.
+-spec get_max_connections(pid()) -> {ok, ranch:max_conns()}.
 get_max_connections(ServerPid) ->
 	gen_server:call(ServerPid, get_max_connections).
 
 %% @doc Set the max number of connections allowed concurrently.
--spec set_max_connections(pid(), non_neg_integer()) -> ok.
+-spec set_max_connections(pid(), ranch:max_conns()) -> ok.
 set_max_connections(ServerPid, MaxConnections) ->
 	gen_server:call(ServerPid, {set_max_connections, MaxConnections}).
 
