@@ -169,6 +169,11 @@ filter_options([Opt = {Key, _}|Tail], AllowedKeys, Acc) ->
 	case lists:member(Key, AllowedKeys) of
 		true -> filter_options(Tail, AllowedKeys, [Opt|Acc]);
 		false -> filter_options(Tail, AllowedKeys, Acc)
+	end;
+filter_options([Opt = {raw, _, _, _}|Tail], AllowedKeys, Acc) ->
+	case lists:member(raw, AllowedKeys) of
+		true -> filter_options(Tail, AllowedKeys, [Opt|Acc]);
+		false -> filter_options(Tail, AllowedKeys, Acc)
 	end.
 
 %% @doc Add an option to a list, but only if it wasn't previously set.
