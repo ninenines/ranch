@@ -56,8 +56,13 @@ loop(LSocket, Transport, Protocol, MaxConns, Opts, ListenerPid, ConnsSup) ->
 				[ListenerPid, CSocket, Transport, Protocol, Opts]),
 			Transport:controlling_process(CSocket, ConnPid),
 			ConnPid ! {shoot, ListenerPid},
-			NbConns = ranch_listener:add_connection(ListenerPid, ConnPid),
-			{ok, MaxConns2} = maybe_wait(ListenerPid, MaxConns, NbConns),
+			{ok, MaxConns2} = case MaxConns of
+				infinity ->
+					{ok, infinity};
+				_ ->
+					NbConns = ranch_listener:add_connection(ListenerPid, ConnPid),
+					maybe_wait(ListenerPid, MaxConns, NbConns)
+			end,
 			?MODULE:init(LSocket, Transport, Protocol,
 				MaxConns2, Opts, ListenerPid, ConnsSup);
 		%% Upgrade the max number of connections allowed concurrently.
