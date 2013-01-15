@@ -27,6 +27,8 @@
 -export([add_connection/1]).
 -export([count_connections/1]).
 -export([remove_connection/1]).
+-export([add_connections_counter/1]).
+-export([remove_connections_counter/1]).
 
 %% gen_server.
 -export([init/1]).
@@ -95,7 +97,12 @@ add_connection(ListenerPid) ->
 %% @doc Count the number of connections in the connection pool.
 -spec count_connections(pid()) -> non_neg_integer().
 count_connections(ListenerPid) ->
-	ets:update_counter(?TAB, {connections, ListenerPid}, 0).
+	try
+		ets:update_counter(?TAB, {connections, ListenerPid}, 0)
+	catch
+		error:badarg -> % Max conns = infinity
+			0
+	end.
 
 %% @doc Remove a connection from the connection pool.
 %%
@@ -103,6 +110,21 @@ count_connections(ListenerPid) ->
 -spec remove_connection(pid()) -> non_neg_integer().
 remove_connection(ListenerPid) ->
 	ets:update_counter(?TAB, {connections, ListenerPid}, -1).
+
+
+%% @doc Add a connections counter to the connection pool
+%%
+%% Should only be used by ranch listeners when settings regarding the max
+%% number of connections change.
+add_connections_counter(Pid) ->
+	true = ets:insert_new(?TAB, {{connections, Pid}, 0}).
+
+%% @doc remove a connections counter from the connection pool
+%%
+%% Should only be used by ranch listeners when settings regarding the max
+%% number of connections change.
+remove_connections_counter(Pid) ->
+	true = ets:delete(?TAB, {connections, Pid}).
 
 %% gen_server.
 
@@ -117,7 +139,6 @@ handle_call(_Request, _From, State) ->
 %% @private
 handle_cast({insert_listener, Ref, Pid}, State=#state{monitors=Monitors}) ->
 	true = ets:insert_new(?TAB, {{acceptors, Ref}, []}),
-	true = ets:insert_new(?TAB, {{connections, Pid}, 0}),
 	MonitorRef = erlang:monitor(process, Pid),
 	{noreply, State#state{
 		monitors=[{{MonitorRef, Pid}, {listener, Ref}}|Monitors]}};
@@ -157,7 +178,7 @@ code_change(_OldVsn, State, _Extra) ->
 remove_process(Key = {listener, Ref}, MonitorRef, Pid, Monitors) ->
 	true = ets:delete(?TAB, Key),
 	true = ets:delete(?TAB, {acceptors, Ref}),
-	true = ets:delete(?TAB, {connections, Pid}),
+	remove_connections_counter(Pid),
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors);
 remove_process(Key = {acceptors, _}, MonitorRef, Pid, Monitors) ->
 	try

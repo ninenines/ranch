@@ -69,8 +69,14 @@ add_connection(ServerPid, ConnPid) ->
 %% connections.
 -spec remove_connection(pid()) -> non_neg_integer().
 remove_connection(ServerPid) ->
-	ok = gen_server:cast(ServerPid, remove_connection),
-	ranch_server:remove_connection(ServerPid).
+	try
+		Count = ranch_server:remove_connection(ServerPid),
+		ok = gen_server:cast(ServerPid, remove_connection),
+		Count
+	catch
+		error:badarg -> % Max conns = infinity
+			0
+	end.
 
 %% @doc Return the listener's port.
 -spec get_port(pid()) -> {ok, inet:port_number()}.
@@ -105,8 +111,12 @@ set_protocol_options(ServerPid, ProtoOpts) ->
 %% gen_server.
 
 %% @private
+init([Ref, infinity, ProtoOpts]) ->
+	ok = ranch_server:insert_listener(Ref, self()),
+	{ok, #state{ref=Ref, max_conns=infinity, proto_opts=ProtoOpts}};
 init([Ref, MaxConns, ProtoOpts]) ->
 	ok = ranch_server:insert_listener(Ref, self()),
+	ranch_server:add_connections_counter(self()),
 	{ok, #state{ref=Ref, max_conns=MaxConns, proto_opts=ProtoOpts}}.
 
 %% @private
@@ -115,9 +125,19 @@ handle_call(get_port, _From, State=#state{port=Port}) ->
 handle_call(get_max_connections, _From, State=#state{max_conns=MaxConns}) ->
 	{reply, {ok, MaxConns}, State};
 handle_call({set_max_connections, MaxConnections}, _From,
-		State=#state{ref=Ref}) ->
+		State=#state{ref=Ref, max_conns=CurrMax, rm_diff=CurrDiff}) ->
+	RmDiff = case {MaxConnections, CurrMax} of
+		{infinity, _} -> % moving to infinity, delete connection key
+			ranch_server:remove_connections_counter(self()),
+			0;
+		{_, infinity} -> % moving away from infinity, create connection key
+			ranch_server:add_connections_counter(self()),
+			CurrDiff;
+		{_, _} -> % stay current
+			CurrDiff
+	end,
 	ranch_server:send_to_acceptors(Ref, {set_max_conns, MaxConnections}),
-	{reply, ok, State#state{max_conns=MaxConnections}};
+	{reply, ok, State#state{max_conns=MaxConnections, rm_diff=RmDiff}};
 handle_call(get_protocol_options, _From, State=#state{proto_opts=ProtoOpts}) ->
 	{reply, {ok, ProtoOpts}, State};
 handle_call({set_protocol_options, ProtoOpts}, _From, State=#state{ref=Ref}) ->
@@ -131,6 +151,8 @@ handle_call(_, _From, State) ->
 %% @private
 handle_cast({add_connection, ConnPid}, State) ->
 	_ = erlang:monitor(process, ConnPid),
+	{noreply, State};
+handle_cast(remove_connection, State=#state{max_conns=infinity}) ->
 	{noreply, State};
 handle_cast(remove_connection, State=#state{rm_diff=RmDiff}) ->
 	{noreply, State#state{rm_diff=RmDiff + 1}};

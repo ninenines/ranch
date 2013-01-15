@@ -40,6 +40,7 @@
 -export([tcp_max_connections/1]).
 -export([tcp_max_connections_and_beyond/1]).
 -export([tcp_set_max_connections/1]).
+-export([tcp_infinity_max_connections/1]).
 -export([tcp_upgrade/1]).
 
 %% supervisor.
@@ -58,6 +59,7 @@ groups() ->
 		tcp_active_echo,
 		tcp_echo,
 		tcp_max_connections,
+		tcp_infinity_max_connections,
 		tcp_max_connections_and_beyond,
 		tcp_set_max_connections,
 		tcp_upgrade
@@ -274,6 +276,25 @@ tcp_set_max_connections(_) ->
 	ranch:set_max_connections(tcp_set_max_connections, 20),
 	10 = receive_loop(connected, 1000),
 	20 = ranch:get_max_connections(tcp_set_max_connections).
+
+tcp_infinity_max_connections(_) ->
+	{ok, _} = ranch:start_listener(tcp_infinity_max_connections, 1,
+		ranch_tcp, [{port, 0}, {max_connections, 10}],
+		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
+	Port = ranch:get_port(tcp_infinity_max_connections),
+	%% @todo We'll probably want a more direct interface to count_connections.
+	ListenerPid = ranch_server:lookup_listener(tcp_infinity_max_connections),
+	ok = connect_loop(Port, 20, 0),
+	10 = ranch_server:count_connections(ListenerPid),
+	10 = receive_loop(connected, 1000),
+	10 = ranch:get_max_connections(tcp_infinity_max_connections),
+	ranch:set_max_connections(tcp_infinity_max_connections, infinity),
+	0 = ranch_server:count_connections(ListenerPid),
+	infinity = ranch:get_max_connections(tcp_infinity_max_connections),
+	ranch:set_max_connections(tcp_infinity_max_connections, 10),
+	0 = ranch_server:count_connections(ListenerPid),
+	10 = receive_loop(connected, 1000),
+	10 = ranch_server:count_connections(ListenerPid). % count could be off
 
 tcp_upgrade(_) ->
 	receive after 20000 -> ok end,
