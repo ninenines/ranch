@@ -31,4 +31,5 @@ Ranch User Guide
    *  Embedding
  *  [Internals](internals.md)
    *  Architecture
-   *  Efficiency considerations
+   *  Number of acceptors
+   *  Platform-specific TCP features

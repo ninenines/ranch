@@ -5,6 +5,12 @@ This chapter may not apply to embedded Ranch as embedding allows you
 to use an architecture specific to your application, which may or may
 not be compatible with the description of the Ranch application.
 
+Note that for everything related to efficiency and performance,
+you should perform the benchmarks yourself to get the numbers that
+matter to you. Generic benchmarks found on the web may or may not
+be of use to you, you can never know until you benchmark your own
+system.
+
 Architecture
 ------------
 
@@ -47,16 +53,8 @@ sockets. Protocol handlers start a new process, which receives socket
 ownership, with no requirements on how the code should be written inside
 that new process.
 
-Efficiency considerations
--------------------------
-
-Note that for everything related to efficiency and performance,
-you should perform the benchmarks yourself to get the numbers that
-matter to you. Generic benchmarks found on the web may or may not
-be of use to you, you can never know until you benchmark your own
-system.
-
-* * *
+Number of acceptors
+-------------------
 
 The second argument to `ranch:start_listener/6` is the number of
 processes that will be accepting connections. Care should be taken
@@ -78,3 +76,28 @@ Our observations suggest that using 100 acceptors on modern hardware
 is a good solution, as it's big enough to always have acceptors ready
 and it's low enough that it doesn't have a negative impact on the
 system's performances.
+
+Platform-specific TCP features
+------------------------------
+
+Some socket options are platform-specific and not supported by `inet`.
+They can be of interest because they generally are related to
+optimizations provided by the underlying OS. They can still be enabled
+thanks to the `raw` option, for which we will see an example.
+
+One of these features is `TCP_DEFER_ACCEPT` on Linux. It is a simplified
+accept mechanism which will wait for application data to come in before
+handing out the connection to the Erlang process.
+
+This is especially useful if you expect many connections to be mostly
+idle, perhaps part of a connection pool. They can be handled by the
+kernel directly until they send any real data, instead of allocating
+resources to idle connections.
+
+To enable this mechanism, the following option can be used.
+
+``` erlang
+    {raw, 6, 9, << 30:32/native >>}
+```
+
+It means go on layer 6, turn on option 9 with the given integer parameter.
