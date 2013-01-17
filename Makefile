@@ -1,27 +1,40 @@
 # See LICENSE for licensing information.
 
 PROJECT = ranch
+ERLC_OPTS = -Werror +debug_info +warn_export_all # +bin_opt_info +warn_missing_spec
 
-DIALYZER = dialyzer
-REBAR = rebar
+DEPS_DIR ?= $(CURDIR)/deps
+export DEPS_DIR
 
-all: app
+.PHONY: all clean-all app clean docs clean-docs tests build-plt dialyze
 
 # Application.
 
-deps:
-	@$(REBAR) get-deps
+all: app
 
-app: deps
-	@$(REBAR) compile
+clean-all: clean clean-docs
+	rm -f .$(PROJECT).plt
+	rm -rf $(DEPS_DIR) logs
+
+MODULES = $(shell ls src/*.erl | sed 's/src\///;s/\.erl/,/' | sed '$$s/.$$//')
+
+app:
+	@mkdir -p ebin/
+	@cat src/$(PROJECT).app.src \
+		| sed 's/{modules, \[\]}/{modules, \[$(MODULES)\]}/' \
+		> ebin/$(PROJECT).app
+	erlc -v $(ERLC_OPTS) -o ebin/ -pa ebin/ \
+		src/$(PROJECT)_transport.erl src/*.erl
 
 clean:
-	@$(REBAR) clean
+	rm -rf ebin/
 	rm -f test/*.beam
 	rm -f erl_crash.dump
 
+# Documentation.
+
 docs: clean-docs
-	@$(REBAR) doc skip_deps=true
+	erl -noshell -eval 'edoc:application($(PROJECT), ".", []), init:stop().'
 
 clean-docs:
 	rm -f doc/*.css
@@ -31,20 +44,22 @@ clean-docs:
 
 # Tests.
 
-tests: clean app eunit ct
+CT_RUN = ct_run \
+	-pa ebin $(DEPS_DIR)/*/ebin \
+	-dir test \
+	-logdir logs \
+	-cover test/cover.spec
 
-eunit:
-	@$(REBAR) -C rebar.tests.config eunit skip_deps=true
-
-ct:
-	@$(REBAR) -C rebar.tests.config ct skip_deps=true
+tests: clean app
+	@mkdir -p logs/
+	@$(CT_RUN) -suite acceptor_SUITE
 
 # Dialyzer.
 
-build-plt:
-	@$(DIALYZER) --build_plt --output_plt .$(PROJECT).plt \
-		--apps kernel stdlib sasl tools inets crypto public_key ssl
+build-plt: app
+	@dialyzer --build_plt --output_plt .$(PROJECT).plt \
+		--apps erts kernel stdlib crypto public_key ssl
 
 dialyze:
-	@$(DIALYZER) --src src --plt .$(PROJECT).plt \
+	@dialyzer --src src --plt .$(PROJECT).plt \
 		-Werror_handling -Wrace_conditions -Wunmatched_returns # -Wunderspecs
