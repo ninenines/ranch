@@ -21,6 +21,7 @@ Ranch User Guide
  *  [Protocols](protocols.md)
    *  Purpose
    *  Writing a protocol handler
+   *  Using gen_server
  *  [SSL client authentication](ssl_auth.md)
    *  Purpose
    *  Obtaining client certificates

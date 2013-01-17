@@ -59,3 +59,63 @@ loop(Socket, Transport) ->
             ok = Transport:close(Socket)
     end.
 ```
+
+Using gen_server
+----------------
+
+Special processes like the ones that use the `gen_server` or `gen_fsm`
+behaviours have the particularity of having their `start_link` call not
+return until the `init` function returns. This is problematic, because
+you won't be able to call `ranch:accept_ack/1` from the `init` callback
+as this would cause a deadlock to happen.
+
+There are two ways of solving this problem.
+
+The first, and probably the most elegant one, is to make use of the
+`gen_server:enter_loop/3` function. It allows you to start your process
+normally (although it must be started with `proc_lib` like all special
+processes), then perform any needed operations before falling back into
+the normal `gen_server` execution loop.
+
+``` erlang
+-module(my_protocol).
+-behaviour(gen_server).
+-behaviour(ranch_protocol).
+
+-export([start_link/4]).
+-export([init/1]).
+%% Exports of other gen_server callbacks here.
+
+start_link(ListenerPid, Socket, Transport, Opts) ->
+    proc_lib:start_link(?MODULE, [[ListenerPid, Socket, Transport, Opts]]).
+
+init(ListenerPid, Socket, Transport, _Opts = []) ->
+    ok = proc_lib:init_ack({ok, self()}),
+    %% Perform any required state initialization here.
+    ok = ranch:accept_ack(ListenerPid),
+    ok = Transport:setopts(Socket, [{active, once}]),
+    gen_server:enter_loop(?MODULE, [], {state, Socket, Transport}).
+
+%% Other gen_server callbacks here.
+```
+
+The second method involves triggering a timeout just after `gen_server:init`
+ends. If you return a timeout value of `0` then the `gen_server` will call
+`handle_info(timeout, _, _)` right away.
+
+``` erlang
+-module(my_protocol).
+-behaviour(gen_server).
+-behaviour(ranch_protocol).
+
+%% Exports go here.
+
+init([ListenerPid, Socket, Transport]) ->
+    {ok, {state, ListenerPid, Socket, Transport}, 0}.
+
+handle_info(timeout, State={state, ListenerPid, Socket, Transport}) ->
+    ok = ranch:accept_ack(ListenerPid),
+    ok = Transport:setopts(Socket, [{active, once}]),
+    {noreply, State};
+%% ...
+```
