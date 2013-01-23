@@ -59,8 +59,14 @@ stop(ServerPid) ->
 %% @doc Add a connection to the listener's pool.
 -spec add_connection(pid(), pid()) -> non_neg_integer().
 add_connection(ServerPid, ConnPid) ->
-	ok = gen_server:cast(ServerPid, {add_connection, ConnPid}),
-	ranch_server:add_connection(ServerPid).
+	try
+		Count = ranch_server:add_connection(ServerPid),
+		ok = gen_server:cast(ServerPid, {add_connection, ConnPid}),
+		Count
+	catch
+		error:badarg -> % Max conns = infinity
+			0
+	end.
 
 %% @doc Remove this process' connection from the pool.
 %%
@@ -149,6 +155,8 @@ handle_call(_, _From, State) ->
 	{reply, ignored, State}.
 
 %% @private
+handle_cast({add_connection, _ConnPid}, State=#state{max_conns=infinity}) ->
+	{noreply, State};
 handle_cast({add_connection, ConnPid}, State) ->
 	_ = erlang:monitor(process, ConnPid),
 	{noreply, State};
