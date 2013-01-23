@@ -127,9 +127,12 @@ handle_call(get_max_connections, _From, State=#state{max_conns=MaxConns}) ->
 handle_call({set_max_connections, MaxConnections}, _From,
 		State=#state{ref=Ref, max_conns=CurrMax, rm_diff=CurrDiff}) ->
 	RmDiff = case {MaxConnections, CurrMax} of
+		{infinity, infinity} -> % stay current
+			CurrDiff;
 		{infinity, _} -> % moving to infinity, delete connection key
+			Count = ranch_server:count_connections(self()),
 			ranch_server:remove_connections_counter(self()),
-			0;
+			CurrDiff + Count;
 		{_, infinity} -> % moving away from infinity, create connection key
 			ranch_server:add_connections_counter(self()),
 			CurrDiff;
