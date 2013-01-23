@@ -294,7 +294,11 @@ tcp_infinity_max_connections(_) ->
 	ranch:set_max_connections(tcp_infinity_max_connections, 10),
 	0 = ranch_server:count_connections(ListenerPid),
 	10 = receive_loop(connected, 1000),
-	10 = ranch_server:count_connections(ListenerPid). % count could be off
+	10 = ranch_server:count_connections(ListenerPid), % count could be off
+	ranch:set_max_connections(tcp_infinity_max_connections, infinity),
+	Ref = monitor(process, ListenerPid),
+	receive {'DOWN', _, _, Reason} -> error(Reason) after 2500 -> ok end,
+	true = demonitor(Ref, [flush, info]).
 
 tcp_upgrade(_) ->
 	receive after 20000 -> ok end,
