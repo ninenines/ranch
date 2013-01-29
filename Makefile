@@ -18,13 +18,15 @@ clean-all: clean clean-docs
 
 MODULES = $(shell ls src/*.erl | sed 's/src\///;s/\.erl/,/' | sed '$$s/.$$//')
 
-app:
-	@mkdir -p ebin/
+app: ebin/$(PROJECT).app
 	@cat src/$(PROJECT).app.src \
 		| sed 's/{modules, \[\]}/{modules, \[$(MODULES)\]}/' \
 		> ebin/$(PROJECT).app
+
+ebin/$(PROJECT).app: src/*.erl
+	@mkdir -p ebin/
 	erlc -v $(ERLC_OPTS) -o ebin/ -pa ebin/ \
-		src/$(PROJECT)_transport.erl src/*.erl
+		src/$(PROJECT)_transport.erl $?
 
 clean:
 	rm -rf ebin/
