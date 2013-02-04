@@ -297,7 +297,6 @@ tcp_infinity_max_connections(_) ->
 	10 = ranch_server:count_connections(ListenerPid). % count could be off
 
 tcp_upgrade(_) ->
-	receive after 20000 -> ok end,
 	{ok, _} = ranch:start_listener(tcp_upgrade, 1,
 		ranch_tcp, [{port, 0}],
 		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
