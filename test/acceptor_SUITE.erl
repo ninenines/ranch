@@ -23,9 +23,11 @@
 -export([end_per_suite/1]).
 -export([init_per_group/2]).
 -export([end_per_group/2]).
+-export([end_per_testcase/2]).
 
 %% misc.
 -export([misc_bad_transport/1]).
+-export([recover_ranch_server_state/1]).
 
 %% ssl.
 -export([ssl_accept_error/1]).
@@ -47,6 +49,8 @@
 -export([supervisor_clean_restart/1]).
 -export([supervisor_clean_child_restart/1]).
 -export([supervisor_conns_alive/1]).
+-export([supervisor_clean_listener_restart1/1]).
+-export([supervisor_clean_listener_restart2/1]).
 
 %% ct.
 
@@ -69,11 +73,14 @@ groups() ->
 		ssl_active_echo,
 		ssl_echo
 	]}, {misc, [
-		misc_bad_transport
+		misc_bad_transport,
+		recover_ranch_server_state
 	]}, {supervisor, [
 		supervisor_clean_restart,
 		supervisor_clean_child_restart,
-		supervisor_conns_alive
+		supervisor_conns_alive,
+		supervisor_clean_listener_restart1,
+		supervisor_clean_listener_restart2
 	]}].
 
 init_per_suite(Config) ->
@@ -100,6 +107,16 @@ end_per_group(ssl, _) ->
 end_per_group(_, _) ->
 	ok.
 
+end_per_testcase(_, _) ->
+	Apps = application:which_applications(),
+	case lists:keymember(ranch, 1, Apps) of
+		true ->
+			ok;
+		false ->
+			application:start(ranch),
+			{fail, ranch_down}
+	end.
+
 %% misc.
 
 misc_bad_transport(_) ->
@@ -107,6 +124,33 @@ misc_bad_transport(_) ->
 		bad_transport, [{port, 0}],
 		echo_protocol, []),
 	ok.
+
+recover_ranch_server_state(_) ->
+	%% Verify that if the ranch_server crashes it will recover its state
+	%% (re-monitor active listeners/acceptors).
+	%% @todo add format_status/2 to ranch_server and check using sys:get_status.
+	Name = recover_ranch_server_state,
+	{ok, _Pid} = ranch:start_listener(Name,
+		2, ranch_tcp, [{port, 0}], echo_protocol, []),
+	ServerPid = erlang:whereis(ranch_server),
+	{monitors, Monitors} = erlang:process_info(ServerPid, monitors),
+	erlang:exit(ServerPid, kill),
+	receive after 1000 -> ok end,
+	ServerPid2 = erlang:whereis(ranch_server),
+	{monitors, Monitors2} = erlang:process_info(ServerPid2, monitors),
+	%% check ranch_server is monitoring same processes
+	true = (lists:sort(Monitors) == lists:sort(Monitors2)),
+	%% kill listener and check it is unregistered
+	ranch:stop_listener(Name),
+	receive after 1000 -> ok end,
+	try ranch_server:lookup_listener(Name) of
+		_ ->
+			error(failed_to_unregister_listener)
+	catch
+		error:badarg ->
+			%% ranch_server unregistered the listener.
+			ok
+	end.
 
 %% ssl.
 
@@ -435,6 +479,61 @@ supervisor_conns_alive(_) ->
 	receive {tcp_closed, _} -> ok end,
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
+	ranch:stop_listener(Name).
+
+supervisor_clean_listener_restart1(_) ->
+	%% Verify that if the listener dies and ranch_server is busy (has not yet
+	%% handled the 'DOWN' message) that the newly spawned listener can still
+	%% register. If the listener can not, it could repeatedly fail causing ranch
+	%% to shutdown.
+	Name = supervisor_clean_listener_restart1,
+	{ok, Pid} = ranch:start_listener(Name,
+		1, ranch_tcp, [{port, 0}], echo_protocol, []),
+	1 = erlang:trace(Pid, true, [procs]),
+	ListenerPid0 = ranch_server:lookup_listener(Name),
+	ServerPid = erlang:whereis(ranch_server),
+	%% prevent ranch_server from handling the 'DOWN' message before restart
+	erlang:suspend_process(ServerPid),
+	erlang:exit(ListenerPid0, kill),
+	receive after 1000 -> ok end,
+	%% allow ranch_server to continue (badarg here means ranch shutdown)
+	erlang:resume_process(ServerPid),
+	%% listener_sup restarts listener, conns_sup and acceptors_sup
+	[receive {trace, Pid, spawn, _, _} -> ok after 1000 -> error(timeout) end ||
+		_ <- [ranch_listener, ranch_conns_sup, ranch_acceptors_sup]],
+	receive
+		{trace, Pid, spawn, _, _} ->
+			%% restart wasn't clean
+			error(mulitple_restarts)
+	after 1000 ->
+			ok
+	end,
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces(),
+	ranch:stop_listener(Name).
+
+supervisor_clean_listener_restart2(_) ->
+	%% Verify that if the listener dies and ranch_server has removed it from the
+	%% ets table that a ranch_acceptor (that is about to be killed by its
+	%% supervisor) can attempt to register and not crash the ranch_server
+	Name = supervisor_clean_listener_restart2,
+	{ok, Pid} = ranch:start_listener(Name,
+		1, ranch_tcp, [{port, 0}], echo_protocol, []),
+	ListenerPid0 = ranch_server:lookup_listener(Name),
+	ServerPid = erlang:whereis(ranch_server),
+	Children = supervisor:which_children(Pid),
+	{_, AcceptorsSupPid, _, _} = lists:keyfind(ranch_acceptors_sup, 1, Children),
+	%% prevent ranch_acceptor_sup from handling 'EXIT' from ranch_listener_sup
+	erlang:suspend_process(AcceptorsSupPid),
+	erlang:exit(ListenerPid0, kill),
+	receive after 1000 -> ok end,
+	%% Pretend to be an acceptor registering itself
+	spawn(fun() -> ranch_server:add_acceptor(Name, self()) end),
+	%% allow ranch_acceptor_sup to continue (and kill its acceptors)
+	erlang:resume_process(AcceptorsSupPid),
+	receive after 1000 -> ok end,
+	%% check ranch_server did not crash
+	ServerPid = erlang:whereis(ranch_server),
 	ranch:stop_listener(Name).
 
 %% Utility functions.
