@@ -71,6 +71,11 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %%  <dt>port</dt><dd>TCP port number to open. Defaults to 0 (see below)</dd>
 %%  <dt>verify</dt><dd>Optional. If set to verify_peer, performs an x509-path
 %%   validation and request the client for a certificate.</dd>
+%%  <dt>fail_if_no_peer_cert</dt><dd>Optional. Used together with {verify, verify_peer}.
+%%   If set to true, the server will fail if the client does not have a certificate
+%%   to send, i.e. sends a empty certificate, if set to false (that is by default)
+%%   it will only fail if the client sends an invalid certificate (an empty
+%%   certificate is considered valid).</dd>
 %% </dl>
 %%
 %% You can listen to a random port by setting the port option to 0.
@@ -84,7 +89,7 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 	| {certfile, string()} | {ciphers, [ssl:erl_cipher_suite()] | string()}
 	| {ip, inet:ip_address()} | {keyfile, string()} | {nodelay, boolean()}
 	| {password, string()} | {port, inet:port_number()}
-	| {verify, ssl:verify_type()}])
+	| {verify, ssl:verify_type()} | {fail_if_no_peer_cert, boolean()}])
 	-> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
 	ranch:require([crypto, public_key, ssl]),
@@ -95,7 +100,7 @@ listen(Opts) ->
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts2,
 		[backlog, cacertfile, certfile, ciphers, ip,
-			keyfile, nodelay, password, port, raw, verify],
+			keyfile, nodelay, password, port, raw, verify, fail_if_no_peer_cert],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 
