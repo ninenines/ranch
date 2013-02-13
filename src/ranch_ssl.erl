@@ -61,6 +61,11 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %%  <dt>ciphers</dt><dd>Optional. The cipher suites that should be supported.
 %%   The function ssl:cipher_suites/0 can be used to find all available
 %%   ciphers.</dd>
+%%  <dt>fail_if_no_peer_cert</dt><dd>Optional. Used together with {verify, verify_peer}.
+%%   If set to true, the server will fail if the client does not have a certificate
+%%   to send, i.e. sends a empty certificate, if set to false (that is by default)
+%%   it will only fail if the client sends an invalid certificate (an empty
+%%   certificate is considered valid).</dd>
 %%  <dt>ip</dt><dd>Interface to listen on. Listen on all interfaces
 %%   by default.</dd>
 %%  <dt>keyfile</dt><dd>Optional. Path to the file containing the user's
@@ -71,11 +76,6 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %%  <dt>port</dt><dd>TCP port number to open. Defaults to 0 (see below)</dd>
 %%  <dt>verify</dt><dd>Optional. If set to verify_peer, performs an x509-path
 %%   validation and request the client for a certificate.</dd>
-%%  <dt>fail_if_no_peer_cert</dt><dd>Optional. Used together with {verify, verify_peer}.
-%%   If set to true, the server will fail if the client does not have a certificate
-%%   to send, i.e. sends a empty certificate, if set to false (that is by default)
-%%   it will only fail if the client sends an invalid certificate (an empty
-%%   certificate is considered valid).</dd>
 %% </dl>
 %%
 %% You can listen to a random port by setting the port option to 0.
@@ -87,9 +87,10 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %% @see ssl:listen/2
 -spec listen([{backlog, non_neg_integer()} | {cacertfile, string()}
 	| {certfile, string()} | {ciphers, [ssl:erl_cipher_suite()] | string()}
+	| {fail_if_no_peer_cert, boolean()}
 	| {ip, inet:ip_address()} | {keyfile, string()} | {nodelay, boolean()}
 	| {password, string()} | {port, inet:port_number()}
-	| {verify, ssl:verify_type()} | {fail_if_no_peer_cert, boolean()}])
+	| {verify, ssl:verify_type()}])
 	-> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
 	ranch:require([crypto, public_key, ssl]),
@@ -99,8 +100,8 @@ listen(Opts) ->
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts2,
-		[backlog, cacertfile, certfile, ciphers, ip,
-			keyfile, nodelay, password, port, raw, verify, fail_if_no_peer_cert],
+		[backlog, cacertfile, certfile, ciphers, fail_if_no_peer_cert, ip,
+			keyfile, nodelay, password, port, raw, verify],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 
