@@ -70,6 +70,9 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %%   by default.</dd>
 %%  <dt>keyfile</dt><dd>Optional. Path to the file containing the user's
 %%   private PEM encoded key.</dd>
+%%  <dt>next_protocols_advertised</dt><dd>Optional. Erlang R16B+ required.
+%%   List of protocols advertised by TLS Next Protocol Negotiation
+%%   extension.</dd>
 %%  <dt>nodelay</dt><dd>Optional. Enable TCP_NODELAY. Enabled by default.</dd>
 %%  <dt>password</dt><dd>Optional. String containing the user's password.
 %%   All private keyfiles must be password protected currently.</dd>
@@ -88,7 +91,8 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 -spec listen([{backlog, non_neg_integer()} | {cacertfile, string()}
 	| {certfile, string()} | {ciphers, [ssl:erl_cipher_suite()] | string()}
 	| {fail_if_no_peer_cert, boolean()}
-	| {ip, inet:ip_address()} | {keyfile, string()} | {nodelay, boolean()}
+	| {ip, inet:ip_address()} | {keyfile, string()}
+	| {next_protocols_advertised, [binary()]} | {nodelay, boolean()}
 	| {password, string()} | {port, inet:port_number()}
 	| {verify, ssl:verify_type()}])
 	-> {ok, ssl:sslsocket()} | {error, atom()}.
@@ -101,7 +105,8 @@ listen(Opts) ->
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts2,
 		[backlog, cacertfile, certfile, ciphers, fail_if_no_peer_cert, ip,
-			keyfile, nodelay, password, port, raw, verify],
+			keyfile, next_protocols_advertised, nodelay, password, port,
+			raw, verify],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 
