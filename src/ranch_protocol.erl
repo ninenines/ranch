@@ -14,11 +14,21 @@
 
 %% @private
 -module(ranch_protocol).
+-export([behaviour_info/1]).
 
 %% Start a new connection process for the given socket.
--callback start_link(
-		ListenerPid::pid(),
-		Socket::any(),
-		Transport::module(),
-		ProtocolOptions::any())
-	-> {ok, ConnectionPid::pid()}.
+%%-callback start_link(
+%%		ListenerPid::pid(),
+%%		Socket::any(),
+%%		Transport::module(),
+%%		ProtocolOptions::any())
+%%	-> {ok, ConnectionPid::pid()}.
+
+
+%% @doc Behaviour information callback.
+behaviour_info(callbacks) ->
+    [{start_link,4}]; %% Start a new connection process for the given socket.
+behaviour_info(_) ->
+    undefined.
+
+
