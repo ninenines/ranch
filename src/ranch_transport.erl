@@ -44,6 +44,10 @@
 -callback accept(socket(), timeout())
 	-> {ok, socket()} | {error, closed | timeout | atom() | tuple()}.
 
+%% Initiate any post-accept handshake operations
+-callback handshake(socket(), timeout())
+	-> {ok, socket()} | {error, closed | timeout | atom() | tuple()}.
+
 %% Experimental. Open a connection to the given host and port number.
 -callback connect(string(), inet:port_number(), opts())
 	-> {ok, socket()} | {error, atom()}.
