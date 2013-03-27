@@ -2,14 +2,14 @@
 -behaviour(ranch_protocol).
 
 -export([start_link/4]).
--export([init/2]).
+-export([init/4]).
 
-start_link(ListenerPid, _, _, [{remove, MaybeRemove}]) ->
-	Pid = spawn_link(?MODULE, init, [ListenerPid, MaybeRemove]),
+start_link(ListenerPid, Socket, Transport, [{remove, MaybeRemove}]) ->
+	Pid = spawn_link(?MODULE, init, [ListenerPid, Socket, Transport, MaybeRemove]),
 	{ok, Pid}.
 
-init(ListenerPid, MaybeRemove) ->
-	ranch:accept_ack(ListenerPid),
+init(ListenerPid, Socket, Transport, MaybeRemove) ->
+	_ = ranch:accept_ack(ListenerPid, Socket, Transport, infinity),
 	case MaybeRemove of
 		true ->
 			ranch_listener:remove_connection(ListenerPid);

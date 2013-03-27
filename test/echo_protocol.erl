@@ -9,8 +9,8 @@ start_link(ListenerPid, Socket, Transport, Opts) ->
 	{ok, Pid}.
 
 init(ListenerPid, Socket, Transport, _Opts = []) ->
-	ok = ranch:accept_ack(ListenerPid),
-	loop(Socket, Transport).
+	{ok, Socket1} = ranch:accept_ack(ListenerPid, Socket, Transport, infinity),
+	loop(Socket1, Transport).
 
 loop(Socket, Transport) ->
 	case Transport:recv(Socket, 0, 5000) of
