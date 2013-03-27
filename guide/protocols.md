@@ -19,17 +19,18 @@ the call to `ranch:start_listener/6`. This callback must
 return `{ok, Pid}`, with `Pid` the pid of the new process.
 
 The newly started process can then freely initialize itself. However,
-it must call `ranch:accept_ack/1` before doing any socket operation.
+it must call `ranch:accept_ack/4` before doing any socket operation.
 This will ensure the connection process is the owner of the socket.
-It expects the listener's pid as argument.
+It expects the listener's pid as argument, as well as the socket and
+the transport.
 
 ``` erlang
-ok = ranch:accept_ack(ListenerPid).
+ok = ranch:accept_ack(ListenerPid, Socket, Transport, Timeout).
 ```
 
 If your protocol code requires specific socket options, you should
 set them while initializing your connection process and before
-starting `ranch:accept_ack/1`. You can use `Transport:setopts/2`
+starting `ranch:accept_ack/4`. You can use `Transport:setopts/2`
 for that purpose.
 
 Following is the complete protocol code for the example found
@@ -47,8 +48,8 @@ start_link(ListenerPid, Socket, Transport, Opts) ->
     {ok, Pid}.
 
 init(ListenerPid, Socket, Transport, _Opts = []) ->
-    ok = ranch:accept_ack(ListenerPid),
-    loop(Socket, Transport).
+    {ok, Socket1} = ranch:accept_ack(ListenerPid, Socket, Transport, infinity),
+    loop(Socket1, Transport).
 
 loop(Socket, Transport) ->
     case Transport:recv(Socket, 0, 5000) of
@@ -66,7 +67,7 @@ Using gen_server
 Special processes like the ones that use the `gen_server` or `gen_fsm`
 behaviours have the particularity of having their `start_link` call not
 return until the `init` function returns. This is problematic, because
-you won't be able to call `ranch:accept_ack/1` from the `init` callback
+you won't be able to call `ranch:accept_ack/4` from the `init` callback
 as this would cause a deadlock to happen.
 
 There are two ways of solving this problem.
@@ -92,9 +93,9 @@ start_link(ListenerPid, Socket, Transport, Opts) ->
 init(ListenerPid, Socket, Transport, _Opts = []) ->
     ok = proc_lib:init_ack({ok, self()}),
     %% Perform any required state initialization here.
-    ok = ranch:accept_ack(ListenerPid),
+    {ok, Socket1} = ranch:accept_ack(ListenerPid, Socket, Transport, infinity),
     ok = Transport:setopts(Socket, [{active, once}]),
-    gen_server:enter_loop(?MODULE, [], {state, Socket, Transport}).
+    gen_server:enter_loop(?MODULE, [], {state, Socket1, Transport}).
 
 %% Other gen_server callbacks here.
 ```
@@ -114,8 +115,8 @@ init([ListenerPid, Socket, Transport]) ->
     {ok, {state, ListenerPid, Socket, Transport}, 0}.
 
 handle_info(timeout, State={state, ListenerPid, Socket, Transport}) ->
-    ok = ranch:accept_ack(ListenerPid),
-    ok = Transport:setopts(Socket, [{active, once}]),
-    {noreply, State};
+    {ok, Socket1} = ranch:accept_ack(ListenerPid, Socket, Transport, infinity),
+    ok = Transport:setopts(Socket1, [{active, once}]),
+    {noreply, {state, ListenerPid, Socket1, Transport}};
 %% ...
 ```
