@@ -35,10 +35,9 @@ start_link(LSocket, Transport, ConnsSup) ->
 loop(LSocket, Transport, ConnsSup) ->
 	_ = case Transport:accept(LSocket, infinity) of
 		{ok, CSocket} ->
-			Transport:controlling_process(CSocket, ConnsSup),
-			%% This call will not return until process has been started
-			%% AND we are below the maximum number of connections.
-			ranch_conns_sup:start_protocol(ConnsSup, CSocket);
+			start_protocol(Transport, ConnsSup, CSocket, undefined);
+		{ok, CSocket, HandshakeFun} ->
+			start_protocol(Transport, ConnsSup, CSocket, HandshakeFun);
 		%% Reduce the accept rate if we run out of file descriptors.
 		%% We can't accept anymore anyway, so we might as well wait
 		%% a little for the situation to resolve itself.
@@ -49,3 +48,14 @@ loop(LSocket, Transport, ConnsSup) ->
 			ok
 	end,
 	?MODULE:loop(LSocket, Transport, ConnsSup).
+
+%% internal
+
+-spec start_protocol(module(), pid(), inet:socket(),
+		ranch_transport:handshake())
+	-> {ok, pid()} | {error, term()}.
+start_protocol(Transport, ConnsSup, CSocket, HandshakeFun) ->
+	Transport:controlling_process(CSocket, ConnsSup),
+	%% This call will not return until process has been started
+	%% AND we are below the maximum number of connections.
+	ranch_conns_sup:start_protocol(ConnsSup, CSocket, HandshakeFun).

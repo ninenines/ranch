@@ -21,7 +21,7 @@
 
 %% API.
 -export([start_link/3]).
--export([start_protocol/2]).
+-export([start_protocol/3]).
 -export([active_connections/1]).
 
 %% Supervisor internals.
@@ -61,9 +61,10 @@ start_link(Ref, Transport, Protocol) ->
 %% We do not need the reply, we only need the ok from the supervisor
 %% to continue. The supervisor sends its own pid when the acceptor can
 %% continue.
--spec start_protocol(pid(), inet:socket()) -> ok.
-start_protocol(SupPid, Socket) ->
-	SupPid ! {?MODULE, start_protocol, self(), Socket},
+-spec start_protocol(pid(), inet:socket(), ranch_transport:handshake())
+	-> {ok, pid()}.
+start_protocol(SupPid, Socket, Handshake) ->
+	SupPid ! {?MODULE, start_protocol, self(), Socket, Handshake},
 	receive SupPid -> ok end.
 
 %% We can't make the above assumptions here. This function might be
@@ -102,11 +103,11 @@ loop(State=#state{parent=Parent, ref=Ref,
 		transport=Transport, protocol=Protocol, opts=Opts,
 		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
 	receive
-		{?MODULE, start_protocol, To, Socket} ->
+		{?MODULE, start_protocol, To, Socket, Handshake} ->
 			case Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
 					Transport:controlling_process(Socket, Pid),
-					Pid ! {shoot, Ref},
+					Pid ! {shoot, Ref, Handshake},
 					put(Pid, true),
 					CurConns2 = CurConns + 1,
 					if CurConns2 < MaxConns ->

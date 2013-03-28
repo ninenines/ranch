@@ -118,11 +118,12 @@ listen(Opts) ->
 %% @see ssl:transport_accept/2
 %% @see ssl:ssl_accept/2
 -spec accept(ssl:sslsocket(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom() | tuple()}.
+    -> {ok, ssl:sslsocket(), ranch_transport:handshake()}
+	| {error, closed | timeout | atom() | tuple()}.
 accept(LSocket, Timeout) ->
 	case ssl:transport_accept(LSocket, Timeout) of
 		{ok, CSocket} ->
-			ssl_accept(CSocket, Timeout);
+			{ok, CSocket, fun() -> ssl_accept(CSocket, Timeout) end};
 		{error, Reason} ->
 			{error, Reason}
 	end.
@@ -222,13 +223,13 @@ close(Socket) ->
 %% was given, or because we've decided to use 5000ms instead of infinity.
 %% This value should be reasonable enough for the moment.
 -spec ssl_accept(ssl:sslsocket(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, {ssl_accept, atom()}}.
+	-> ok | {error, {ssl_accept, atom()}}.
 ssl_accept(Socket, infinity) ->
 	ssl_accept(Socket, 5000);
 ssl_accept(Socket, Timeout) ->
 	case ssl:ssl_accept(Socket, Timeout) of
 		ok ->
-			{ok, Socket};
+			ok;
 		{error, Reason} ->
 			{error, {ssl_accept, Reason}}
 	end.

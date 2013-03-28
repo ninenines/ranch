@@ -17,6 +17,9 @@
 
 -type socket() :: any().
 -type opts() :: any().
+-type handshake() :: undefined | fun(() -> ok | {error, term()}).
+
+-export_type([handshake/0]).
 
 %% Name of the transport.
 -callback name() -> atom().
@@ -40,9 +43,13 @@
 %% ranch:get_port/1 instead.
 -callback listen(opts()) -> {ok, socket()} | {error, atom()}.
 
-%% Accept connections with the given listening socket.
+%% Accept connections with the given listening socket. If handshaking is
+%% required after the initial accept a fun is also returned. The fun should
+%% accept a timeout value and return ok on success. It will be called by
+%% ranch:accept_ack/2.
 -callback accept(socket(), timeout())
-	-> {ok, socket()} | {error, closed | timeout | atom() | tuple()}.
+    -> {ok, socket()} | {ok, socket(), handshake()}
+	| {error, closed | timeout | atom() | tuple()}.
 
 %% Experimental. Open a connection to the given host and port number.
 -callback connect(string(), inet:port_number(), opts())
