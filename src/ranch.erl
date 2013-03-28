@@ -18,7 +18,7 @@
 -export([start_listener/6]).
 -export([stop_listener/1]).
 -export([child_spec/6]).
--export([accept_ack/1]).
+-export([accept_ack/4]).
 -export([get_port/1]).
 -export([get_max_connections/1]).
 -export([set_max_connections/2]).
@@ -115,9 +115,10 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 %%
 %% Effectively used to make sure the socket control has been given to
 %% the protocol process before starting to use it.
--spec accept_ack(pid()) -> ok.
-accept_ack(ListenerPid) ->
-	receive {shoot, ListenerPid} -> ok end.
+-spec accept_ack(pid(), any(), module(), timeout()) -> {ok, inet:socket()} | {error, closed | timeout | atom()}.
+accept_ack(ListenerPid, Socket, Transport, Timeout) ->
+	receive {shoot, ListenerPid} -> ok end,
+	Transport:handshake(Socket, Timeout).
 
 %% @doc Return the listener's port.
 -spec get_port(any()) -> inet:port_number().

@@ -24,6 +24,7 @@
 -export([messages/0]).
 -export([listen/1]).
 -export([accept/2]).
+-export([handshake/2]).
 -export([connect/3]).
 -export([recv/3]).
 -export([send/2]).
@@ -80,6 +81,12 @@ listen(Opts) ->
 	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.
 accept(LSocket, Timeout) ->
 	gen_tcp:accept(LSocket, Timeout).
+
+%% @doc Post-accept handshake for the connected socket.
+-spec handshake(inet:socket(), timeout())
+	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.
+handshake(Socket, _Timeout) ->
+	{ok, Socket}.
 
 %% @private Experimental. Open a connection to the given host and port number.
 %% @see gen_tcp:connect/3

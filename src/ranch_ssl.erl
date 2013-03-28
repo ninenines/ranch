@@ -29,6 +29,7 @@
 -export([messages/0]).
 -export([listen/1]).
 -export([accept/2]).
+-export([handshake/2]).
 -export([connect/3]).
 -export([recv/3]).
 -export([send/2]).
@@ -110,21 +111,29 @@ listen(Opts) ->
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 
-%% @doc Accept connections with the given listening socket.
+%% @doc Accept transport connections with the given listening socket.
 %%
-%% Note that this function does both the transport accept and
-%% the SSL handshake. The returned socket is thus fully connected.
+%% Note that this function only does the transport accept and
+%% the returned socket is only connected at the transport layer.
 %%
+%% @see handshake/2
 %% @see ssl:transport_accept/2
-%% @see ssl:ssl_accept/2
 -spec accept(ssl:sslsocket(), timeout())
 	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom() | tuple()}.
 accept(LSocket, Timeout) ->
-	case ssl:transport_accept(LSocket, Timeout) of
-		{ok, CSocket} ->
-			ssl_accept(CSocket, Timeout);
+	ssl:transport_accept(LSocket, Timeout).
+
+%% @doc Initiate the ssl handshake for the connected socket
+%%
+%% @see ssl:ssl_accept/2
+-spec handshake(ssl:sslsocket(), timeout())
+	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom() | tuple()}.
+handshake(Socket, Timeout) ->
+	case ssl:ssl_accept(Socket, Timeout) of
+		ok ->
+			{ok, Socket};
 		{error, Reason} ->
-			{error, Reason}
+			{error, {ssl_accept, Reason}}
 	end.
 
 %% @private Experimental. Open a connection to the given host and port number.
@@ -215,15 +224,3 @@ sockname(Socket) ->
 -spec close(ssl:sslsocket()) -> ok.
 close(Socket) ->
 	ssl:close(Socket).
-
-%% Internal.
-
--spec ssl_accept(ssl:sslsocket(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, {ssl_accept, atom()}}.
-ssl_accept(Socket, Timeout) ->
-	case ssl:ssl_accept(Socket, Timeout) of
-		ok ->
-			{ok, Socket};
-		{error, Reason} ->
-			{error, {ssl_accept, Reason}}
-	end.
