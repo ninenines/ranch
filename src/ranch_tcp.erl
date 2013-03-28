@@ -114,7 +114,15 @@ send(Socket, Packet) ->
 -spec sendfile(inet:socket(), file:name())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, Filename) ->
-	file:sendfile(Filename, Socket).
+	try file:sendfile(Filename, Socket) of
+		Result -> Result
+	catch
+		error:{badmatch, {error, enotconn}} ->
+			%% file:sendfile/2 might fail by throwing a {badmatch, {error, enotconn}}
+			%% this is because its internal implementation fails with a badmatch in
+			%% prim_file:sendfile/10 if the socket is not connected.
+			{error, closed}
+	end.
 
 %% @doc Set options on the given socket.
 %% @see inet:setopts/2
