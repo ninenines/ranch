@@ -23,12 +23,7 @@
 -export([set_connections_sup/2]).
 -export([lookup_connections_sup/1]).
 -export([add_acceptor/2]).
--export([send_to_acceptors/2]).
--export([add_connection/1]).
 -export([count_connections/1]).
--export([remove_connection/1]).
--export([add_connections_counter/1]).
--export([remove_connections_counter/1]).
 
 %% gen_server.
 -export([init/1]).
@@ -80,51 +75,10 @@ lookup_connections_sup(Ref) ->
 add_acceptor(Ref, Pid) ->
 	gen_server:cast(?MODULE, {add_acceptor, Ref, Pid}).
 
-%% @doc Send a message to all acceptors of the given listener.
--spec send_to_acceptors(any(), any()) -> ok.
-send_to_acceptors(Ref, Msg) ->
-	Acceptors = ets:lookup_element(?TAB, {acceptors, Ref}, 2),
-	_ = [Pid ! Msg || Pid <- Acceptors],
-	ok.
-
-%% @doc Add a connection to the connection pool.
-%%
-%% Also return the number of connections in the pool after this operation.
--spec add_connection(pid()) -> non_neg_integer().
-add_connection(ListenerPid) ->
-	ets:update_counter(?TAB, {connections, ListenerPid}, 1).
-
 %% @doc Count the number of connections in the connection pool.
--spec count_connections(pid()) -> non_neg_integer().
-count_connections(ListenerPid) ->
-	try
-		ets:update_counter(?TAB, {connections, ListenerPid}, 0)
-	catch
-		error:badarg -> % Max conns = infinity
-			0
-	end.
-
-%% @doc Remove a connection from the connection pool.
-%%
-%% Also return the number of connections in the pool after this operation.
--spec remove_connection(pid()) -> non_neg_integer().
-remove_connection(ListenerPid) ->
-	ets:update_counter(?TAB, {connections, ListenerPid}, -1).
-
-
-%% @doc Add a connections counter to the connection pool
-%%
-%% Should only be used by ranch listeners when settings regarding the max
-%% number of connections change.
-add_connections_counter(Pid) ->
-	true = ets:insert_new(?TAB, {{connections, Pid}, 0}).
-
-%% @doc remove a connections counter from the connection pool
-%%
-%% Should only be used by ranch listeners when settings regarding the max
-%% number of connections change.
-remove_connections_counter(Pid) ->
-	true = ets:delete(?TAB, {connections, Pid}).
+-spec count_connections(any()) -> non_neg_integer().
+count_connections(Ref) ->
+	ranch_conns_sup:active_connections(lookup_connections_sup(Ref)).
 
 %% gen_server.
 
@@ -148,9 +102,6 @@ handle_cast({add_acceptor, Ref, Pid}, State=#state{monitors=Monitors}) ->
 	true = ets:insert(?TAB, {{acceptors, Ref}, [Pid|Acceptors]}),
 	{noreply, State#state{
 		monitors=[{{MonitorRef, Pid}, {acceptors, Ref}}|Monitors]}};
-handle_cast({add_connection, Pid}, State) ->
-	_ = erlang:monitor(process, Pid),
-	{noreply, State};
 handle_cast(_Request, State) ->
 	{noreply, State}.
 
@@ -178,7 +129,6 @@ code_change(_OldVsn, State, _Extra) ->
 remove_process(Key = {listener, Ref}, MonitorRef, Pid, Monitors) ->
 	true = ets:delete(?TAB, Key),
 	true = ets:delete(?TAB, {acceptors, Ref}),
-	remove_connections_counter(Pid),
 	lists:keydelete({MonitorRef, Pid}, 1, Monitors);
 remove_process(Key = {acceptors, _}, MonitorRef, Pid, Monitors) ->
 	try
