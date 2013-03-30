@@ -19,7 +19,6 @@
 %% API.
 -export([start_link/3]).
 -export([stop/1]).
--export([add_connection/2]).
 -export([remove_connection/1]).
 -export([get_port/1]).
 -export([set_port/2]).
@@ -40,8 +39,7 @@
 	ref :: any(),
 	max_conns = undefined :: ranch:max_conns(),
 	port = undefined :: undefined | inet:port_number(),
-	proto_opts = undefined :: any(),
-	rm_diff = 0 :: non_neg_integer()
+	proto_opts = undefined :: any()
 }).
 
 %% API.
@@ -56,27 +54,16 @@ start_link(Ref, MaxConns, ProtoOpts) ->
 stop(ServerPid) ->
 	gen_server:call(ServerPid, stop).
 
-%% @doc Add a connection to the listener's pool.
--spec add_connection(pid(), pid()) -> non_neg_integer().
-add_connection(ServerPid, ConnPid) ->
-	ok = gen_server:cast(ServerPid, {add_connection, ConnPid}),
-	ranch_server:add_connection(ServerPid).
-
 %% @doc Remove this process' connection from the pool.
 %%
 %% Useful if you have long-lived connections that aren't taking up
 %% resources and shouldn't be counted in the limited number of running
 %% connections.
--spec remove_connection(pid()) -> non_neg_integer().
+-spec remove_connection(pid()) -> ok.
 remove_connection(ServerPid) ->
-	try
-		Count = ranch_server:remove_connection(ServerPid),
-		ok = gen_server:cast(ServerPid, remove_connection),
-		Count
-	catch
-		error:badarg -> % Max conns = infinity
-			0
-	end.
+	ConnsSup = ranch_server:find_connections_sup(ServerPid),
+	ConnsSup ! {remove_connection, ServerPid},
+	ok.
 
 %% @doc Return the listener's port.
 -spec get_port(pid()) -> {ok, inet:port_number()}.
@@ -111,12 +98,8 @@ set_protocol_options(ServerPid, ProtoOpts) ->
 %% gen_server.
 
 %% @private
-init([Ref, infinity, ProtoOpts]) ->
-	ok = ranch_server:insert_listener(Ref, self()),
-	{ok, #state{ref=Ref, max_conns=infinity, proto_opts=ProtoOpts}};
 init([Ref, MaxConns, ProtoOpts]) ->
 	ok = ranch_server:insert_listener(Ref, self()),
-	ranch_server:add_connections_counter(self()),
 	{ok, #state{ref=Ref, max_conns=MaxConns, proto_opts=ProtoOpts}}.
 
 %% @private
@@ -125,23 +108,15 @@ handle_call(get_port, _From, State=#state{port=Port}) ->
 handle_call(get_max_connections, _From, State=#state{max_conns=MaxConns}) ->
 	{reply, {ok, MaxConns}, State};
 handle_call({set_max_connections, MaxConnections}, _From,
-		State=#state{ref=Ref, max_conns=CurrMax, rm_diff=CurrDiff}) ->
-	RmDiff = case {MaxConnections, CurrMax} of
-		{infinity, _} -> % moving to infinity, delete connection key
-			ranch_server:remove_connections_counter(self()),
-			0;
-		{_, infinity} -> % moving away from infinity, create connection key
-			ranch_server:add_connections_counter(self()),
-			CurrDiff;
-		{_, _} -> % stay current
-			CurrDiff
-	end,
-	ranch_server:send_to_acceptors(Ref, {set_max_conns, MaxConnections}),
-	{reply, ok, State#state{max_conns=MaxConnections, rm_diff=RmDiff}};
+		State=#state{ref=Ref}) ->
+	ConnsSup = ranch_server:lookup_connections_sup(Ref),
+	ConnsSup ! {set_max_conns, MaxConnections},
+	{reply, ok, State#state{max_conns=MaxConnections}};
 handle_call(get_protocol_options, _From, State=#state{proto_opts=ProtoOpts}) ->
 	{reply, {ok, ProtoOpts}, State};
 handle_call({set_protocol_options, ProtoOpts}, _From, State=#state{ref=Ref}) ->
-	ranch_server:send_to_acceptors(Ref, {set_opts, ProtoOpts}),
+	ConnsSup = ranch_server:lookup_connections_sup(Ref),
+	ConnsSup ! {set_opts, ProtoOpts},
 	{reply, ok, State#state{proto_opts=ProtoOpts}};
 handle_call(stop, _From, State) ->
 	{stop, normal, stopped, State};
@@ -149,24 +124,12 @@ handle_call(_, _From, State) ->
 	{reply, ignored, State}.
 
 %% @private
-handle_cast({add_connection, ConnPid}, State) ->
-	_ = erlang:monitor(process, ConnPid),
-	{noreply, State};
-handle_cast(remove_connection, State=#state{max_conns=infinity}) ->
-	{noreply, State};
-handle_cast(remove_connection, State=#state{rm_diff=RmDiff}) ->
-	{noreply, State#state{rm_diff=RmDiff + 1}};
 handle_cast({set_port, Port}, State) ->
 	{noreply, State#state{port=Port}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
 %% @private
-handle_info({'DOWN', _, process, _, _}, State=#state{rm_diff=0}) ->
-	_ = ranch_server:remove_connection(self()),
-	{noreply, State};
-handle_info({'DOWN', _, process, _, _}, State=#state{rm_diff=RmDiff}) ->
-	{noreply, State#state{rm_diff=RmDiff - 1}};
 handle_info(_Info, State) ->
 	{noreply, State}.
 
