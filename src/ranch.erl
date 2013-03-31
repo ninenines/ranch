@@ -88,12 +88,7 @@ start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 %% connections abruptly.
 -spec stop_listener(any()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
-	case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
-		ok ->
-			supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref});
-		{error, Reason} ->
-			{error, Reason}
-	end.
+	supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}).
 
 %% @doc Return a child spec suitable for embedding.
 %%
@@ -109,7 +104,7 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		andalso is_atom(Protocol) ->
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
 		Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
-	]}, permanent, 5000, supervisor, [ranch_listener_sup]}.
+	]}, temporary, 5000, supervisor, [ranch_listener_sup]}.
 
 %% @doc Acknowledge the accepted connection.
 %%

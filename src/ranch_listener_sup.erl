@@ -30,23 +30,26 @@ start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	MaxConns = proplists:get_value(max_connections, TransOpts, 1024),
 	supervisor:start_link(?MODULE, {
 		Ref, NbAcceptors, MaxConns, Transport, TransOpts, Protocol, ProtoOpts
-		}).
+	}).
 
 %% supervisor.
 
 init({Ref, NbAcceptors, MaxConns, Transport, TransOpts, Protocol, ProtoOpts}) ->
+	Tid = ets:new(ranch_listener, [public]),
+	ok = ranch_listener:save_max_connections(Tid, MaxConns),
+	ok = ranch_listener:save_protocol_options(Tid, ProtoOpts),
 	ChildSpecs = [
 		%% listener
 		{ranch_listener, {ranch_listener, start_link,
-			[Ref, MaxConns, ProtoOpts]},
-		 permanent, 5000, worker, [ranch_listener]},
+				[Ref, Tid]},
+			permanent, 5000, worker, [ranch_listener]},
 		%% conns_sup
-		{ranch_conns_sup, {ranch_conns_sup, start_link, [Ref]},
-		 permanent, infinity, supervisor, [ranch_conns_sup]},
+		{ranch_conns_sup, {ranch_conns_sup, start_link,
+				[Ref, Transport, Protocol]},
+			permanent, infinity, supervisor, [ranch_conns_sup]},
 		%% acceptors_sup
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,
-			[Ref, NbAcceptors, Transport, TransOpts, Protocol]
-		 }, permanent, infinity, supervisor, [ranch_acceptors_sup]}
+				[Ref, NbAcceptors, Transport, TransOpts]
+			}, permanent, infinity, supervisor, [ranch_acceptors_sup]}
 	],
 	{ok, {{rest_for_one, 10, 10}, ChildSpecs}}.
-
