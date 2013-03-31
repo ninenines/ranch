@@ -35,10 +35,13 @@ start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 %% supervisor.
 
 init({Ref, NbAcceptors, MaxConns, Transport, TransOpts, Protocol, ProtoOpts}) ->
+	Tid = ets:new(ranch_listener, [public]),
+	ok = ranch_listener:save_max_connections(Tid, MaxConns),
+	ok = ranch_listener:save_protocol_options(Tid, ProtoOpts),
 	ChildSpecs = [
 		%% listener
 		{ranch_listener, {ranch_listener, start_link,
-				[Ref, MaxConns, ProtoOpts]},
+				[Ref, Tid]},
 			permanent, 5000, worker, [ranch_listener]},
 		%% conns_sup
 		{ranch_conns_sup, {ranch_conns_sup, start_link,

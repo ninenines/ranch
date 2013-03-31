@@ -47,6 +47,7 @@
 -export([supervisor_clean_restart/1]).
 -export([supervisor_clean_child_restart/1]).
 -export([supervisor_conns_alive/1]).
+-export([supervisor_listener_recover_state/1]).
 
 %% ct.
 
@@ -73,7 +74,8 @@ groups() ->
 	]}, {supervisor, [
 		supervisor_clean_restart,
 		supervisor_clean_child_restart,
-		supervisor_conns_alive
+		supervisor_conns_alive,
+		supervisor_listener_recover_state
 	]}].
 
 init_per_suite(Config) ->
@@ -433,6 +435,31 @@ supervisor_conns_alive(_) ->
 	receive {tcp_closed, _} -> error(closed) after 1500 -> ok end,
 	ok = gen_tcp:send(Socket, <<"poke">>),
 	receive {tcp_closed, _} -> ok end,
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces(),
+	ranch:stop_listener(Name).
+
+supervisor_listener_recover_state(_) ->
+	Name = supervisor_listener_recover_state,
+	{ok, _} = ranch:start_listener(Name, 1,
+			ranch_tcp, [{port, 0}, {max_connections, 10}], echo_protocol, []),
+	_ = erlang:trace(new, true, [call]),
+	1 = erlang:trace_pattern({ranch_listener, init, 1},
+			[{'_', [], [{return_trace}]}], [global]),
+	ok = ranch:set_max_connections(Name, 20),
+	ok = ranch:set_protocol_options(Name, [new]),
+	ListenerPid = ranch_server:lookup_listener(Name),
+	erlang:exit(ListenerPid, kill),
+	receive
+		{trace, _, return_from, {ranch_listener, init, 1}, _Result} ->
+			ok
+	after
+		1000 ->
+			error(timeout)
+	end,
+	%% check state was recovered
+	20 = ranch:get_max_connections(Name),
+	[new] = ranch:get_protocol_options(Name),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
 	ranch:stop_listener(Name).

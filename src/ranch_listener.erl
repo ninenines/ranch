@@ -17,7 +17,7 @@
 -behaviour(gen_server).
 
 %% API.
--export([start_link/3]).
+-export([start_link/2]).
 -export([stop/1]).
 -export([remove_connection/1]).
 -export([get_port/1]).
@@ -26,6 +26,8 @@
 -export([set_max_connections/2]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
+-export([save_max_connections/2]).
+-export([save_protocol_options/2]).
 
 %% gen_server.
 -export([init/1]).
@@ -37,6 +39,7 @@
 
 -record(state, {
 	ref :: any(),
+	tid :: ets:tid(),
 	max_conns = undefined :: ranch:max_conns(),
 	port = undefined :: undefined | inet:port_number(),
 	proto_opts = undefined :: any()
@@ -45,9 +48,9 @@
 %% API.
 
 %% @private
--spec start_link(any(), non_neg_integer(), any()) -> {ok, pid()}.
-start_link(Ref, MaxConns, ProtoOpts) ->
-	gen_server:start_link(?MODULE, [Ref, MaxConns, ProtoOpts], []).
+-spec start_link(any(), ets:tid()) -> {ok, pid()}.
+start_link(Ref, Tid) ->
+	gen_server:start_link(?MODULE, [Ref, Tid], []).
 
 %% @private
 -spec stop(pid()) -> stopped.
@@ -93,12 +96,28 @@ get_protocol_options(ServerPid) ->
 set_protocol_options(ServerPid, ProtoOpts) ->
 	gen_server:call(ServerPid, {set_protocol_options, ProtoOpts}).
 
+%% @private
+-spec save_max_connections(ets:tid(), non_neg_integer() | infinity)
+	-> ok.
+save_max_connections(Tid, MaxConns) ->
+	true = ets:insert(Tid, {max_connections, MaxConns}),
+	ok.
+
+%% @private
+-spec save_protocol_options(ets:tid(), any())
+	-> ok.
+save_protocol_options(Tid, ProtoOpts) ->
+	true = ets:insert(Tid, {protocol_options, ProtoOpts}),
+	ok.
+
 %% gen_server.
 
 %% @private
-init([Ref, MaxConns, ProtoOpts]) ->
+init([Ref, Tid]) ->
 	ok = ranch_server:insert_listener(Ref, self()),
-	{ok, #state{ref=Ref, max_conns=MaxConns, proto_opts=ProtoOpts}}.
+	MaxConns = recover_max_connections(Tid),
+	ProtoOpts = recover_protocol_options(Tid),
+	{ok, #state{ref=Ref, tid=Tid, max_conns=MaxConns, proto_opts=ProtoOpts}}.
 
 %% @private
 handle_call(get_port, _From, State=#state{port=Port}) ->
@@ -106,15 +125,18 @@ handle_call(get_port, _From, State=#state{port=Port}) ->
 handle_call(get_max_connections, _From, State=#state{max_conns=MaxConns}) ->
 	{reply, {ok, MaxConns}, State};
 handle_call({set_max_connections, MaxConnections}, _From,
-		State=#state{ref=Ref}) ->
+		State=#state{ref=Ref, tid=Tid}) ->
 	ConnsSup = ranch_server:lookup_connections_sup(Ref),
 	ConnsSup ! {set_max_conns, MaxConnections},
+	ok = save_max_connections(Tid, MaxConnections),
 	{reply, ok, State#state{max_conns=MaxConnections}};
 handle_call(get_protocol_options, _From, State=#state{proto_opts=ProtoOpts}) ->
 	{reply, {ok, ProtoOpts}, State};
-handle_call({set_protocol_options, ProtoOpts}, _From, State=#state{ref=Ref}) ->
+handle_call({set_protocol_options, ProtoOpts}, _From,
+		State=#state{ref=Ref, tid=Tid}) ->
 	ConnsSup = ranch_server:lookup_connections_sup(Ref),
 	ConnsSup ! {set_opts, ProtoOpts},
+	ok = save_protocol_options(Tid, ProtoOpts),
 	{reply, ok, State#state{proto_opts=ProtoOpts}};
 handle_call(stop, _From, State) ->
 	{stop, normal, stopped, State};
@@ -142,3 +164,15 @@ terminate(_Reason, _State) ->
 %% @private
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
+
+%% internal
+
+-spec recover_max_connections(ets:tid())
+	-> non_neg_integer() | infinity.
+recover_max_connections(Tid) ->
+	ets:lookup_element(Tid, max_connections, 2).
+
+-spec recover_protocol_options(ets:tid())
+	-> any().
+recover_protocol_options(Tid) ->
+	ets:lookup_element(Tid, protocol_options, 2).
