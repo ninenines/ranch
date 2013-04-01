@@ -41,6 +41,7 @@
 -export([tcp_max_connections_and_beyond/1]).
 -export([tcp_set_max_connections/1]).
 -export([tcp_infinity_max_connections/1]).
+-export([tcp_clean_set_max_connections/1]).
 -export([tcp_upgrade/1]).
 
 %% supervisor.
@@ -62,6 +63,7 @@ groups() ->
 		tcp_infinity_max_connections,
 		tcp_max_connections_and_beyond,
 		tcp_set_max_connections,
+		tcp_clean_set_max_connections,
 		tcp_upgrade
 	]}, {ssl, [
 		ssl_accept_error,
@@ -319,6 +321,33 @@ tcp_infinity_max_connections(_) ->
 	ranch:set_max_connections(Name, 10),
 	20 = ranch_server:count_connections(Name),
 	10 = receive_loop(connected, 1000),
+	ranch:stop_listener(Name).
+
+tcp_clean_set_max_connections(_) ->
+	%% This is a regression test to check that setting max connections does not
+	%% cause any processes to crash.
+	Name = tcp_clean_set_max_connections,
+	{ok, ListSupPid} = ranch:start_listener(Name, 4, ranch_tcp,
+			[{port, 0}, {max_connections, 4}],
+			notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
+	Children = supervisor:which_children(ListSupPid),
+	{_, AccSupPid, _, _} = lists:keyfind(ranch_acceptors_sup, 1, Children),
+	1 = erlang:trace(ListSupPid, true, [procs]),
+	1 = erlang:trace(AccSupPid, true, [procs]),
+	Port = ranch:get_port(tcp_clean_set_max_connections),
+	N = 20,
+	ok = connect_loop(Port, N*5, 0),
+	%% Randomly set max connections.
+	[spawn(ranch, set_max_connections, [tcp_clean_set_max_connections, Max]) ||
+		Max <- lists:flatten(lists:duplicate(N, [6, 4, 8, infinity]))],
+	receive
+		{trace, _, spawn, _, _} ->
+			error(dirty_set_max_connections)
+	after
+		2000 -> ok
+	end,
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces(),
 	ranch:stop_listener(Name).
 
 tcp_upgrade(_) ->
