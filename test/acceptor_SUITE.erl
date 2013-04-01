@@ -47,6 +47,7 @@
 -export([supervisor_clean_restart/1]).
 -export([supervisor_clean_child_restart/1]).
 -export([supervisor_conns_alive/1]).
+-export([supervisor_server_recover_state/1]).
 
 %% ct.
 
@@ -73,7 +74,8 @@ groups() ->
 	]}, {supervisor, [
 		supervisor_clean_restart,
 		supervisor_clean_child_restart,
-		supervisor_conns_alive
+		supervisor_conns_alive,
+		supervisor_server_recover_state
 	]}].
 
 init_per_suite(Config) ->
@@ -438,6 +440,35 @@ supervisor_conns_alive(_) ->
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
 	ranch:stop_listener(Name).
+
+supervisor_server_recover_state(_) ->
+	%% Verify that if ranch_server crashes it regains its state and monitors
+	%% ranch_conns_sup that were previously registered.
+	Name = supervisor_server_recover_state,
+	{ok, _} = ranch:start_listener(Name, 1,
+			ranch_tcp, [{port, 0}], echo_protocol, []),
+	_ = erlang:trace(new, true, [call]),
+	1 = erlang:trace_pattern({ranch_server, init, 1},
+			[{'_', [], [{return_trace}]}], [global]),
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	ServerPid = erlang:whereis(ranch_server),
+	{monitors, Monitors} = erlang:process_info(ServerPid, monitors),
+	erlang:exit(ServerPid, kill),
+	receive
+		{trace, ServerPid2, return_from, {ranch_server, init, 1}, _Result} ->
+			{monitors, Monitors2} = erlang:process_info(ServerPid2, monitors),
+			%% Check that ranch_server is monitoring the same processes.
+			true = (lists:usort(Monitors) == lists:usort(Monitors2))
+	after
+		1000 ->
+			error(timeout)
+	end,
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	ranch:stop_listener(Name),
+	%% Check ranch_server has removed the ranch_conns_sup.
+	{'EXIT', {badarg, _}} = (catch ranch_server:get_connections_sup(Name)),
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces().
 
 %% Utility functions.
 
