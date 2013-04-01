@@ -49,6 +49,7 @@
 -export([supervisor_clean_child_restart/1]).
 -export([supervisor_conns_alive/1]).
 -export([supervisor_server_recover_state/1]).
+-export([supervisor_clean_conns_sup_restart/1]).
 
 %% ct.
 
@@ -77,7 +78,8 @@ groups() ->
 		supervisor_clean_restart,
 		supervisor_clean_child_restart,
 		supervisor_conns_alive,
-		supervisor_server_recover_state
+		supervisor_server_recover_state,
+		supervisor_clean_conns_sup_restart
 	]}].
 
 init_per_suite(Config) ->
@@ -498,6 +500,26 @@ supervisor_server_recover_state(_) ->
 	{'EXIT', {badarg, _}} = (catch ranch_server:get_connections_sup(Name)),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces().
+
+supervisor_clean_conns_sup_restart(_) ->
+	%% Verify that a conns_sup can not register with the same Name as an already
+	%% registered conns_sup that is still alive. Make sure this does not crash
+	%% the ranch_server.
+	Name = supervisor_clean_conns_sup_restart,
+	{ok, _} = ranch:start_listener(Name,
+		1, ranch_tcp, [{port, 0}], echo_protocol, []),
+	Server = erlang:whereis(ranch_server),
+	ServerMonRef = erlang:monitor(process, Server),
+	%% Exit because Name already registered and is alive.
+	{'EXIT', _}  = (catch ranch_server:set_connections_sup(Name, self())),
+	receive
+		{'DOWN', ServerMonRef, process, Server, _} ->
+			error(ranch_server_down)
+	after
+		1000 ->
+			ok
+	end,
+	ranch:stop_listener(Name).
 
 %% Utility functions.
 
