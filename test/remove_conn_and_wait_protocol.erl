@@ -4,15 +4,15 @@
 -export([start_link/4]).
 -export([init/2]).
 
-start_link(ListenerPid, _, _, [{remove, MaybeRemove}]) ->
-	Pid = spawn_link(?MODULE, init, [ListenerPid, MaybeRemove]),
+start_link(Ref, _, _, [{remove, MaybeRemove}]) ->
+	Pid = spawn_link(?MODULE, init, [Ref, MaybeRemove]),
 	{ok, Pid}.
 
-init(ListenerPid, MaybeRemove) ->
-	ranch:accept_ack(ListenerPid),
+init(Ref, MaybeRemove) ->
+	ranch:accept_ack(Ref),
 	case MaybeRemove of
 		true ->
-			ranch_listener:remove_connection(ListenerPid);
+			ranch:remove_connection(Ref);
 		false ->
 			ok
 	end,

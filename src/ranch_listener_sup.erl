@@ -28,18 +28,15 @@
 	-> {ok, pid()}.
 start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	MaxConns = proplists:get_value(max_connections, TransOpts, 1024),
+	ranch_server:set_new_listener_opts(Ref, MaxConns, ProtoOpts),
 	supervisor:start_link(?MODULE, {
-		Ref, NbAcceptors, MaxConns, Transport, TransOpts, Protocol, ProtoOpts
+		Ref, NbAcceptors, Transport, TransOpts, Protocol
 	}).
 
 %% supervisor.
 
-init({Ref, NbAcceptors, MaxConns, Transport, TransOpts, Protocol, ProtoOpts}) ->
+init({Ref, NbAcceptors, Transport, TransOpts, Protocol}) ->
 	ChildSpecs = [
-		%% listener
-		{ranch_listener, {ranch_listener, start_link,
-				[Ref, MaxConns, ProtoOpts]},
-			permanent, 5000, worker, [ranch_listener]},
 		%% conns_sup
 		{ranch_conns_sup, {ranch_conns_sup, start_link,
 				[Ref, Transport, Protocol]},

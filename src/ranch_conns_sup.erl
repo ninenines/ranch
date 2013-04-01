@@ -32,7 +32,7 @@
 
 -record(state, {
 	parent = undefined :: pid(),
-	listener_pid = undefined :: pid(),
+	ref :: any(),
 	transport = undefined :: module(),
 	protocol = undefined :: module(),
 	opts :: any(),
@@ -92,22 +92,21 @@ active_connections(SupPid) ->
 init(Parent, Ref, Transport, Protocol) ->
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, self()),
-	ListenerPid = ranch_server:lookup_listener(Ref),
-	{ok, MaxConns} = ranch_listener:get_max_connections(ListenerPid),
-	{ok, Opts} = ranch_listener:get_protocol_options(ListenerPid),
+	MaxConns = ranch_server:get_max_connections(Ref),
+	Opts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
-	loop(#state{parent=Parent, listener_pid=ListenerPid, transport=Transport,
+	loop(#state{parent=Parent, ref=Ref, transport=Transport,
 		protocol=Protocol, opts=Opts, max_conns=MaxConns}, 0, 0, []).
 
-loop(State=#state{parent=Parent, listener_pid=ListenerPid,
+loop(State=#state{parent=Parent, ref=Ref,
 		transport=Transport, protocol=Protocol, opts=Opts,
 		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
-			case Protocol:start_link(ListenerPid, Socket, Transport, Opts) of
+			case Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
 					Transport:controlling_process(Socket, Pid),
-					Pid ! {shoot, ListenerPid},
+					Pid ! {shoot, Ref},
 					put(Pid, true),
 					CurConns2 = CurConns + 1,
 					if CurConns2 < MaxConns ->
@@ -126,7 +125,7 @@ loop(State=#state{parent=Parent, listener_pid=ListenerPid,
 			To ! {Tag, CurConns},
 			loop(State, CurConns, NbChildren, Sleepers);
 		%% Remove a connection from the count of connections.
-		{remove_connection, ListenerPid} ->
+		{remove_connection, Ref} ->
 			loop(State, CurConns - 1, NbChildren, Sleepers);
 		%% Upgrade the max number of connections allowed concurrently.
 		%% We resume all sleeping acceptors if this number increases.

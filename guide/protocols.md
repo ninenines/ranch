@@ -13,7 +13,7 @@ Writing a protocol handler
 All protocol handlers must implement the `ranch_protocol` behavior
 which defines a single callback, `start_link/4`. This callback is
 responsible for spawning a new process for handling the connection.
-It receives four arguments: the listener's pid, the socket, the
+It receives four arguments: the name of the listener, the socket, the
 transport handler being used and the protocol options defined in
 the call to `ranch:start_listener/6`. This callback must
 return `{ok, Pid}`, with `Pid` the pid of the new process.
@@ -21,10 +21,10 @@ return `{ok, Pid}`, with `Pid` the pid of the new process.
 The newly started process can then freely initialize itself. However,
 it must call `ranch:accept_ack/1` before doing any socket operation.
 This will ensure the connection process is the owner of the socket.
-It expects the listener's pid as argument.
+It expects the listener's name as argument.
 
 ``` erlang
-ok = ranch:accept_ack(ListenerPid).
+ok = ranch:accept_ack(Ref).
 ```
 
 If your protocol code requires specific socket options, you should
@@ -42,12 +42,12 @@ in `examples/tcp_echo/`.
 -export([start_link/4]).
 -export([init/4]).
 
-start_link(ListenerPid, Socket, Transport, Opts) ->
-    Pid = spawn_link(?MODULE, init, [ListenerPid, Socket, Transport, Opts]),
+start_link(Ref, Socket, Transport, Opts) ->
+    Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
     {ok, Pid}.
 
-init(ListenerPid, Socket, Transport, _Opts = []) ->
-    ok = ranch:accept_ack(ListenerPid),
+init(Ref, Socket, Transport, _Opts = []) ->
+    ok = ranch:accept_ack(Ref),
     loop(Socket, Transport).
 
 loop(Socket, Transport) ->
@@ -86,13 +86,13 @@ the normal `gen_server` execution loop.
 -export([init/1]).
 %% Exports of other gen_server callbacks here.
 
-start_link(ListenerPid, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, [[ListenerPid, Socket, Transport, Opts]]).
+start_link(Ref, Socket, Transport, Opts) ->
+    proc_lib:start_link(?MODULE, [[Ref, Socket, Transport, Opts]]).
 
-init(ListenerPid, Socket, Transport, _Opts = []) ->
+init(Ref, Socket, Transport, _Opts = []) ->
     ok = proc_lib:init_ack({ok, self()}),
     %% Perform any required state initialization here.
-    ok = ranch:accept_ack(ListenerPid),
+    ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}]),
     gen_server:enter_loop(?MODULE, [], {state, Socket, Transport}).
 
@@ -110,11 +110,11 @@ ends. If you return a timeout value of `0` then the `gen_server` will call
 
 %% Exports go here.
 
-init([ListenerPid, Socket, Transport]) ->
-    {ok, {state, ListenerPid, Socket, Transport}, 0}.
+init([Ref, Socket, Transport]) ->
+    {ok, {state, Ref, Socket, Transport}, 0}.
 
-handle_info(timeout, State={state, ListenerPid, Socket, Transport}) ->
-    ok = ranch:accept_ack(ListenerPid),
+handle_info(timeout, State={state, Ref, Socket, Transport}) ->
+    ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
 %% ...

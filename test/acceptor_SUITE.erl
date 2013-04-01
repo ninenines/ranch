@@ -266,9 +266,9 @@ tcp_max_connections_and_beyond(_) ->
 	receive after 250 -> ok end,
 	0 = ranch_server:count_connections(Name),
 	10 = length(supervisor:which_children(
-		ranch_server:lookup_connections_sup(Name))),
+		ranch_server:get_connections_sup(Name))),
 	Counts = supervisor:count_children(
-		ranch_server:lookup_connections_sup(Name)),
+		ranch_server:get_connections_sup(Name)),
 	{_, 1} = lists:keyfind(specs, 1, Counts),
 	{_, 0} = lists:keyfind(supervisors, 1, Counts),
 	{_, 10} = lists:keyfind(active, 1, Counts),
@@ -279,9 +279,9 @@ tcp_max_connections_and_beyond(_) ->
 	receive after 250 -> ok end,
 	10 = ranch_server:count_connections(Name),
 	20 = length(supervisor:which_children(
-		ranch_server:lookup_connections_sup(Name))),
+		ranch_server:get_connections_sup(Name))),
 	Counts2 = supervisor:count_children(
-		ranch_server:lookup_connections_sup(Name)),
+		ranch_server:get_connections_sup(Name)),
 	{_, 20} = lists:keyfind(active, 1, Counts2),
 	{_, 20} = lists:keyfind(workers, 1, Counts2),
 	ranch:stop_listener(Name).
@@ -346,16 +346,15 @@ supervisor_clean_restart(_) ->
 		NbAcc, ranch_tcp, [{port, 0}], echo_protocol, []),
 	%% Trace supervisor spawns.
 	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
-	ListenerPid0 = ranch_server:lookup_listener(Name),
-	erlang:exit(ListenerPid0, kill),
+	ConnsSup0 = ranch_server:get_connections_sup(Name),
+	erlang:exit(ConnsSup0, kill),
 	receive after 1000 -> ok end,
 	%% Verify that supervisor is alive
 	true = is_process_alive(Pid),
 	%% ...but children are dead.
-	false = is_process_alive(ListenerPid0),
+	false = is_process_alive(ConnsSup0),
 	%% Receive traces from newly started children
-	ListenerPid = receive {trace, Pid, spawn, Pid1, _} -> Pid1 end,
-	_ConnSupPid = receive {trace, Pid, spawn, Pid2, _} -> Pid2 end,
+	ConnsSup = receive {trace, Pid, spawn, Pid2, _} -> Pid2 end,
 	AccSupPid = receive {trace, Pid, spawn, Pid3, _} -> Pid3 end,
 	%% ...and its acceptors.
 	[receive {trace, AccSupPid, spawn, _Pid, _} -> ok end ||
@@ -366,7 +365,7 @@ supervisor_clean_restart(_) ->
 			error(invalid_restart)
 	after 1000 -> ok end,
 	%% Verify that new children registered themselves properly.
-	ListenerPid = ranch_server:lookup_listener(Name),
+	ConnsSup = ranch_server:get_connections_sup(Name),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
 	ranch:stop_listener(Name).
@@ -383,7 +382,7 @@ supervisor_clean_child_restart(_) ->
 		1, ranch_tcp, [{port, 0}], echo_protocol, []),
 	%% Trace supervisor spawns.
 	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
-	ListenerPid = ranch_server:lookup_listener(Name),
+	ConnsSup = ranch_server:get_connections_sup(Name),
 	%% Manually shut the listening socket down.
 	LSocket = receive
 		{trace, _, return_from, {ranch_tcp, listen, 1}, {ok, Socket}} ->
@@ -395,7 +394,7 @@ supervisor_clean_child_restart(_) ->
 	receive after 1000 -> ok end,
 	%% Verify that supervisor and its first two children are alive.
 	true = is_process_alive(Pid),
-	true = is_process_alive(ListenerPid),
+	true = is_process_alive(ConnsSup),
 	%% Check that acceptors_sup is restarted properly.
 	AccSupPid = receive {trace, Pid, spawn, Pid1, _} -> Pid1 end,
 	receive {trace, AccSupPid, spawn, _, _} -> ok end,
@@ -404,7 +403,7 @@ supervisor_clean_child_restart(_) ->
 		{trace, _, spawn, _, _} -> error(invalid_restart)
 	after 1000 -> ok end,
 	%% Verify that children still registered right.
-	ListenerPid = ranch_server:lookup_listener(Name),
+	ConnsSup = ranch_server:get_connections_sup(Name),
 	_ = erlang:trace_pattern({ranch_tcp, listen, 1}, false, []),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),

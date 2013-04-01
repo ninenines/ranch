@@ -32,8 +32,7 @@ start_link(Ref, NbAcceptors, Transport, TransOpts) ->
 %% supervisor.
 
 init([Ref, NbAcceptors, Transport, TransOpts]) ->
-	ListenerPid = ranch_server:lookup_listener(Ref),
-	ConnsSup = ranch_server:lookup_connections_sup(Ref),
+	ConnsSup = ranch_server:get_connections_sup(Ref),
 	LSocket = case proplists:get_value(socket, TransOpts) of
 		undefined ->
 			{ok, Socket} = Transport:listen(TransOpts),
@@ -42,7 +41,7 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 			Socket
 	end,
 	{ok, {_, Port}} = Transport:sockname(LSocket),
-	ranch_listener:set_port(ListenerPid, Port),
+	ranch_server:set_port(Ref, Port),
 	Procs = [
 		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
 			LSocket, Transport, ConnsSup

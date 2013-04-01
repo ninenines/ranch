@@ -4,12 +4,12 @@
 -export([start_link/4]).
 -export([init/4]).
 
-start_link(ListenerPid, Socket, Transport, Opts) ->
-	Pid = spawn_link(?MODULE, init, [ListenerPid, Socket, Transport, Opts]),
+start_link(Ref, Socket, Transport, Opts) ->
+	Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
 	{ok, Pid}.
 
-init(ListenerPid, Socket, Transport, _Opts = []) ->
-	ok = ranch:accept_ack(ListenerPid),
+init(Ref, Socket, Transport, _Opts = []) ->
+	ok = ranch:accept_ack(Ref),
 	loop(Socket, Transport).
 
 loop(Socket, Transport) ->
