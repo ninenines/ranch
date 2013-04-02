@@ -16,7 +16,7 @@
 	{id, "Ranch"},
 	{description, "Socket acceptor pool for TCP protocols."},
 	{sub_description, "Reusable library for building networked applications."},
-	{vsn, "0.6.2"},
+	{vsn, "0.8.0"},
 	{modules, []},
 	{registered, [ranch_sup, ranch_server]},
 	{applications, [
