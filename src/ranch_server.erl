@@ -114,7 +114,9 @@ count_connections(Ref) ->
 
 %% @private
 init([]) ->
-	{ok, #state{}}.
+	Monitors = [{{erlang:monitor(process, Pid), Pid}, Ref} ||
+		[Ref, Pid] <- ets:match(?TAB, {{conns_sup, '$1'}, '$2'})],
+	{ok, #state{monitors=Monitors}}.
 
 %% @private
 handle_call({set_new_listener_opts, Ref, MaxConns, Opts}, _, State) ->
