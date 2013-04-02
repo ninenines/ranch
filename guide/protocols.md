@@ -83,11 +83,11 @@ the normal `gen_server` execution loop.
 -behaviour(ranch_protocol).
 
 -export([start_link/4]).
--export([init/1]).
+-export([init/4]).
 %% Exports of other gen_server callbacks here.
 
 start_link(Ref, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, [[Ref, Socket, Transport, Opts]]).
+    proc_lib:start_link(?MODULE, init, [Ref, Socket, Transport, Opts]).
 
 init(Ref, Socket, Transport, _Opts = []) ->
     ok = proc_lib:init_ack({ok, self()}),
