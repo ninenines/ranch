@@ -1,7 +1,7 @@
 Ranch
 =====
 
-Ranch is a socket acceptor pool for TCP protocols.
+Ranch is a socket acceptor pool for TCP protocols. It is a reusable library for building networked applications.
 
 Goals
 -----
