@@ -68,7 +68,8 @@ cleanup_listener_opts(Ref) ->
 %% @doc Set a connection supervisor associated with specific listener.
 -spec set_connections_sup(any(), pid()) -> ok.
 set_connections_sup(Ref, Pid) ->
-	gen_server:call(?MODULE, {set_connections_sup, Ref, Pid}).
+	true = gen_server:call(?MODULE, {set_connections_sup, Ref, Pid}),
+	ok.
 
 %% @doc Return the connection supervisor used by specific listener.
 -spec get_connections_sup(any()) -> pid().
@@ -125,10 +126,14 @@ handle_call({set_new_listener_opts, Ref, MaxConns, Opts}, _, State) ->
 	{reply, ok, State};
 handle_call({set_connections_sup, Ref, Pid}, _,
 		State=#state{monitors=Monitors}) ->
-	true = ets:insert_new(?TAB, {{conns_sup, Ref}, Pid}),
-	MonitorRef = erlang:monitor(process, Pid),
-	{reply, ok, State#state{
-		monitors=[{{MonitorRef, Pid}, Ref}|Monitors]}};
+	case ets:insert_new(?TAB, {{conns_sup, Ref}, Pid}) of
+		true ->
+			MonitorRef = erlang:monitor(process, Pid),
+			{reply, true,
+				State#state{monitors=[{{MonitorRef, Pid}, Ref}|Monitors]}};
+		false ->
+			{reply, false, State}
+	end;
 handle_call({set_port, Ref, Port}, _, State) ->
 	true = ets:insert(?TAB, {{port, Ref}, Port}),
 	{reply, ok, State};
