@@ -218,8 +218,13 @@ close(Socket) ->
 
 %% Internal.
 
+%% This call always times out, either because a numeric timeout value
+%% was given, or because we've decided to use 5000ms instead of infinity.
+%% This value should be reasonable enough for the moment.
 -spec ssl_accept(ssl:sslsocket(), timeout())
 	-> {ok, ssl:sslsocket()} | {error, {ssl_accept, atom()}}.
+ssl_accept(Socket, infinity) ->
+	ssl_accept(Socket, 5000);
 ssl_accept(Socket, Timeout) ->
 	case ssl:ssl_accept(Socket, Timeout) of
 		ok ->
