@@ -7,6 +7,7 @@ Ranch User Guide
  *  [Listeners](listeners.md)
    *  Purpose
    *  Starting and stopping
+   *  Default transport options
    *  Listening on a random port
    *  Listening on privileged ports
    *  Accepting connections on an existing socket

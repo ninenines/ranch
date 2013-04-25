@@ -81,6 +81,17 @@ telnet> quit
 Connection closed.
 ```
 
+Default transport options
+-------------------------
+
+By default the socket will be set to return `binary` data, with the
+options `{active, false}`, `{packet, raw}`, `{reuseaddr, true}` set.
+These values can't be overriden when starting the listener, but
+they can be overriden using `Transport:setopts/2` in the protocol.
+
+It will also set `{backlog, 1024}` and `{nodelay, true}`, which
+can be overriden at listener startup.
+
 Listening on a random port
 --------------------------
 
