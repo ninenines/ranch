@@ -30,6 +30,7 @@
 %% ssl.
 -export([ssl_accept_error/1]).
 -export([ssl_accept_socket/1]).
+-export([ssl_accept_socket_nofile/1]).
 -export([ssl_active_echo/1]).
 -export([ssl_echo/1]).
 
@@ -70,6 +71,7 @@ groups() ->
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_accept_socket,
+		ssl_accept_socket_nofile,
 		ssl_active_echo,
 		ssl_echo
 	]}, {misc, [
@@ -135,6 +137,31 @@ ssl_accept_error(Config) ->
 	receive after 500 -> ok end,
 	true = is_process_alive(AcceptorPid),
 	ranch:stop_listener(Name).
+
+ssl_accept_socket_nofile(Config) ->
+	%%% XXX we can't do the spawn to test the controlling process change
+	%%% because of the bug in ssl
+	{ok, Pem} = file:read_file(filename:join(?config(data_dir, Config),
+											 "cert.pem")),
+	[{KeyType, Key, not_encrypted},
+	 {_CertType, Cert, not_encrypted}] = public_key:pem_decode(Pem),
+	Name = ssl_accept_socket,
+	{ok, S} = ssl:listen(0,
+		[{cert, Cert}, {key, {KeyType, Key}}, binary,
+			{active, false}, {packet, raw}, {reuseaddr, true}]),
+	{ok, _} = ranch:start_listener(Name, 1,
+		ranch_ssl, [{socket, S}], echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw},
+		{certfile, ?config(data_dir, Config) ++ "cert.pem"}]),
+	ok = ssl:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
 
 ssl_accept_socket(Config) ->
 	%%% XXX we can't do the spawn to test the controlling process change
