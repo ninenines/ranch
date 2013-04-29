@@ -36,10 +36,11 @@ start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 %% supervisor.
 
 init({Ref, NbAcceptors, Transport, TransOpts, Protocol}) ->
+	ConnType = proplists:get_value(connection_type, TransOpts, worker),
 	ChildSpecs = [
 		%% conns_sup
 		{ranch_conns_sup, {ranch_conns_sup, start_link,
-				[Ref, Transport, Protocol]},
+				[Ref, ConnType, Transport, Protocol]},
 			permanent, infinity, supervisor, [ranch_conns_sup]},
 		%% acceptors_sup
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,

@@ -20,19 +20,22 @@
 -module(ranch_conns_sup).
 
 %% API.
--export([start_link/3]).
+-export([start_link/4]).
 -export([start_protocol/2]).
 -export([active_connections/1]).
 
 %% Supervisor internals.
--export([init/4]).
+-export([init/5]).
 -export([system_continue/3]).
 -export([system_terminate/4]).
 -export([system_code_change/4]).
 
+-type conn_type() :: worker | supervisor.
+
 -record(state, {
 	parent = undefined :: pid(),
 	ref :: any(),
+	conn_type :: conn_type(),
 	transport = undefined :: module(),
 	protocol = undefined :: module(),
 	opts :: any(),
@@ -41,9 +44,10 @@
 
 %% API.
 
--spec start_link(any(), module(), module()) -> {ok, pid()}.
-start_link(Ref, Transport, Protocol) ->
-	proc_lib:start_link(?MODULE, init, [self(), Ref, Transport, Protocol]).
+-spec start_link(any(), conn_type(), module(), module()) -> {ok, pid()}.
+start_link(Ref, ConnType, Transport, Protocol) ->
+	proc_lib:start_link(?MODULE, init,
+		[self(), Ref, ConnType, Transport, Protocol]).
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
@@ -88,17 +92,18 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), any(), module(), module()) -> no_return().
-init(Parent, Ref, Transport, Protocol) ->
+-spec init(pid(), any(), conn_type(), module(), module()) -> no_return().
+init(Parent, Ref, ConnType, Transport, Protocol) ->
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
 	Opts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
-	loop(#state{parent=Parent, ref=Ref, transport=Transport,
-		protocol=Protocol, opts=Opts, max_conns=MaxConns}, 0, 0, []).
+	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
+		transport=Transport, protocol=Protocol, opts=Opts,
+		max_conns=MaxConns}, 0, 0, []).
 
-loop(State=#state{parent=Parent, ref=Ref,
+loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
 		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
 	receive
@@ -157,14 +162,17 @@ loop(State=#state{parent=Parent, ref=Ref,
 		%% Calls from the supervisor module.
 		{'$gen_call', {To, Tag}, which_children} ->
 			Pids = get_keys(true),
-			Children = [{Protocol, Pid, worker, [Protocol]}
+			Children = [{Protocol, Pid, ConnType, [Protocol]}
 				|| Pid <- Pids],
 			To ! {Tag, Children},
 			loop(State, CurConns, NbChildren, Sleepers);
 		{'$gen_call', {To, Tag}, count_children} ->
-			Counts = [{specs, 1}, {active, NbChildren},
-				{supervisors, 0}, {workers, NbChildren}],
-			To ! {Tag, Counts},
+			Counts = case ConnType of
+				worker -> [{supervisors, 0}, {workers, NbChildren}];
+				supervisor -> [{supervisors, NbChildren}, {workers, 0}]
+			end,
+			Counts2 = [{specs, 1}, {active, NbChildren}|Counts],
+			To ! {Tag, Counts2},
 			loop(State, CurConns, NbChildren, Sleepers);
 		{'$gen_call', {To, Tag}, _} ->
 			To ! {Tag, {error, ?MODULE}},
