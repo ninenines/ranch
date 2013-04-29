@@ -88,25 +88,27 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %% ranch:get_port/1 instead.
 %%
 %% @see ssl:listen/2
--spec listen([{backlog, non_neg_integer()} | {cacertfile, string()}
+-spec listen([{backlog, non_neg_integer()} | {cacerts, [Der::binary()]}
+	| {cacertfile, string()} | {cert, Der::binary()}
 	| {certfile, string()} | {ciphers, [ssl:erl_cipher_suite()] | string()}
 	| {fail_if_no_peer_cert, boolean()}
-	| {ip, inet:ip_address()} | {keyfile, string()}
+	| {ip, inet:ip_address()} | {key, Der::binary()} | {keyfile, string()}
 	| {next_protocols_advertised, [binary()]} | {nodelay, boolean()}
 	| {password, string()} | {port, inet:port_number()}
 	| {verify, ssl:verify_type()}])
 	-> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
 	ranch:require([crypto, public_key, ssl]),
-	{certfile, _} = lists:keyfind(certfile, 1, Opts),
+	true = lists:keymember(cert, 1, Opts)
+		orelse lists:keymember(certfile, 1, Opts),
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts2,
-		[backlog, cacertfile, certfile, ciphers, fail_if_no_peer_cert, ip,
-			keyfile, next_protocols_advertised, nodelay, password, port,
-			raw, verify],
+		[backlog, cacerts, cacertfile, cert, certfile, ciphers,
+			fail_if_no_peer_cert, ip, key, keyfile, next_protocols_advertised,
+			nodelay, password, port, raw, verify],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 
