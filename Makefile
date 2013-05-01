@@ -2,6 +2,11 @@
 
 PROJECT = ranch
 
+# Dependencies.
+
+TEST_DEPS = ct_helper
+dep_ct_helper = https://github.com/extend/ct_helper.git master
+
 # Options.
 
 COMPILE_FIRST = ranch_transport
