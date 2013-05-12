@@ -204,5 +204,5 @@ rrequire([App|Tail] = Apps) ->
 	case application:start(App) of
 		ok -> require(Tail);
 		{error, {already_started, App}} -> require(Tail);
-		{error, {not_started, Dependency}} -> require(Apps)
+		{error, {not_started, Dependency}} -> require([Dependency|Apps])
 	end.
