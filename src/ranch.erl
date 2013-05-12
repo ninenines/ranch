@@ -200,9 +200,9 @@ set_option_default(Opts, Key, Value) ->
 -spec require(list(module())) -> ok.
 require([]) ->
 	ok;
-require([App|Tail]) ->
+rrequire([App|Tail] = Apps) ->
 	case application:start(App) of
-		ok -> ok;
-		{error, {already_started, App}} -> ok
-	end,
-	require(Tail).
+		ok -> require(Tail);
+		{error, {already_started, App}} -> require(Tail);
+		{error, {not_started, Dependency}} -> require(Apps)
+	end.
