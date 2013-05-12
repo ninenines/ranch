@@ -98,7 +98,7 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 	| {verify, ssl:verify_type()}])
 	-> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
-	ranch:require([crypto, public_key, ssl]),
+	ranch:require([ssl]),
 	true = lists:keymember(cert, 1, Opts)
 		orelse lists:keymember(certfile, 1, Opts),
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
