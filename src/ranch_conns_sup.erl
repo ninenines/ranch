@@ -34,7 +34,7 @@
 
 -record(state, {
 	parent = undefined :: pid(),
-	ref :: any(),
+	ref :: ranch:ref(),
 	conn_type :: conn_type(),
 	transport = undefined :: module(),
 	protocol = undefined :: module(),
@@ -44,7 +44,7 @@
 
 %% API.
 
--spec start_link(any(), conn_type(), module(), module()) -> {ok, pid()}.
+-spec start_link(ranch:ref(), conn_type(), module(), module()) -> {ok, pid()}.
 start_link(Ref, ConnType, Transport, Protocol) ->
 	proc_lib:start_link(?MODULE, init,
 		[self(), Ref, ConnType, Transport, Protocol]).
@@ -92,7 +92,7 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), any(), conn_type(), module(), module()) -> no_return().
+-spec init(pid(), ranch:ref(), conn_type(), module(), module()) -> no_return().
 init(Parent, Ref, ConnType, Transport, Protocol) ->
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, self()),

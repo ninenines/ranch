@@ -24,7 +24,7 @@
 
 %% API.
 
--spec start_link(any(), non_neg_integer(), module(), any(), module(), any())
+-spec start_link(ranch:ref(), non_neg_integer(), module(), any(), module(), any())
 	-> {ok, pid()}.
 start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	MaxConns = proplists:get_value(max_connections, TransOpts, 1024),

@@ -53,12 +53,12 @@ start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% @private
--spec set_new_listener_opts(any(), ranch:max_conns(), any()) -> ok.
+-spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any()) -> ok.
 set_new_listener_opts(Ref, MaxConns, Opts) ->
 	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, Opts}).
 
 %% @doc Cleanup listener options after it has been stopped.
--spec cleanup_listener_opts(any()) -> ok.
+-spec cleanup_listener_opts(ranch:ref()) -> ok.
 cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {port, Ref}),
 	_ = ets:delete(?TAB, {max_conns, Ref}),
@@ -66,48 +66,48 @@ cleanup_listener_opts(Ref) ->
 	ok.
 
 %% @doc Set a connection supervisor associated with specific listener.
--spec set_connections_sup(any(), pid()) -> ok.
+-spec set_connections_sup(ranch:ref(), pid()) -> ok.
 set_connections_sup(Ref, Pid) ->
 	true = gen_server:call(?MODULE, {set_connections_sup, Ref, Pid}),
 	ok.
 
 %% @doc Return the connection supervisor used by specific listener.
--spec get_connections_sup(any()) -> pid().
+-spec get_connections_sup(ranch:ref()) -> pid().
 get_connections_sup(Ref) ->
 	ets:lookup_element(?TAB, {conns_sup, Ref}, 2).
 
 %% @private
--spec set_port(any(), inet:port_number()) -> ok.
+-spec set_port(ranch:ref(), inet:port_number()) -> ok.
 set_port(Ref, Port) ->
 	gen_server:call(?MODULE, {set_port, Ref, Port}).
 
 %% @doc Return the listener's port.
--spec get_port(any()) -> inet:port_number().
+-spec get_port(ranch:ref()) -> inet:port_number().
 get_port(Ref) ->
 	ets:lookup_element(?TAB, {port, Ref}, 2).
 
 %% @doc Set the max number of connections allowed concurrently.
--spec set_max_connections(any(), ranch:max_conns()) -> ok.
+-spec set_max_connections(ranch:ref(), ranch:max_conns()) -> ok.
 set_max_connections(Ref, MaxConnections) ->
 	gen_server:call(?MODULE, {set_max_conns, Ref, MaxConnections}).
 
 %% @doc Return the max number of connections allowed concurrently.
--spec get_max_connections(any()) -> ranch:max_conns().
+-spec get_max_connections(ranch:ref()) -> ranch:max_conns().
 get_max_connections(Ref) ->
 	ets:lookup_element(?TAB, {max_conns, Ref}, 2).
 
 %% @doc Upgrade the protocol options.
--spec set_protocol_options(any(), any()) -> ok.
+-spec set_protocol_options(ranch:ref(), any()) -> ok.
 set_protocol_options(Ref, ProtoOpts) ->
 	gen_server:call(?MODULE, {set_opts, Ref, ProtoOpts}).
 
 %% @doc Return the current protocol options.
--spec get_protocol_options(any()) -> any().
+-spec get_protocol_options(ranch:ref()) -> any().
 get_protocol_options(Ref) ->
 	ets:lookup_element(?TAB, {opts, Ref}, 2).
 
 %% @doc Count the number of connections in the connection pool.
--spec count_connections(any()) -> non_neg_integer().
+-spec count_connections(ranch:ref()) -> non_neg_integer().
 count_connections(Ref) ->
 	ranch_conns_sup:active_connections(get_connections_sup(Ref)).
 

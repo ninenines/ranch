@@ -17,7 +17,7 @@
 
 %% Start a new connection process for the given socket.
 -callback start_link(
-		Ref::any(),
+		Ref::ranch:ref(),
 		Socket::any(),
 		Transport::module(),
 		ProtocolOptions::any())

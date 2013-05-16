@@ -32,6 +32,9 @@
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
 
+-type ref() :: any().
+-export_type([ref/0]).
+
 %% @doc Start a listener for the given transport and protocol.
 %%
 %% A listener is effectively a pool of <em>NbAcceptors</em> acceptors.
@@ -56,7 +59,7 @@
 %%
 %% This function will return `{error, badarg}` if and only if the transport
 %% module given doesn't appear to be correct.
--spec start_listener(any(), non_neg_integer(), module(), any(), module(), any())
+-spec start_listener(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> {ok, pid()} | {error, badarg}.
 start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
@@ -93,7 +96,7 @@ start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 %%
 %% Note that stopping the listener will close all currently running
 %% connections abruptly.
--spec stop_listener(any()) -> ok | {error, not_found}.
+-spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
 	case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
 		ok ->
@@ -110,7 +113,7 @@ stop_listener(Ref) ->
 %% The parameters are the same as in <em>start_listener/6</em> but rather
 %% than hooking the listener to the Ranch internal supervisor, it just returns
 %% the spec.
--spec child_spec(any(), non_neg_integer(), module(), any(), module(), any())
+-spec child_spec(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> supervisor:child_spec().
 child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
@@ -123,7 +126,7 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 %%
 %% Effectively used to make sure the socket control has been given to
 %% the protocol process before starting to use it.
--spec accept_ack(any()) -> ok.
+-spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
 	receive {shoot, Ref} -> ok end.
 
@@ -132,29 +135,29 @@ accept_ack(Ref) ->
 %% Useful if you have long-lived connections that aren't taking up
 %% resources and shouldn't be counted in the limited number of running
 %% connections.
--spec remove_connection(any()) -> ok.
+-spec remove_connection(ref()) -> ok.
 remove_connection(Ref) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	ConnsSup ! {remove_connection, Ref},
 	ok.
 
 %% @doc Return the listener's port.
--spec get_port(any()) -> inet:port_number().
+-spec get_port(ref()) -> inet:port_number().
 get_port(Ref) ->
 	ranch_server:get_port(Ref).
 
 %% @doc Return the max number of connections allowed concurrently.
--spec get_max_connections(any()) -> max_conns().
+-spec get_max_connections(ref()) -> max_conns().
 get_max_connections(Ref) ->
 	ranch_server:get_max_connections(Ref).
 
 %% @doc Set the max number of connections allowed concurrently.
--spec set_max_connections(any(), max_conns()) -> ok.
+-spec set_max_connections(ref(), max_conns()) -> ok.
 set_max_connections(Ref, MaxConnections) ->
 	ranch_server:set_max_connections(Ref, MaxConnections).
 
 %% @doc Return the current protocol options for the given listener.
--spec get_protocol_options(any()) -> any().
+-spec get_protocol_options(ref()) -> any().
 get_protocol_options(Ref) ->
 	ranch_server:get_protocol_options(Ref).
 
@@ -163,7 +166,7 @@ get_protocol_options(Ref) ->
 %% The upgrade takes place at the acceptor level, meaning that only the
 %% newly accepted connections receive the new protocol options. This has
 %% no effect on the currently opened connections.
--spec set_protocol_options(any(), any()) -> ok.
+-spec set_protocol_options(ref(), any()) -> ok.
 set_protocol_options(Ref, Opts) ->
 	ranch_server:set_protocol_options(Ref, Opts).
 

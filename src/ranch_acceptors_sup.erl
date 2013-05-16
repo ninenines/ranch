@@ -24,7 +24,7 @@
 
 %% API.
 
--spec start_link(any(), non_neg_integer(), module(), any())
+-spec start_link(ranch:ref(), non_neg_integer(), module(), any())
 	-> {ok, pid()}.
 start_link(Ref, NbAcceptors, Transport, TransOpts) ->
 	supervisor:start_link(?MODULE, [Ref, NbAcceptors, Transport, TransOpts]).
