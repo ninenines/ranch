@@ -175,8 +175,8 @@ set_protocol_options(Ref, Opts) ->
 %% It takes a list of options, a list of allowed keys and an accumulator.
 %% This accumulator can be used to set default options that should never
 %% be overriden.
--spec filter_options([{atom(), any()}], [atom()], Acc)
-	-> Acc when Acc :: [any()].
+-spec filter_options([{atom(), any()} | {atom(), any(), any(), any()}],
+	[atom()], Acc) -> Acc when Acc :: [any()].
 filter_options([], _, Acc) ->
 	Acc;
 filter_options([Opt = {Key, _}|Tail], AllowedKeys, Acc) ->
