@@ -39,6 +39,25 @@
 -export([sockname/1]).
 -export([close/1]).
 
+-type opts() :: [{backlog, non_neg_integer()}
+	| {cacertfile, string()}
+	| {cacerts, [Der::binary()]}
+	| {cert, Der::binary()}
+	| {certfile, string()}
+	| {ciphers, [ssl:erl_cipher_suite()] | string()}
+	| {fail_if_no_peer_cert, boolean()}
+	| {ip, inet:ip_address()}
+	| {key, Der::binary()}
+	| {keyfile, string()}
+	| {next_protocols_advertised, [binary()]}
+	| {nodelay, boolean()}
+	| {password, string()}
+	| {port, inet:port_number()}
+	| {raw, non_neg_integer(), non_neg_integer(),
+		non_neg_integer() | binary()}
+	| {verify, ssl:verify_type()}].
+-export_type([opts/0]).
+
 %% @doc Name of this transport, <em>ssl</em>.
 name() -> ssl.
 
@@ -88,15 +107,7 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %% ranch:get_port/1 instead.
 %%
 %% @see ssl:listen/2
--spec listen([{backlog, non_neg_integer()} | {cacerts, [Der::binary()]}
-	| {cacertfile, string()} | {cert, Der::binary()}
-	| {certfile, string()} | {ciphers, [ssl:erl_cipher_suite()] | string()}
-	| {fail_if_no_peer_cert, boolean()}
-	| {ip, inet:ip_address()} | {key, Der::binary()} | {keyfile, string()}
-	| {next_protocols_advertised, [binary()]} | {nodelay, boolean()}
-	| {password, string()} | {port, inet:port_number()}
-	| {verify, ssl:verify_type()}])
-	-> {ok, ssl:sslsocket()} | {error, atom()}.
+-spec listen(opts()) -> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
 	ranch:require([crypto, public_key, ssl]),
 	true = lists:keymember(cert, 1, Opts)
@@ -106,7 +117,7 @@ listen(Opts) ->
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts2,
-		[backlog, cacerts, cacertfile, cert, certfile, ciphers,
+		[backlog, cacertfile, cacerts, cert, certfile, ciphers,
 			fail_if_no_peer_cert, ip, key, keyfile, next_protocols_advertised,
 			nodelay, password, port, raw, verify],
 		[binary, {active, false}, {packet, raw},
