@@ -75,7 +75,7 @@ start_protocol(SupPid, Socket) ->
 -spec active_connections(pid()) -> non_neg_integer().
 active_connections(SupPid) ->
 	Tag = erlang:monitor(process, SupPid),
-	erlang:send(SupPid, {?MODULE, active_connections, self(), Tag},
+	catch erlang:send(SupPid, {?MODULE, active_connections, self(), Tag},
 		[noconnect]),
 	receive
 		{Tag, Ret} ->
