@@ -163,7 +163,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{'$gen_call', {To, Tag}, which_children} ->
 			Pids = get_keys(true),
 			Children = [{Protocol, Pid, ConnType, [Protocol]}
-				|| Pid <- Pids],
+				|| Pid <- Pids, is_pid(Pid)],
 			To ! {Tag, Children},
 			loop(State, CurConns, NbChildren, Sleepers);
 		{'$gen_call', {To, Tag}, count_children} ->
