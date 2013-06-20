@@ -16,10 +16,11 @@
 %%
 %% Wrapper around <em>ssl</em> implementing the Ranch transport API.
 %%
-%% This transport requires the <em>crypto</em>, <em>public_key</em>
-%% and <em>ssl</em> applications to be started. If they aren't started,
-%% it will try to start them itself before opening a port to listen.
-%% Applications aren't stopped when the listening socket is closed, though.
+%% This transport requires the <em>crypto</em>, <em>asn1</em>,
+%% <em>public_key</em> and <em>ssl</em> applications to be started.
+%% If they aren't started, it will try to start them itself before
+%% opening a port to listen. Applications aren't stopped when the
+%% listening socket is closed, though.
 %%
 %% @see ssl
 -module(ranch_ssl).
@@ -131,7 +132,7 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %% @see ssl:listen/2
 -spec listen(opts()) -> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
-	ranch:require([crypto, public_key, ssl]),
+	ranch:require([crypto, asn1, public_key, ssl]),
 	true = lists:keymember(cert, 1, Opts)
 		orelse lists:keymember(certfile, 1, Opts),
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),

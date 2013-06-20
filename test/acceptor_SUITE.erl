@@ -92,6 +92,7 @@ end_per_suite(_) ->
 
 init_per_group(ssl, Config) ->
 	application:start(crypto),
+	application:start(asn1),
 	application:start(public_key),
 	application:start(ssl),
 	Config;
@@ -101,6 +102,7 @@ init_per_group(_, Config) ->
 end_per_group(ssl, _) ->
 	application:stop(ssl),
 	application:stop(public_key),
+	application:stop(asn1),
 	application:stop(crypto),
 	ok;
 end_per_group(_, _) ->

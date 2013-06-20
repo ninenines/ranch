@@ -20,9 +20,10 @@ SSL transport
 -------------
 
 The SSL transport is a thin wrapper around `ssl`. It requires
-the `crypto`, `public_key` and `ssl` applications to be started.
-You can start each of them individually, or you can call the
-`ssl:start/0` convenience function.
+the `crypto`, `asn1`, `public_key` and `ssl` applications
+to be started. When starting an SSL listener, Ranch will attempt
+to automatically start them. It will not try to stop them when
+the listener is removed, however.
 
 ``` erlang
 ssl:start().
