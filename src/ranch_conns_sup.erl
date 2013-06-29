@@ -160,7 +160,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 				CurConns, NbChildren, Sleepers);
 		{'EXIT', Parent, Reason} ->
 			exit(Reason);
-        {'EXIT', Pid, _} when Sleepers =:= [], Status =:= closing ->
+        {'EXIT', Pid, _} when Sleepers =:= [], Status =:= stopping ->
             erase(Pid),
             exit(normal);
         {'EXIT', Pid, _} when Sleepers =:= [], Status =:= active ->
