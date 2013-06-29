@@ -162,7 +162,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			exit(Reason);
         {'EXIT', Pid, _} when Sleepers =:= [], Status =:= stopping ->
             erase(Pid),
-            exit(normal);
+            ranch:stop_listener(Ref);
         {'EXIT', Pid, _} when Sleepers =:= [], Status =:= active ->
             erase(Pid),
             loop(State, CurConns - 1, NbChildren - 1, Sleepers);
