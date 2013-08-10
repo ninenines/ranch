@@ -17,6 +17,8 @@
 
 -export([start_listener/6]).
 -export([stop_listener/1]).
+-export([shutdown_listener/1]).
+-export([shutdown_listener/2]).
 -export([child_spec/6]).
 -export([accept_ack/1]).
 -export([remove_connection/1]).
@@ -34,6 +36,9 @@
 
 -type ref() :: any().
 -export_type([ref/0]).
+
+-type graceful_timeout() :: non_neg_integer() | infinity.
+-export_type([graceful_timeout/0]).
 
 %% @doc Start a listener for the given transport and protocol.
 %%
@@ -105,6 +110,35 @@ stop_listener(Ref) ->
 		{error, Reason} ->
 			{error, Reason}
 	end.
+
+%% @doc Tell to the listener to stop accepting connections.
+-spec shutdown_listener(ref()) -> ok.
+shutdown_listener(Ref) ->
+    shutdown_listener(Ref, infinity).
+
+%% @doc Tell to the listner to stop after a graceful timeout
+-spec shutdown_listener(ref(), graceful_timeout()) -> ok.
+shutdown_listener(Ref, Timeout) ->
+    %% find listenr sup
+    Children = supervisor:which_children(ranch_sup),
+
+    {_, ListenerSup, _, _} = lists:keyfind({ranch_listener_sup, Ref}, 1,
+                                           Children),
+
+    %% stop accepting
+    case supervisor:terminate_child(ListenerSup, ranch_acceptors_sup) of
+		ok ->
+			_ = supervisor:delete_child(ListenerSup, ranch_acceptors_sup);
+		{error, _Reason} ->
+			ok
+	end,
+
+    %% tell the connection supervisor to stop after a graceful timeout
+    %% if infinity, the connection supervisor will wait until the
+    %% connection is closed.
+    ConnsSup = ranch_server:get_connections_sup(Ref),
+	ConnsSup ! {stop, {Ref, Timeout}},
+	ok.
 
 %% @doc Return a child spec suitable for embedding.
 %%

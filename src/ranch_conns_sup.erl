@@ -31,6 +31,7 @@
 -export([system_code_change/4]).
 
 -type conn_type() :: worker | supervisor.
+-type conns_status() :: active | stopping.
 
 -record(state, {
 	parent = undefined :: pid(),
@@ -39,7 +40,8 @@
 	transport = undefined :: module(),
 	protocol = undefined :: module(),
 	opts :: any(),
-	max_conns = undefined :: non_neg_integer() | infinity
+	max_conns = undefined :: non_neg_integer() | infinity,
+    status :: conns_status()
 }).
 
 %% API.
@@ -101,11 +103,11 @@ init(Parent, Ref, ConnType, Transport, Protocol) ->
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
-		max_conns=MaxConns}, 0, 0, []).
+		max_conns=MaxConns, status=active}, 0, 0, []).
 
 loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
-		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
+		max_conns=MaxConns, status=Status}, CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
 			case Protocol:start_link(Ref, Socket, Transport, Opts) of
@@ -129,6 +131,17 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{?MODULE, active_connections, To, Tag} ->
 			To ! {Tag, CurConns},
 			loop(State, CurConns, NbChildren, Sleepers);
+        {stop, {Ref, _}} when CurConns =:= 0, Sleepers =:= [] ->
+            ranch:stop_listener(Ref);
+        {stop, {Ref, infinity}} ->
+            loop(State#state{status=stopping},
+				CurConns, NbChildren, Sleepers);
+        {stop, {Ref, Timeout}} ->
+            erlang:start_timer(Timeout, self(), {close, Ref}),
+            loop(State#state{status=stopping},
+				CurConns, NbChildren, Sleepers);
+        {close, Ref} ->
+            ranch:stop_listener(Ref);
 		%% Remove a connection from the count of connections.
 		{remove_connection, Ref} ->
 			loop(State, CurConns - 1, NbChildren, Sleepers);
@@ -147,11 +160,14 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 				CurConns, NbChildren, Sleepers);
 		{'EXIT', Parent, Reason} ->
 			exit(Reason);
-		{'EXIT', Pid, _} when Sleepers =:= [] ->
-			erase(Pid),
-			loop(State, CurConns - 1, NbChildren - 1, Sleepers);
-		%% Resume a sleeping acceptor if needed.
-		{'EXIT', Pid, _} ->
+        {'EXIT', Pid, _} when Sleepers =:= [], Status =:= stopping ->
+            erase(Pid),
+            ranch:stop_listener(Ref);
+        {'EXIT', Pid, _} when Sleepers =:= [], Status =:= active ->
+            erase(Pid),
+            loop(State, CurConns - 1, NbChildren - 1, Sleepers);
+        %% Resume a sleeping acceptor if needed.
+        {'EXIT', Pid, _} ->
 			erase(Pid),
 			[To|Sleepers2] = Sleepers,
 			To ! self(),
