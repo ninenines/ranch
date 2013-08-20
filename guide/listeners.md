@@ -55,7 +55,7 @@ You can try this out by compiling and running the `tcp_echo` example in the
 examples directory. To do so, open a shell in the `examples/tcp_echo/`
 directory and run the following commands:
 
-```
+``` bash
 % rebar get-deps compile
 % ./start.sh
 Listening on port 5555
