@@ -179,7 +179,11 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			loop(State, CurConns, NbChildren, Sleepers);
 		{'$gen_call', {To, Tag}, _} ->
 			To ! {Tag, {error, ?MODULE}},
-			loop(State, CurConns, NbChildren, Sleepers)
+			loop(State, CurConns, NbChildren, Sleepers);
+		Msg ->
+			error_logger:error_msg(
+				"Ranch listener ~p received unexpected message ~p~n",
+				[Ref, Msg])
 	end.
 
 system_continue(_, _, {State, CurConns, NbChildren, Sleepers}) ->
