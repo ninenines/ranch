@@ -119,6 +119,34 @@ end.
 You can easily integrate active sockets with existing Erlang code as all
 you really need is just a few more clauses when receiving messages.
 
+Sending files
+-------------
+
+As in the previous section it is assumed `Transport` is a valid transport
+handler and `Socket` is a connected socket obtained through the listener.
+
+To send a whole file, with name `Filename`, over a socket:
+
+```erlang
+{ok, SentBytes} = Transport:sendfile(Socket, Filename).
+```
+
+Or part of a file, with `Offset` greater than or equal to 0, `Bytes` number of
+bytes and chunks of size `ChunkSize`:
+
+```erlang
+Opts = [{chunk_size, ChunkSize}],
+{ok, SentBytes} = Transport:sendfile(Socket, Filename, Offset, Bytes, Opts).
+```
+
+To improve efficiency when sending multiple parts of the same file it is also
+possible to use a file descriptor opened in raw mode:
+
+```erlang
+{ok, RawFile} = file:open(Filename, [raw, read, binary]),
+{ok, SentBytes} = Transport:sendfile(Socket, RawFile, Offset, Bytes, Opts).
+```
+
 Writing a transport handler
 ---------------------------
 
@@ -131,3 +159,7 @@ socket. These do not need to be common to all transports as it's easy enough
 to write different initialization functions for the different transports that
 will be used. With one exception though. The `setopts/2` function *must*
 implement the `{active, once}` and the `{active, true}` options.
+
+If the transport handler doesn't have a native implementation of `sendfile/5` a
+fallback is available, `ranch_transport:sendfile/6`. The extra first argument
+is the transport's module. See `ranch_ssl` for an example.
