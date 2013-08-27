@@ -124,6 +124,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 					end;
 				_ ->
 					To ! self(),
+					Transport:close(Socket),
 					loop(State, CurConns, NbChildren, Sleepers)
 			end;
 		{?MODULE, active_connections, To, Tag} ->
