@@ -10,7 +10,7 @@ dep_ct_helper = https://github.com/extend/ct_helper.git master
 # Options.
 
 COMPILE_FIRST = ranch_transport
-CT_SUITES = acceptor
+CT_SUITES = acceptor sendfile
 PLT_APPS = crypto public_key ssl
 
 # Standard targets.

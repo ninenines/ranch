@@ -34,6 +34,8 @@
 -export([recv/3]).
 -export([send/2]).
 -export([sendfile/2]).
+-export([sendfile/4]).
+-export([sendfile/5]).
 -export([setopts/2]).
 -export([controlling_process/2]).
 -export([peername/1]).
@@ -188,33 +190,32 @@ recv(Socket, Length, Timeout) ->
 send(Socket, Packet) ->
 	ssl:send(Socket, Packet).
 
-%% @doc Send a file on a socket.
+%% @equiv sendfile(Socket, Filename, 0, 0, [])
+-spec sendfile(ssl:sslsocket(), file:name_all())
+	-> {ok, non_neg_integer()} | {error, atom()}.
+sendfile(Socket, Filename) ->
+	sendfile(Socket, Filename, 0, 0, []).
+
+%% @equiv sendfile(Socket, File, Offset, Bytes, [])
+-spec sendfile(ssl:sslsocket(), file:name_all() | file:fd(),
+		non_neg_integer(), non_neg_integer())
+	-> {ok, non_neg_integer()} | {error, atom()}.
+sendfile(Socket, File, Offset, Bytes) ->
+	sendfile(Socket, File, Offset, Bytes, []).
+
+%% @doc Send part of a file on a socket.
 %%
 %% Unlike with TCP, no syscall can be used here, so sending files
-%% through SSL will be much slower in comparison.
+%% through SSL will be much slower in comparison. Note that unlike
+%% file:sendfile/5 this function accepts either a file or a file name.
 %%
-%% @see file:sendfile/2
--spec sendfile(ssl:sslsocket(), file:name())
+%% @see ranch_transport:sendfile/6
+%% @see file:sendfile/5
+-spec sendfile(ssl:sslsocket(), file:name_all() | file:fd(),
+		non_neg_integer(), non_neg_integer(), ranch_transport:sendfile_opts())
 	-> {ok, non_neg_integer()} | {error, atom()}.
-sendfile(Socket, Filepath) ->
-	{ok, IoDevice} = file:open(Filepath, [read, binary, raw]),
-	sendfile(Socket, IoDevice, 0).
-
--spec sendfile(ssl:sslsocket(), file:io_device(), non_neg_integer())
-	-> {ok, non_neg_integer()} | {error, atom()}.
-sendfile(Socket, IoDevice, Sent) ->
-	case file:read(IoDevice, 16#1FFF) of
-		eof ->
-			ok = file:close(IoDevice),
-			{ok, Sent};
-		{ok, Bin} ->
-			case send(Socket, Bin) of
-				ok ->
-					sendfile(Socket, IoDevice, Sent + byte_size(Bin));
-				{error, Reason} ->
-					{error, Reason}
-			end
-	end.
+sendfile(Socket, File, Offset, Bytes, Opts) ->
+	ranch_transport:sendfile(?MODULE, Socket, File, Offset, Bytes, Opts).
 
 %% @doc Set options on the given socket.
 %% @see ssl:setopts/2
