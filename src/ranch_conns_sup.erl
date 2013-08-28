@@ -200,6 +200,10 @@ system_code_change(Misc, _, _, _) ->
 %% support printable strings.
 report_error(_, _, normal) ->
 	ok;
+report_error(_, _, shutdown) ->
+	ok;
+report_error(_, _, {shutdown, _}) ->
+	ok;
 report_error(Ref, Pid, Reason) ->
 	error_logger:error_msg(
 		"Ranch listener ~p had connection process ~p "
