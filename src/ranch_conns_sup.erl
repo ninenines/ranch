@@ -149,12 +149,12 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{'EXIT', Parent, Reason} ->
 			exit(Reason);
 		{'EXIT', Pid, Reason} when Sleepers =:= [] ->
-			report_error(Ref, Pid, Reason),
+			report_error(Ref, Protocol, Pid, Reason),
 			erase(Pid),
 			loop(State, CurConns - 1, NbChildren - 1, Sleepers);
 		%% Resume a sleeping acceptor if needed.
 		{'EXIT', Pid, Reason} ->
-			report_error(Ref, Pid, Reason),
+			report_error(Ref, Protocol, Pid, Reason),
 			erase(Pid),
 			[To|Sleepers2] = Sleepers,
 			To ! self(),
@@ -198,10 +198,14 @@ system_code_change(Misc, _, _, _) ->
 
 %% We use ~999999p here instead of ~w because the latter doesn't
 %% support printable strings.
-report_error(_, _, normal) ->
+report_error(_, _, _, normal) ->
 	ok;
-report_error(Ref, Pid, Reason) ->
+report_error(_, _, _, shutdown) ->
+	ok;
+report_error(_, _, _, {shutdown, _}) ->
+	ok;
+report_error(Ref, Protocol, Pid, Reason) ->
 	error_logger:error_msg(
-		"Ranch listener ~p had connection process ~p "
-		"exit with reason: ~999999p~n",
-		[Ref, Pid, Reason]).
+		"Ranch listener ~p had connection process started with "
+		"~p:start_link/4 at ~p exit with reason: ~999999p~n",
+		[Ref, Protocol, Pid, Reason]).
