@@ -20,6 +20,7 @@
 -export([child_spec/6]).
 -export([accept_ack/1]).
 -export([remove_connection/1]).
+-export([unlink_connection/1]).
 -export([get_port/1]).
 -export([get_max_connections/1]).
 -export([set_max_connections/2]).
@@ -139,6 +140,15 @@ accept_ack(Ref) ->
 remove_connection(Ref) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	ConnsSup ! {remove_connection, Ref},
+	ok.
+
+%% @doc Unlink and Remove the calling process' connection from the pool.
+%%
+%% Useful if you want to monitor differently a connection
+-spec unlink_connection(ref()) -> ok.
+unlink_connection(Ref) ->
+	ConnsSup = ranch_server:get_connections_sup(Ref),
+    ConnsSup ! {unlink_connection, Ref, self()},
 	ok.
 
 %% @doc Return the listener's port.
