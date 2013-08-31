@@ -141,7 +141,19 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
             after 0 ->
                     true
             end,
-            loop(State, CurConns - 1, NbChildren, Sleepers);
+
+            %% erase PID
+            erase(Pid),
+
+            %% wake up sleepers
+            Sleepers2 = case Sleepers of
+                [] -> Sleepers;
+                [To|Sleepers1] ->
+                    To ! self(),
+                    Sleepers1
+            end,
+
+            loop(State, CurConns - 1, NbChildren - 1, Sleepers2);
 		%% Upgrade the max number of connections allowed concurrently.
 		%% We resume all sleeping acceptors if this number increases.
 		{set_max_conns, MaxConns2} when MaxConns2 > MaxConns ->
