@@ -281,7 +281,7 @@ ssl_accept(Socket, Timeout) ->
 -spec unbroken_cipher_suites() -> [ssl:erl_cipher_suite()].
 unbroken_cipher_suites() ->
 	case proplists:get_value(ssl_app, ssl:versions()) of
-		"5.3" ->
+		Version when Version =:= "5.3"; Version =:= "5.3.1" ->
 			lists:filter(fun(Suite) ->
 				string:left(atom_to_list(element(1, Suite)), 4) =/= "ecdh"
 			end, ssl:cipher_suites());
