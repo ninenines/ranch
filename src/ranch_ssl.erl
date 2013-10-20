@@ -49,6 +49,7 @@
 	| {certfile, string()}
 	| {ciphers, [ssl:erl_cipher_suite()] | string()}
 	| {fail_if_no_peer_cert, boolean()}
+	| {hibernate_after, integer() | undefined}
 	| {ip, inet:ip_address()}
 	| {key, Der::binary()}
 	| {keyfile, string()}
@@ -94,6 +95,10 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 %%   to send, i.e. sends a empty certificate, if set to false (that is by default)
 %%   it will only fail if the client sends an invalid certificate (an empty
 %%   certificate is considered valid).</dd>
+%%  <dt>hibernate_after</dt><dd>When an integer-value is specified, the ssl_connection
+%%   will go into hibernation after the specified number of milliseconds of inactivity,
+%%   thus reducing its memory footprint. When undefined is specified (this is the
+%%   default), the process will never go into hibernation.</dd>
 %%  <dt>ip</dt><dd>Interface to listen on. Listen on all interfaces
 %%   by default.</dd>
 %%  <dt>key</dt><dd>Optional. The DER encoded users private key. If this option
@@ -144,8 +149,9 @@ listen(Opts) ->
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts3,
 		[backlog, cacertfile, cacerts, cert, certfile, ciphers,
-			fail_if_no_peer_cert, ip, key, keyfile, next_protocols_advertised,
-			nodelay, password, port, raw, reuse_session, reuse_sessions,
+			fail_if_no_peer_cert, hibernate_after, ip, key, keyfile,
+			next_protocols_advertised, nodelay, password, port, raw,
+			reuse_session, reuse_sessions,
 			secure_renegotiate, verify, verify_fun],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
