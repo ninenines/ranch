@@ -48,4 +48,14 @@ loop(LSocket, Transport, ConnsSup) ->
 		{error, Reason} when Reason =/= closed ->
 			ok
 	end,
+	flush(),
 	?MODULE:loop(LSocket, Transport, ConnsSup).
+
+-spec flush() -> ok.
+flush() ->
+	receive Any ->
+		error_logger:warning_msg("ranch acceptor leaked message ~p", [Any]),
+		flush()
+	after 0 ->
+		ok
+	end.
