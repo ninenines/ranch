@@ -31,6 +31,7 @@
 -export([listen/1]).
 -export([accept/2]).
 -export([connect/3]).
+-export([connect/4]).
 -export([recv/3]).
 -export([send/2]).
 -export([sendfile/2]).
@@ -182,6 +183,17 @@ accept(LSocket, Timeout) ->
 connect(Host, Port, Opts) when is_integer(Port) ->
 	ssl:connect(Host, Port,
 		Opts ++ [binary, {active, false}, {packet, raw}]).
+
+%% @private Experimental. Open a connection to the given host and port number.
+%% @see ssl:connect/4
+%% @todo Probably filter Opts?
+-spec connect(inet:ip_address() | inet:hostname(),
+	inet:port_number(), any(), timeout())
+	-> {ok, inet:socket()} | {error, atom()}.
+connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
+	ssl:connect(Host, Port,
+		Opts ++ [binary, {active, false}, {packet, raw}],
+		Timeout).
 
 %% @doc Receive data from a socket in passive mode.
 %% @see ssl:recv/3

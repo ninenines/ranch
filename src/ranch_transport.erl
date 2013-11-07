@@ -52,6 +52,11 @@
 -callback connect(string(), inet:port_number(), opts())
 	-> {ok, socket()} | {error, atom()}.
 
+%% Experimental. Open a connection to the given host and port number
+%% with a timeout.
+-callback connect(string(), inet:port_number(), opts(), timeout())
+	-> {ok, socket()} | {error, atom()}.
+
 %% Receive data from a socket in passive mode.
 -callback recv(socket(), non_neg_integer(), timeout())
 	-> {ok, any()} | {error, closed | timeout | atom()}.
