@@ -53,8 +53,8 @@ loop(LSocket, Transport, ConnsSup) ->
 
 -spec flush() -> ok.
 flush() ->
-	receive Any ->
-		error_logger:warning_msg("ranch acceptor leaked message ~p", [Any]),
+	receive Msg ->
+		error_logger:error_msg("Ranch acceptor received unexpected message: ~p~n", [Msg]),
 		flush()
 	after 0 ->
 		ok
