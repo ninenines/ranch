@@ -275,6 +275,7 @@ ssl_accept(Socket, Timeout) ->
 		ok ->
 			{ok, Socket};
 		{error, Reason} ->
+			ok = close(Socket),
 			{error, {ssl_accept, Reason}}
 	end.
 
