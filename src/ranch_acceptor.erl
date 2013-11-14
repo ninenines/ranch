@@ -48,4 +48,15 @@ loop(LSocket, Transport, ConnsSup) ->
 		{error, Reason} when Reason =/= closed ->
 			ok
 	end,
+	flush(),
 	?MODULE:loop(LSocket, Transport, ConnsSup).
+
+flush() ->
+	receive Msg ->
+		error_logger:error_msg(
+			"Ranch acceptor received unexpected message: ~p~n",
+			[Msg]),
+		flush()
+	after 0 ->
+		ok
+	end.
