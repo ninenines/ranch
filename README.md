@@ -22,7 +22,7 @@ to close any of the currently opened sockets.
 Getting started
 ---------------
 
- *  [Read the guide](http://ninenines.eu/docs/en/ranch/HEAD/guide/introduction)
+ *  [Read the guide](http://ninenines.eu/docs/en/ranch/HEAD/guide/)
  *  Look at the examples in the `examples/` directory
  *  Build API documentation with `make docs`; open `doc/index.html`
 
