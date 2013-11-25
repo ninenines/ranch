@@ -56,9 +56,8 @@ examples directory. To do so, open a shell in the `examples/tcp_echo/`
 directory and run the following commands:
 
 ``` bash
-% rebar get-deps compile
-% ./start.sh
-Listening on port 5555
+$ make
+$ ./_rel/bin/tcp_echo console
 ```
 
 You can then connect to it using telnet and see the echo server reply
@@ -67,7 +66,7 @@ the `Ctrl+]` key to escape to the telnet command line and type
 `quit` to exit.
 
 ```
-% telnet localhost 5555
+$ telnet localhost 5555
 Trying 127.0.0.1...
 Connected to localhost.
 Escape character is '^]'.
