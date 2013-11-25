@@ -15,6 +15,7 @@ Using Ranch
  *  [Listeners](listeners.md)
  *  [Transports](transports.md)
  *  [Protocols](protocols.md)
+ *  [Writing parsers](parsers.md)
 
 Advanced topics
 ---------------
