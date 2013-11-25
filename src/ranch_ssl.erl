@@ -197,7 +197,7 @@ send(Socket, Packet) ->
 	ssl:send(Socket, Packet).
 
 %% @equiv sendfile(Socket, Filename, 0, 0, [])
--spec sendfile(ssl:sslsocket(), file:name_all())
+-spec sendfile(ssl:sslsocket(), file:name_all() | file:fd())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, Filename) ->
 	sendfile(Socket, Filename, 0, 0, []).

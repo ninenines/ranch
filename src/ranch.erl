@@ -175,7 +175,7 @@ set_protocol_options(Ref, Opts) ->
 %% It takes a list of options, a list of allowed keys and an accumulator.
 %% This accumulator can be used to set default options that should never
 %% be overriden.
--spec filter_options([{atom(), any()} | {atom(), any(), any(), any()}],
+-spec filter_options([{atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].
 filter_options([], _, Acc) ->
 	Acc;
@@ -200,7 +200,7 @@ set_option_default(Opts, Key, Value) ->
 	end.
 
 %% @doc Start the given applications if they were not already started.
--spec require(list(module())) -> ok.
+-spec require([atom()]) -> ok.
 require([]) ->
 	ok;
 require([App|Tail]) ->

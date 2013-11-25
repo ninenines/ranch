@@ -113,7 +113,7 @@ send(Socket, Packet) ->
 	gen_tcp:send(Socket, Packet).
 
 %% @equiv sendfile(Socket, File, Offset, Bytes, [])
--spec sendfile(inet:socket(), file:name_all())
+-spec sendfile(inet:socket(), file:name_all() | file:fd())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, Filename) ->
 	sendfile(Socket, Filename, 0, 0, []).

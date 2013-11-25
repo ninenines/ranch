@@ -60,7 +60,7 @@
 -callback send(socket(), iodata()) -> ok | {error, atom()}.
 
 %% Send a file on a socket.
--callback sendfile(socket(), file:name())
+-callback sendfile(socket(), file:name() | file:fd())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 
 %% Send part of a file on a socket.
