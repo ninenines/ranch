@@ -20,12 +20,12 @@
 -module(ranch_conns_sup).
 
 %% API.
--export([start_link/4]).
+-export([start_link/5]).
 -export([start_protocol/2]).
 -export([active_connections/1]).
 
 %% Supervisor internals.
--export([init/5]).
+-export([init/6]).
 -export([system_continue/3]).
 -export([system_terminate/4]).
 -export([system_code_change/4]).
@@ -39,15 +39,17 @@
 	transport = undefined :: module(),
 	protocol = undefined :: module(),
 	opts :: any(),
-	max_conns = undefined :: non_neg_integer() | infinity
+	ack_timeout :: timeout(),
+	max_conns = undefined :: ranch:max_conns()
 }).
 
 %% API.
 
--spec start_link(ranch:ref(), conn_type(), module(), module()) -> {ok, pid()}.
-start_link(Ref, ConnType, Transport, Protocol) ->
+-spec start_link(ranch:ref(), conn_type(), module(), timeout(), module())
+	-> {ok, pid()}.
+start_link(Ref, ConnType, Transport, AckTimeout, Protocol) ->
 	proc_lib:start_link(?MODULE, init,
-		[self(), Ref, ConnType, Transport, Protocol]).
+		[self(), Ref, ConnType, Transport, AckTimeout, Protocol]).
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
@@ -92,8 +94,9 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), ranch:ref(), conn_type(), module(), module()) -> no_return().
-init(Parent, Ref, ConnType, Transport, Protocol) ->
+-spec init(pid(), ranch:ref(), conn_type(), module(), timeout(), module())
+	-> no_return().
+init(Parent, Ref, ConnType, Transport, AckTimeout, Protocol) ->
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
@@ -101,17 +104,18 @@ init(Parent, Ref, ConnType, Transport, Protocol) ->
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
-		max_conns=MaxConns}, 0, 0, []).
+		ack_timeout=AckTimeout, max_conns=MaxConns}, 0, 0, []).
 
 loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
-		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
+		ack_timeout=AckTimeout, max_conns=MaxConns},
+		CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
 			case Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
 					Transport:controlling_process(Socket, Pid),
-					Pid ! {shoot, Ref},
+					Pid ! {shoot, Ref, Transport, Socket, AckTimeout},
 					put(Pid, true),
 					CurConns2 = CurConns + 1,
 					if CurConns2 < MaxConns ->

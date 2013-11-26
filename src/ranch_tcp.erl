@@ -24,6 +24,7 @@
 -export([messages/0]).
 -export([listen/1]).
 -export([accept/2]).
+-export([accept_ack/2]).
 -export([connect/3]).
 -export([recv/3]).
 -export([send/2]).
@@ -88,6 +89,10 @@ listen(Opts) ->
 	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.
 accept(LSocket, Timeout) ->
 	gen_tcp:accept(LSocket, Timeout).
+
+-spec accept_ack(inet:socket(), timeout()) -> ok.
+accept_ack(_, _) ->
+	ok.
 
 %% @private Experimental. Open a connection to the given host and port number.
 %% @see gen_tcp:connect/3

@@ -36,10 +36,11 @@ start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 %% supervisor.
 
 init({Ref, NbAcceptors, Transport, TransOpts, Protocol}) ->
+	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
 	ConnType = proplists:get_value(connection_type, TransOpts, worker),
 	ChildSpecs = [
 		{ranch_conns_sup, {ranch_conns_sup, start_link,
-				[Ref, ConnType, Transport, Protocol]},
+				[Ref, ConnType, Transport, AckTimeout, Protocol]},
 			permanent, infinity, supervisor, [ranch_conns_sup]},
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,
 				[Ref, NbAcceptors, Transport, TransOpts]},

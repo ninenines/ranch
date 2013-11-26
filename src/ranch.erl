@@ -128,7 +128,9 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 %% the protocol process before starting to use it.
 -spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
-	receive {shoot, Ref} -> ok end.
+	receive {shoot, Ref, Transport, Socket, AckTimeout} ->
+		Transport:accept_ack(Socket, AckTimeout)
+	end.
 
 %% @doc Remove the calling process' connection from the pool.
 %%

@@ -46,7 +46,10 @@
 
 %% Accept connections with the given listening socket.
 -callback accept(socket(), timeout())
-	-> {ok, socket()} | {error, closed | timeout | atom() | tuple()}.
+	-> {ok, socket()} | {error, closed | timeout | atom()}.
+
+%% Perform post-accept operations on the socket.
+-callback accept_ack(socket(), timeout()) -> ok.
 
 %% Experimental. Open a connection to the given host and port number.
 -callback connect(string(), inet:port_number(), opts())

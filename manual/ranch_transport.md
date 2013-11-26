@@ -17,7 +17,7 @@ Callbacks
 ---------
 
 ### accept(LSocket, Timeout)
-	-> {ok, CSocket} | {error, closed | timeout | atom() | tuple()}
+	-> {ok, CSocket} | {error, closed | timeout | atom()}
 
 > Types:
 >  *  LSocket = CSocket = any()

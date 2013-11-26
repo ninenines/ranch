@@ -30,6 +30,7 @@
 -export([messages/0]).
 -export([listen/1]).
 -export([accept/2]).
+-export([accept_ack/2]).
 -export([connect/3]).
 -export([recv/3]).
 -export([send/2]).
@@ -164,13 +165,18 @@ listen(Opts) ->
 %% @see ssl:transport_accept/2
 %% @see ssl:ssl_accept/2
 -spec accept(ssl:sslsocket(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom() | tuple()}.
+	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom()}.
 accept(LSocket, Timeout) ->
-	case ssl:transport_accept(LSocket, Timeout) of
-		{ok, CSocket} ->
-			ssl_accept(CSocket, Timeout);
+	ssl:transport_accept(LSocket, Timeout).
+
+-spec accept_ack(ssl:sslsocket(), timeout()) -> ok.
+accept_ack(CSocket, Timeout) ->
+	case ssl:ssl_accept(CSocket, Timeout) of
+		ok ->
+			ok;
 		{error, Reason} ->
-			{error, Reason}
+			ok = close(CSocket),
+			error(Reason)
 	end.
 
 %% @private Experimental. Open a connection to the given host and port number.
@@ -262,22 +268,6 @@ close(Socket) ->
 	ssl:close(Socket).
 
 %% Internal.
-
-%% This call always times out, either because a numeric timeout value
-%% was given, or because we've decided to use 5000ms instead of infinity.
-%% This value should be reasonable enough for the moment.
--spec ssl_accept(ssl:sslsocket(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, {ssl_accept, atom()}}.
-ssl_accept(Socket, infinity) ->
-	ssl_accept(Socket, 5000);
-ssl_accept(Socket, Timeout) ->
-	case ssl:ssl_accept(Socket, Timeout) of
-		ok ->
-			{ok, Socket};
-		{error, Reason} ->
-			ok = close(Socket),
-			{error, {ssl_accept, Reason}}
-	end.
 
 %% Unfortunately the implementation of elliptic-curve ciphers that has
 %% been introduced in R16B01 is incomplete.  Depending on the particular

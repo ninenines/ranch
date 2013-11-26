@@ -305,6 +305,7 @@ sockets(Config) ->
 	end,
 	_ = spawn_link(Fun),
 	{ok, Server} = Transport:accept(LSocket, 500),
+	ok = Transport:accept_ack(Server, 500),
 	receive
 		{ok, Client} ->
 			ok = Transport:close(LSocket),
