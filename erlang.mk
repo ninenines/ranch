@@ -24,7 +24,7 @@ export PKG_FILE
 PKG_FILE_URL ?= https://raw.github.com/extend/erlang.mk/master/packages.v1.tsv
 
 define get_pkg_file
-	wget -O $(PKG_FILE) $(PKG_FILE_URL)
+	wget --no-check-certificate -O $(PKG_FILE) $(PKG_FILE_URL) || rm $(PKG_FILE)
 endef
 
 # Verbosity and tweaks.
@@ -46,8 +46,36 @@ dtl_verbose = $(dtl_verbose_$(V))
 gen_verbose_0 = @echo " GEN   " $@;
 gen_verbose = $(gen_verbose_$(V))
 
-.PHONY: all clean-all app clean deps clean-deps docs clean-docs \
-	build-tests tests build-plt dialyze
+.PHONY: rel clean-rel all clean-all app clean deps clean-deps \
+	docs clean-docs build-tests tests build-plt dialyze
+
+# Release.
+
+RELX_CONFIG ?= $(CURDIR)/relx.config
+
+ifneq ($(wildcard $(RELX_CONFIG)),)
+
+RELX ?= $(CURDIR)/relx
+export RELX
+
+RELX_URL ?= https://github.com/erlware/relx/releases/download/v0.5.2/relx
+RELX_OPTS ?=
+
+define get_relx
+	wget -O $(RELX) $(RELX_URL) || rm $(RELX)
+	chmod +x $(RELX)
+endef
+
+rel: clean-rel all $(RELX)
+	@$(RELX) -c $(RELX_CONFIG) $(RELX_OPTS)
+
+$(RELX):
+	@$(call get_relx)
+
+clean-rel:
+	@rm -rf _rel
+
+endif
 
 # Deps directory.
 
@@ -79,7 +107,7 @@ app: ebin/$(PROJECT).app
 	$(eval MODULES := $(shell find ebin -type f -name \*.beam \
 		| sed 's/ebin\///;s/\.beam/,/' | sed '$$s/.$$//'))
 	$(appsrc_verbose) cat src/$(PROJECT).app.src \
-		| sed 's/{modules, \[\]}/{modules, \[$(MODULES)\]}/' \
+		| sed 's/{modules,[[:space:]]*\[\]}/{modules, \[$(MODULES)\]}/' \
 		> ebin/$(PROJECT).app
 
 define compile_erl
@@ -152,13 +180,21 @@ deps: $(ALL_DEPS_DIRS)
 	done
 
 clean-deps:
-	@for dep in $(ALL_DEPS_DIRS) ; do $(MAKE) -C $$dep clean; done
+	@for dep in $(ALL_DEPS_DIRS) ; do \
+		if [ -f $$dep/Makefile ] ; then \
+			$(MAKE) -C $$dep clean ; \
+		else \
+			echo "include $(CURDIR)/erlang.mk" | $(MAKE) -f - -C $$dep clean ; \
+		fi ; \
+	done
 
 # Documentation.
 
+EDOC_OPTS ?=
+
 docs: clean-docs
 	$(gen_verbose) erl -noshell \
-		-eval 'edoc:application($(PROJECT), ".", []), init:stop().'
+		-eval 'edoc:application($(PROJECT), ".", [$(EDOC_OPTS)]), init:stop().'
 
 clean-docs:
 	$(gen_verbose) rm -f doc/*.css doc/*.html doc/*.png doc/edoc-info
@@ -183,14 +219,26 @@ CT_RUN = ct_run \
 #	-cover test/cover.spec
 
 CT_SUITES ?=
-CT_SUITES_FULL = $(addsuffix _SUITE,$(CT_SUITES))
+
+define test_target
+test_$(1): ERLC_OPTS += -DTEST=1 +'{parse_transform, eunit_autoexport}'
+test_$(1): clean deps app build-tests
+	@if [ -d "test" ] ; \
+	then \
+		mkdir -p logs/ ; \
+		$(CT_RUN) -suite $(addsuffix _SUITE,$(1)) ; \
+	fi
+	$(gen_verbose) rm -f test/*.beam
+endef
+
+$(foreach test,$(CT_SUITES),$(eval $(call test_target,$(test))))
 
 tests: ERLC_OPTS += -DTEST=1 +'{parse_transform, eunit_autoexport}'
 tests: clean deps app build-tests
 	@if [ -d "test" ] ; \
 	then \
 		mkdir -p logs/ ; \
-		$(CT_RUN) -suite $(CT_SUITES_FULL) ; \
+		$(CT_RUN) -suite $(addsuffix _SUITE,$(CT_SUITES)) ; \
 	fi
 	$(gen_verbose) rm -f test/*.beam
 
