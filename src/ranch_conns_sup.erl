@@ -128,8 +128,12 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 							loop(State, CurConns2, NbChildren + 1,
 								[To|Sleepers])
 					end;
-				_ ->
+				Ret ->
 					To ! self(),
+					error_logger:error_msg(
+						"Ranch listener ~p connection process start failure; "
+						"~p:start_link/4 returned: ~999999p~n",
+						[Ref, Protocol, Ret]),
 					Transport:close(Socket),
 					loop(State, CurConns, NbChildren, Sleepers)
 			end;
