@@ -17,6 +17,7 @@ Types
 	| {ip, inet:ip_address()}
 	| {key, Der::binary()}
 	| {keyfile, string()}
+	| {linger, {boolean(), non_neg_integer()}}
 	| {next_protocols_advertised, [binary()]}
 	| {nodelay, boolean()}
 	| {password, string()}
@@ -25,6 +26,8 @@ Types
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
+	| {send_timeout, timeout()}
+	| {send_timeout_close, boolean()}
 	| {verify, ssl:verify_type()}
 	| {verify_fun, {fun(), InitialUserState::term()}}]
 
@@ -64,6 +67,8 @@ The default value is given next to the option name.
    -  DER encoded user private key.
  -  keyfile
    -  Path to the PEM encoded private key file, if different than the certfile.
+ -  linger ({false, 0})
+   -  Whether to wait and how long to flush data sent before closing the socket.
  -  next_protocols_advertised
    -  List of protocols to send to the client if it supports the Next Protocol extension.
  -  nodelay (true)
@@ -78,6 +83,10 @@ The default value is given next to the option name.
    -  Whether to allow session reuse.
  -  secure_renegotiate (false)
    -  Whether to reject renegotiation attempts that do not conform to RFC5746.
+ -  send_timeout (30000)
+   -  How long the send call may wait for confirmation before returning.
+ -  send_timeout_close (true)
+   -  Whether to close the socket when the confirmation wasn't received.
  -  verify (verify_none)
    -  Use `verify_peer` to request a certificate from the client.
  -  verify_fun

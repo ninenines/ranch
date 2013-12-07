@@ -55,6 +55,7 @@
 	| {ip, inet:ip_address()}
 	| {key, Der::binary()}
 	| {keyfile, string()}
+	| {linger, {boolean(), non_neg_integer()}}
 	| {next_protocols_advertised, [binary()]}
 	| {nodelay, boolean()}
 	| {password, string()}
@@ -64,6 +65,8 @@
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
+	| {send_timeout, timeout()}
+	| {send_timeout_close, boolean()}
 	| {verify, ssl:verify_type()}
 	| {verify_fun, {fun(), InitialUserState::term()}}].
 -export_type([opts/0]).
@@ -145,16 +148,18 @@ listen(Opts) ->
 	true = lists:keymember(cert, 1, Opts)
 		orelse lists:keymember(certfile, 1, Opts),
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, ciphers, unbroken_cipher_suites()),
+	Opts3 = ranch:set_option_default(Opts2, send_timeout, 30000),
+	Opts4 = ranch:set_option_default(Opts3, send_timeout_close, true),
+	Opts5 = ranch:set_option_default(Opts4, ciphers, unbroken_cipher_suites()),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(Opts3,
+	ssl:listen(0, ranch:filter_options(Opts5,
 		[backlog, cacertfile, cacerts, cert, certfile, ciphers,
 			fail_if_no_peer_cert, hibernate_after, ip, key, keyfile,
-			next_protocols_advertised, nodelay, password, port, raw,
-			reuse_session, reuse_sessions,
-			secure_renegotiate, verify, verify_fun],
+			linger, next_protocols_advertised, nodelay, password, port, raw,
+			reuse_session, reuse_sessions, secure_renegotiate,
+			send_timeout, send_timeout_close, verify, verify_fun],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 
