@@ -31,6 +31,7 @@
 -export([controlling_process/2]).
 -export([peername/1]).
 -export([sockname/1]).
+-export([shutdown/2]).
 -export([close/1]).
 
 -type opts() :: [{backlog, non_neg_integer()}
@@ -165,6 +166,11 @@ peername(Socket) ->
 	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 sockname(Socket) ->
 	ssl:sockname(Socket).
+
+-spec shutdown(ssl:sslsocket(), read | write | read_write)
+	-> ok | {error, atom()}.
+shutdown(Socket, How) ->
+	ssl:shutdown(Socket, How).
 
 -spec close(ssl:sslsocket()) -> ok.
 close(Socket) ->

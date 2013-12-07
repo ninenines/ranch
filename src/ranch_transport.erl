@@ -49,6 +49,8 @@
 	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 -callback sockname(socket())
 	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+-callback shutdown(socket(), read | write | read_write)
+	-> ok | {error, atom()}.
 -callback close(socket()) -> ok.
 
 %% A fallback for transports that don't have a native sendfile implementation.

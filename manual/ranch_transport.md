@@ -167,6 +167,14 @@ Callbacks
 >
 > This is mainly useful for switching to active or passive mode.
 
+### shutdown(CSocket, How) -> ok | {error, atom()}
+
+> Types:
+>  *  CSocket = any()
+>  *  How = read | write | read_write
+>
+> Immediately close the socket in one or two directions.
+
 ### sockname(CSocket) -> {ok, {IP, Port}} | {error, atom()}
 
 > Types:
