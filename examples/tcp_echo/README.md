@@ -1,18 +1,23 @@
 Ranch TCP Echo
 ==============
 
-To compile this example you need rebar in your PATH.
-
-Type the following command:
-```
-$ rebar get-deps compile
+To build the example:
+``` bash
+$ make
 ```
 
-You can then start the Erlang node with the following command:
-```
-./start.sh
+To start the release in the foreground:
+
+``` bash
+$ ./_rel/bin/tcp_echo_example console
 ```
 
-Then start telnet as indicated and type in a few lines. Be
-aware that there is a timeout of 5 seconds without receiving
+Then start a telnet session to port 5555:
+``` bash
+$ telnet localhost 5555
+```
+
+Type in a few words and see them echoed back.
+
+Be aware that there is a timeout of 5 seconds without receiving
 data before the example server disconnects your session.
