@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2012, Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) 2011-2013, Loïc Hoguin <essen@ninenines.eu>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -12,19 +12,15 @@
 %% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-%% @private
 -module(ranch_app).
 -behaviour(application).
 
-%% API.
 -export([start/2]).
 -export([stop/1]).
 -export([profile_output/0]).
 
-%% API.
-
 start(_, _) ->
-	consider_profiling(),
+	_ = consider_profiling(),
 	ranch_sup:start_link().
 
 stop(_) ->
@@ -38,9 +34,6 @@ profile_output() ->
 	eprof:log("total.profile"),
 	eprof:analyze(total).
 
-%% Internal.
-
--spec consider_profiling() -> profiling | not_profiling.
 consider_profiling() ->
 	case application:get_env(profile) of
 		{ok, true} ->

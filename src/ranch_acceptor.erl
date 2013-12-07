@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2012, Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) 2011-2013, Loïc Hoguin <essen@ninenines.eu>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -12,24 +12,16 @@
 %% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-%% @private
 -module(ranch_acceptor).
 
-%% API.
 -export([start_link/3]).
-
-%% Internal.
 -export([loop/3]).
-
-%% API.
 
 -spec start_link(inet:socket(), module(), pid())
 	-> {ok, pid()}.
 start_link(LSocket, Transport, ConnsSup) ->
 	Pid = spawn_link(?MODULE, loop, [LSocket, Transport, ConnsSup]),
 	{ok, Pid}.
-
-%% Internal.
 
 -spec loop(inet:socket(), module(), pid()) -> no_return().
 loop(LSocket, Transport, ConnsSup) ->

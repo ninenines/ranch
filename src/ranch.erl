@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2012, Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) 2011-2013, Loïc Hoguin <essen@ninenines.eu>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -12,7 +12,6 @@
 %% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-%% @doc Ranch API to start and stop listeners.
 -module(ranch).
 
 -export([start_listener/6]).
@@ -35,30 +34,6 @@
 -type ref() :: any().
 -export_type([ref/0]).
 
-%% @doc Start a listener for the given transport and protocol.
-%%
-%% A listener is effectively a pool of <em>NbAcceptors</em> acceptors.
-%% Acceptors accept connections on the given <em>Transport</em> and forward
-%% connections to the given <em>Protocol</em> handler. Both transport and
-%% protocol modules can be given options through the <em>TransOpts</em> and
-%% the <em>ProtoOpts</em> arguments. Available options are documented in the
-%% <em>listen</em> transport function and in the protocol module of your choice.
-%%
-%% All acceptor and connection processes are supervised by the listener.
-%%
-%% It is recommended to set a large enough number of acceptors to improve
-%% performance. The exact number depends of course on your hardware, on the
-%% protocol used and on the number of expected simultaneous connections.
-%%
-%% The <em>Transport</em> option <em>max_connections</em> allows you to define
-%% the maximum number of simultaneous connections for this listener. It defaults
-%% to 1024. See <em>ranch_listener</em> for more details on limiting the number
-%% of connections.
-%%
-%% <em>Ref</em> can be used to stop the listener later on.
-%%
-%% This function will return `{error, badarg}` if and only if the transport
-%% module given doesn't appear to be correct.
 -spec start_listener(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> {ok, pid()} | {error, badarg}.
 start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
@@ -92,10 +67,6 @@ start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 			Res
 	end.
 
-%% @doc Stop a listener identified by <em>Ref</em>.
-%%
-%% Note that stopping the listener will close all currently running
-%% connections abruptly.
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
 	case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
@@ -106,13 +77,6 @@ stop_listener(Ref) ->
 			{error, Reason}
 	end.
 
-%% @doc Return a child spec suitable for embedding.
-%%
-%% When you want to embed Ranch in another application, you can use this
-%% function to create a <em>ChildSpec</em> suitable for use in a supervisor.
-%% The parameters are the same as in <em>start_listener/6</em> but rather
-%% than hooking the listener to the Ranch internal supervisor, it just returns
-%% the spec.
 -spec child_spec(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> supervisor:child_spec().
 child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
@@ -122,61 +86,38 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
 	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
 
-%% @doc Acknowledge the accepted connection.
-%%
-%% Effectively used to make sure the socket control has been given to
-%% the protocol process before starting to use it.
 -spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
 	receive {shoot, Ref, Transport, Socket, AckTimeout} ->
 		Transport:accept_ack(Socket, AckTimeout)
 	end.
 
-%% @doc Remove the calling process' connection from the pool.
-%%
-%% Useful if you have long-lived connections that aren't taking up
-%% resources and shouldn't be counted in the limited number of running
-%% connections.
 -spec remove_connection(ref()) -> ok.
 remove_connection(Ref) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	ConnsSup ! {remove_connection, Ref},
 	ok.
 
-%% @doc Return the listener's port.
 -spec get_port(ref()) -> inet:port_number().
 get_port(Ref) ->
 	ranch_server:get_port(Ref).
 
-%% @doc Return the max number of connections allowed concurrently.
 -spec get_max_connections(ref()) -> max_conns().
 get_max_connections(Ref) ->
 	ranch_server:get_max_connections(Ref).
 
-%% @doc Set the max number of connections allowed concurrently.
 -spec set_max_connections(ref(), max_conns()) -> ok.
 set_max_connections(Ref, MaxConnections) ->
 	ranch_server:set_max_connections(Ref, MaxConnections).
 
-%% @doc Return the current protocol options for the given listener.
 -spec get_protocol_options(ref()) -> any().
 get_protocol_options(Ref) ->
 	ranch_server:get_protocol_options(Ref).
 
-%% @doc Upgrade the protocol options for the given listener.
-%%
-%% The upgrade takes place at the acceptor level, meaning that only the
-%% newly accepted connections receive the new protocol options. This has
-%% no effect on the currently opened connections.
 -spec set_protocol_options(ref(), any()) -> ok.
 set_protocol_options(Ref, Opts) ->
 	ranch_server:set_protocol_options(Ref, Opts).
 
-%% @doc Filter a list of options and remove all unwanted values.
-%%
-%% It takes a list of options, a list of allowed keys and an accumulator.
-%% This accumulator can be used to set default options that should never
-%% be overriden.
 -spec filter_options([{atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].
 filter_options([], _, Acc) ->
@@ -192,7 +133,6 @@ filter_options([Opt = {raw, _, _, _}|Tail], AllowedKeys, Acc) ->
 		false -> filter_options(Tail, AllowedKeys, Acc)
 	end.
 
-%% @doc Add an option to a list, but only if it wasn't previously set.
 -spec set_option_default(Opts, atom(), any())
 	-> Opts when Opts :: [{atom(), any()}].
 set_option_default(Opts, Key, Value) ->
@@ -201,7 +141,6 @@ set_option_default(Opts, Key, Value) ->
 		false -> [{Key, Value}|Opts]
 	end.
 
-%% @doc Start the given applications if they were not already started.
 -spec require([atom()]) -> ok.
 require([]) ->
 	ok;

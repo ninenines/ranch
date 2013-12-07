@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2012, Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) 2011-2013, Loïc Hoguin <essen@ninenines.eu>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -12,25 +12,15 @@
 %% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-%% @private
 -module(ranch_sup).
 -behaviour(supervisor).
 
-%% API.
 -export([start_link/0]).
-
-%% supervisor.
 -export([init/1]).
-
--define(SUPERVISOR, ?MODULE).
-
-%% API.
 
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-	supervisor:start_link({local, ?SUPERVISOR}, ?MODULE, []).
-
-%% supervisor.
+	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
 	ranch_server = ets:new(ranch_server, [

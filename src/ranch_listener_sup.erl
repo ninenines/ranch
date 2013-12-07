@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2012, Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) 2011-2013, Loïc Hoguin <essen@ninenines.eu>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -12,17 +12,11 @@
 %% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-%% @private
 -module(ranch_listener_sup).
 -behaviour(supervisor).
 
-%% API.
 -export([start_link/6]).
-
-%% supervisor.
 -export([init/1]).
-
-%% API.
 
 -spec start_link(ranch:ref(), non_neg_integer(), module(), any(), module(), any())
 	-> {ok, pid()}.
@@ -32,8 +26,6 @@ start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	supervisor:start_link(?MODULE, {
 		Ref, NbAcceptors, Transport, TransOpts, Protocol
 	}).
-
-%% supervisor.
 
 init({Ref, NbAcceptors, Transport, TransOpts, Protocol}) ->
 	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
