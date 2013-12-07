@@ -1,7 +1,10 @@
-Ranch TCP Echo
-==============
+Ranch TCP echo example
+======================
 
-To build the example:
+To try this example, you need GNU `make` and `git` in your PATH.
+
+To build the example, run the following command:
+
 ``` bash
 $ make
 ```
@@ -13,6 +16,7 @@ $ ./_rel/bin/tcp_echo_example console
 ```
 
 Then start a telnet session to port 5555:
+
 ``` bash
 $ telnet localhost 5555
 ```

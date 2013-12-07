@@ -1,10 +1,10 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 {application, tcp_echo, [
-	{description, "Ranch TCP Echo example."},
+	{description, "Ranch TCP echo example."},
 	{vsn, "1"},
 	{modules, []},
-	{registered, []},
+	{registered, [tcp_echo_sup]},
 	{applications, [
 		kernel,
 		stdlib,

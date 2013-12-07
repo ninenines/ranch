@@ -1,7 +1,10 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 -module(echo_protocol).
--export([start_link/4, init/4]).
+-behaviour(ranch_protocol).
+
+-export([start_link/4]).
+-export([init/4]).
 
 start_link(Ref, Socket, Transport, Opts) ->
 	Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
