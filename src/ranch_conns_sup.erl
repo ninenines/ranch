@@ -20,22 +20,24 @@
 -module(ranch_conns_sup).
 
 %% API.
--export([start_link/5]).
+-export([start_link/6]).
 -export([start_protocol/2]).
 -export([active_connections/1]).
 
 %% Supervisor internals.
--export([init/6]).
+-export([init/7]).
 -export([system_continue/3]).
 -export([system_terminate/4]).
 -export([system_code_change/4]).
 
 -type conn_type() :: worker | supervisor.
+-type shutdown() :: brutal_kill | timeout().
 
 -record(state, {
 	parent = undefined :: pid(),
 	ref :: ranch:ref(),
 	conn_type :: conn_type(),
+	shutdown :: shutdown(),
 	transport = undefined :: module(),
 	protocol = undefined :: module(),
 	opts :: any(),
@@ -45,11 +47,11 @@
 
 %% API.
 
--spec start_link(ranch:ref(), conn_type(), module(), timeout(), module())
-	-> {ok, pid()}.
-start_link(Ref, ConnType, Transport, AckTimeout, Protocol) ->
+-spec start_link(ranch:ref(), conn_type(), shutdown(), module(),
+	timeout(), module()) -> {ok, pid()}.
+start_link(Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol) ->
 	proc_lib:start_link(?MODULE, init,
-		[self(), Ref, ConnType, Transport, AckTimeout, Protocol]).
+		[self(), Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol]).
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
@@ -94,17 +96,17 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), ranch:ref(), conn_type(), module(), timeout(), module())
-	-> no_return().
-init(Parent, Ref, ConnType, Transport, AckTimeout, Protocol) ->
+-spec init(pid(), ranch:ref(), conn_type(), shutdown(),
+	module(), timeout(), module()) -> no_return().
+init(Parent, Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol) ->
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
 	Opts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
-		transport=Transport, protocol=Protocol, opts=Opts,
-		ack_timeout=AckTimeout, max_conns=MaxConns}, 0, 0, []).
+		shutdown=Shutdown, transport=Transport, protocol=Protocol,
+		opts=Opts, ack_timeout=AckTimeout, max_conns=MaxConns}, 0, 0, []).
 
 loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
@@ -151,7 +153,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			loop(State#state{opts=Opts2},
 				CurConns, NbChildren, Sleepers);
 		{'EXIT', Parent, Reason} ->
-			exit(Reason);
+			terminate(State, Reason, NbChildren);
 		{'EXIT', Pid, Reason} when Sleepers =:= [] ->
 			report_error(Ref, Protocol, Pid, Reason),
 			erase(Pid),
@@ -190,12 +192,59 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 				[Ref, Msg])
 	end.
 
+-spec terminate(#state{}, any(), non_neg_integer()) -> no_return().
+%% Kill all children and then exit. We unlink first to avoid
+%% getting a message for each child getting killed.
+terminate(#state{shutdown=brutal_kill}, Reason, _) ->
+	Pids = get_keys(true),
+	_ = [begin
+		unlink(P),
+		exit(P, kill)
+	end || P <- Pids],
+	exit(Reason);
+%% Attempt to gracefully shutdown all children.
+terminate(#state{shutdown=Shutdown}, Reason, NbChildren) ->
+	shutdown_children(),
+	_ = if
+		Shutdown =:= infinity ->
+			ok;
+		true ->
+			erlang:send_after(Shutdown, self(), kill)
+	end,
+	wait_children(NbChildren),
+	exit(Reason).
+
+%% Monitor processes so we can know which ones have shutdown
+%% before the timeout. Unlink so we avoid receiving an extra
+%% message. Then send a shutdown exit signal.
+shutdown_children() ->
+	Pids = get_keys(true),
+	_ = [begin
+		monitor(process, P),
+		unlink(P),
+		exit(P, shutdown)
+	end || P <- Pids],
+	ok.
+
+wait_children(0) ->
+	ok;
+wait_children(NbChildren) ->
+	receive
+        {'DOWN', _, process, Pid, _} ->
+			_ = erase(Pid),
+			wait_children(NbChildren - 1);
+		kill ->
+			Pids = get_keys(true),
+			_ = [exit(P, kill) || P <- Pids],
+			ok
+	end.
+
 system_continue(_, _, {State, CurConns, NbChildren, Sleepers}) ->
 	loop(State, CurConns, NbChildren, Sleepers).
 
 -spec system_terminate(any(), _, _, _) -> no_return().
-system_terminate(Reason, _, _, _) ->
-	exit(Reason).
+system_terminate(Reason, _, _, {State, _, NbChildren, _}) ->
+	terminate(State, Reason, NbChildren).
 
 system_code_change(Misc, _, _, _) ->
 	{ok, Misc}.

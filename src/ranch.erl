@@ -120,7 +120,7 @@ child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		andalso is_atom(Protocol) ->
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
 		Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
-	]}, permanent, 5000, supervisor, [ranch_listener_sup]}.
+	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
 
 %% @doc Acknowledge the accepted connection.
 %%
