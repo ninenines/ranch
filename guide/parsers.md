@@ -80,7 +80,7 @@ The general idea stays the same though.
 << Size:32, _/bits >> = Buffer,
 case Buffer of
     << Frame:Size/binary, Rest/bits >> ->
-        handle_frame(Frame, Buffer);
+        handle_frame(Frame, Rest);
     _ ->
         get_more_data(Buffer)
 end.
