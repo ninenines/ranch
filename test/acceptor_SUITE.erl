@@ -37,6 +37,7 @@
 -export([tcp_accept_socket/1]).
 -export([tcp_active_echo/1]).
 -export([tcp_echo/1]).
+-export([tcp_inherit_options/1]).
 -export([tcp_max_connections/1]).
 -export([tcp_max_connections_and_beyond/1]).
 -export([tcp_set_max_connections/1]).
@@ -66,7 +67,8 @@ groups() ->
 		tcp_max_connections_and_beyond,
 		tcp_set_max_connections,
 		tcp_clean_set_max_connections,
-		tcp_upgrade
+		tcp_upgrade,
+		tcp_inherit_options
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_accept_socket,
@@ -368,6 +370,19 @@ tcp_upgrade(_) ->
 	ranch:set_protocol_options(Name, [{msg, upgraded}, {pid, self()}]),
 	ok = connect_loop(Port, 1, 0),
 	receive upgraded -> ok after 1000 -> error(timeout) end,
+	ranch:stop_listener(Name).
+
+tcp_inherit_options(_) ->
+	Name = tcp_inherit_options,
+	TcpOptions = [{nodelay, false}, {send_timeout_close, false}],
+	{ok, _} = ranch:start_listener(Name, 4, ranch_tcp,
+			[{port, 0} | TcpOptions],
+			check_tcp_options, [{pid, self()} | TcpOptions]),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+			[binary, {active, true}, {packet, raw}]),
+	receive checked -> ok after 1000 -> error(timeout) end,
+	ok = gen_tcp:close(Socket),
 	ranch:stop_listener(Name).
 
 %% Supervisor tests

@@ -120,18 +120,27 @@ set_protocol_options(Ref, Opts) ->
 
 -spec filter_options([{atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].
-filter_options([], _, Acc) ->
-	Acc;
-filter_options([Opt = {Key, _}|Tail], AllowedKeys, Acc) ->
+filter_options(UserOptions, AllowedKeys, DefaultOptions) ->
+	AllowedOptions = filter_user_options(UserOptions, AllowedKeys),
+	lists:foldl(fun merge_options/2, DefaultOptions, AllowedOptions).
+
+filter_user_options([Opt = {Key, _}|Tail], AllowedKeys) ->
 	case lists:member(Key, AllowedKeys) of
-		true -> filter_options(Tail, AllowedKeys, [Opt|Acc]);
-		false -> filter_options(Tail, AllowedKeys, Acc)
+		true -> [Opt|filter_user_options(Tail, AllowedKeys)];
+		false -> filter_user_options(Tail, AllowedKeys)
 	end;
-filter_options([Opt = {raw, _, _, _}|Tail], AllowedKeys, Acc) ->
+filter_user_options([Opt = {raw, _, _, _}|Tail], AllowedKeys) ->
 	case lists:member(raw, AllowedKeys) of
-		true -> filter_options(Tail, AllowedKeys, [Opt|Acc]);
-		false -> filter_options(Tail, AllowedKeys, Acc)
-	end.
+		true -> [Opt|filter_user_options(Tail, AllowedKeys)];
+		false -> filter_user_options(Tail, AllowedKeys)
+	end;
+filter_user_options([], _) ->
+	[].
+
+merge_options({Key, _} = Option, OptionList) ->
+	lists:keystore(Key, 1, OptionList, Option);
+merge_options(Option, OptionList) ->
+	[Option|OptionList].
 
 -spec set_option_default(Opts, atom(), any())
 	-> Opts when Opts :: [{atom(), any()}].
