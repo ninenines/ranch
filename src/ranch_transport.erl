@@ -17,9 +17,12 @@
 -export([sendfile/6]).
 
 -type socket() :: any().
--type opts() :: any().
 -type sendfile_opts() :: [{chunk_size, non_neg_integer()}].
 -export_type([sendfile_opts/0]).
+
+-ifndef(NO_CALLBACKS).
+
+-type opts() :: any().
 
 -callback name() -> atom().
 %% @todo -callback caps(secure | sendfile) -> boolean().
@@ -52,6 +55,33 @@
 -callback shutdown(socket(), read | write | read_write)
 	-> ok | {error, atom()}.
 -callback close(socket()) -> ok.
+
+-else.
+
+-export([behaviour_info/1]).
+
+behaviour_info(callbacks) ->
+    [
+        {name, 0},
+        {messages, 0},
+        {listen, 1},
+        {accept, 2},
+        {connect, 3},
+        {connect, 4},
+        {recv, 3},
+        {send, 2},
+        {sendfile, 5},
+        {setopts, 2},
+        {controlling_process, 2},
+        {peername, 1},
+        {sockname, 1},
+        {shutdown, 2},
+        {close, 1}
+    ];
+behaviour_info(_) ->
+    undefined.
+
+-endif.
 
 %% A fallback for transports that don't have a native sendfile implementation.
 %% Note that the ordering of arguments is different from file:sendfile/5 and

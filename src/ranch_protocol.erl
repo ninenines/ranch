@@ -14,6 +14,8 @@
 
 -module(ranch_protocol).
 
+-ifndef(NO_CALLBACKS).
+
 %% Start a new connection process for the given socket.
 -callback start_link(
 		Ref::ranch:ref(),
@@ -21,3 +23,14 @@
 		Transport::module(),
 		ProtocolOptions::any())
 	-> {ok, ConnectionPid::pid()}.
+
+-else.
+
+-export([behaviour_info/1]).
+
+behaviour_info(callbacks) ->
+    [{start_link, 4}];
+behaviour_info(_) ->
+    undefined.
+
+-endif.
