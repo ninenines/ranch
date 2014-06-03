@@ -42,10 +42,12 @@
 	| {ciphers, [ssl:erl_cipher_suite()] | string()}
 	| {fail_if_no_peer_cert, boolean()}
 	| {hibernate_after, integer() | undefined}
+	| {honor_cipher_order, boolean()}
 	| {ip, inet:ip_address()}
 	| {key, Der::binary()}
 	| {keyfile, string()}
 	| {linger, {boolean(), non_neg_integer()}}
+	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
 	| {nodelay, boolean()}
 	| {password, string()}
@@ -58,7 +60,8 @@
 	| {send_timeout, timeout()}
 	| {send_timeout_close, boolean()}
 	| {verify, ssl:verify_type()}
-	| {verify_fun, {fun(), InitialUserState::term()}}].
+	| {verify_fun, {fun(), InitialUserState::term()}}
+	| {versions, [atom()]}].
 -export_type([opts/0]).
 
 name() -> ssl.
@@ -79,10 +82,13 @@ listen(Opts) ->
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(Opts5,
 		[backlog, cacertfile, cacerts, cert, certfile, ciphers,
-			fail_if_no_peer_cert, hibernate_after, ip, key, keyfile,
-			linger, next_protocols_advertised, nodelay, password, port, raw,
+			fail_if_no_peer_cert, hibernate_after,
+			honor_cipher_order, ip, key, keyfile, linger,
+			next_protocols_advertised, nodelay,
+			log_alert, password, port, raw,
 			reuse_session, reuse_sessions, secure_renegotiate,
-			send_timeout, send_timeout_close, verify, verify_fun],
+			send_timeout, send_timeout_close, verify, verify_fun,
+			versions],
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
 

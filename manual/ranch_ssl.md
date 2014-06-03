@@ -14,10 +14,12 @@ Types
 	| {ciphers, [ssl:erl_cipher_suite()] | string()}
 	| {fail_if_no_peer_cert, boolean()}
 	| {hibernate_after, integer() | undefined}
+	| {honor_cipher_order, boolean()}
 	| {ip, inet:ip_address()}
 	| {key, Der::binary()}
 	| {keyfile, string()}
 	| {linger, {boolean(), non_neg_integer()}}
+	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
 	| {nodelay, boolean()}
 	| {password, string()}
@@ -29,7 +31,8 @@ Types
 	| {send_timeout, timeout()}
 	| {send_timeout_close, boolean()}
 	| {verify, ssl:verify_type()}
-	| {verify_fun, {fun(), InitialUserState::term()}}]
+	| {verify_fun, {fun(), InitialUserState::term()}},
+	| {versions, [atom()]}].
 
 > Listen options.
 >
@@ -61,6 +64,8 @@ The default value is given next to the option name.
    -  Whether to refuse the connection if the client sends an empty certificate.
  -  hibernate_after (undefined)
    -  Time in ms after which SSL socket processes go into hibernation to reduce memory usage.
+ -  honor_cipher_order (false)
+   -  If true, use the server's preference for cipher selection. If false (the default), use the client's preference.
  -  ip
    -  Interface to listen on. Listen on all interfaces by default.
  -  key
@@ -69,6 +74,8 @@ The default value is given next to the option name.
    -  Path to the PEM encoded private key file, if different than the certfile.
  -  linger ({false, 0})
    -  Whether to wait and how long to flush data sent before closing the socket.
+ -  log_alert (true)
+   -  If false, error reports will not be displayed.
  -  next_protocols_advertised
    -  List of protocols to send to the client if it supports the Next Protocol extension.
  -  nodelay (true)
@@ -91,6 +98,8 @@ The default value is given next to the option name.
    -  Use `verify_peer` to request a certificate from the client.
  -  verify_fun
    -  Custom policy to decide whether a client certificate is valid.
+ -  versions
+   -  TLS protocol versions that will be supported.
 
 Note that the client will not send a certificate unless the
 value for the `verify` option is set to `verify_peer`. This
