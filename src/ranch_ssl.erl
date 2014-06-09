@@ -73,14 +73,14 @@ listen(Opts) ->
 	ranch:require([crypto, asn1, public_key, ssl]),
 	true = lists:keymember(cert, 1, Opts)
 		orelse lists:keymember(certfile, 1, Opts),
-	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, send_timeout, 30000),
-	Opts4 = ranch:set_option_default(Opts3, send_timeout_close, true),
-	Opts5 = ranch:set_option_default(Opts4, ciphers, unbroken_cipher_suites()),
+	Opts2 = ranch:set_option_defaults(Opts, [{backlog, 1024},
+	    {send_timeout, 30000},
+	    {send_timeout_close, true},
+	    {ciphers, unbroken_cipher_suites()}]),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(Opts5,
+	ssl:listen(0, ranch:filter_options(Opts2,
 		[backlog, cacertfile, cacerts, cert, certfile, ciphers,
 			fail_if_no_peer_cert, hibernate_after,
 			honor_cipher_order, ip, key, keyfile, linger,

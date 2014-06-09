@@ -51,16 +51,17 @@ messages() -> {tcp, tcp_closed, tcp_error}.
 
 -spec listen(opts()) -> {ok, inet:socket()} | {error, atom()}.
 listen(Opts) ->
-	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, send_timeout, 30000),
-	Opts4 = ranch:set_option_default(Opts3, send_timeout_close, true),
+	Opts2 = ranch:set_option_defaults(Opts, [{backlog, 1024},
+		{send_timeout, 30000},
+		{send_timeout_close, true},
+		{packet, raw}]),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	gen_tcp:listen(0, ranch:filter_options(Opts4,
-		[backlog, ip, linger, nodelay, port, raw,
+	gen_tcp:listen(0, ranch:filter_options(Opts2,
+		[backlog, ip, linger, nodelay, port, packet, raw,
 			send_timeout, send_timeout_close],
-		[binary, {active, false}, {packet, raw},
+		[binary, {active, false},
 			{reuseaddr, true}, {nodelay, true}])).
 
 -spec accept(inet:socket(), timeout())
