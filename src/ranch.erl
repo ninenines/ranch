@@ -26,6 +26,7 @@
 -export([set_protocol_options/2]).
 -export([filter_options/3]).
 -export([set_option_default/3]).
+-export([set_option_defaults/2]).
 -export([require/1]).
 
 -type max_conns() :: non_neg_integer() | infinity.
@@ -149,6 +150,13 @@ set_option_default(Opts, Key, Value) ->
 		true -> Opts;
 		false -> [{Key, Value}|Opts]
 	end.
+
+-spec set_option_defaults(Opts, Opts)
+	-> Opts when Opts :: [{atom(), any()}].
+set_option_defaults(Opts, DefaultOpts) ->
+	lists:foldl(fun({Key, Val}, Acc) ->
+		ranch:set_option_default(Acc, Key, Val)
+	end, Opts, DefaultOpts).
 
 -spec require([atom()]) -> ok.
 require([]) ->
