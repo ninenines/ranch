@@ -21,7 +21,7 @@ The `ranch` application defines one application environment
 configuration parameter.
 
  -  profile (false)
-   -  When enabled, Ranch will start `etop` profiling automatically.
+   -  When enabled, Ranch will start `eprof` profiling automatically.
 
 You can use the `ranch_app:profile_output/0` function to stop
 profiling and output the results to the files `procs.profile`
