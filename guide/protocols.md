@@ -28,8 +28,8 @@ ok = ranch:accept_ack(Ref).
 ```
 
 If your protocol code requires specific socket options, you should
-set them while initializing your connection process and before
-starting `ranch:accept_ack/1`. You can use `Transport:setopts/2`
+set them while initializing your connection process, after
+calling `ranch:accept_ack/1`. You can use `Transport:setopts/2`
 for that purpose.
 
 Following is the complete protocol code for the example found
