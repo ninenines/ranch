@@ -58,8 +58,8 @@ groups() ->
 	[{tcp, [parallel], Tests}, {ssl, [parallel], Tests ++ [ssl_chunk_size]}].
 
 init_per_suite(Config) ->
-	ok = application:start(ranch),
 	ok = application:start(crypto),
+	ok = application:start(ranch),
 	Filename = filename:join(?config(priv_dir, Config), "sendfile"),
 	Binary = crypto:rand_bytes(20 * 1024 * 1024),
 	ok = file:write_file(Filename, Binary),
