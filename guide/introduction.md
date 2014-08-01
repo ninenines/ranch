@@ -30,3 +30,8 @@ Ranch is developed for Erlang R15B01 and later versions.
 
 Ranch may be compiled on earlier Erlang versions with small source code
 modifications but there is no guarantee that it will work as expected.
+
+Versioning
+----------
+
+Ranch uses [Semantic Versioning 2.0.0](http://semver.org/).
