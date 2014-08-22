@@ -107,7 +107,7 @@ accept_ack(CSocket, Timeout) ->
 			ok = close(CSocket),
 			exit(normal);
 		%% Socket most likely stopped responding, don't error out.
-		{error, timeout} ->
+		{error, Reason} when Reason =:= timeout; Reason =:= closed ->
 			ok = close(CSocket),
 			exit(normal);
 		{error, Reason} ->
