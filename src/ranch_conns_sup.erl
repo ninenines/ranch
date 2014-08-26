@@ -15,6 +15,7 @@
 %% Make sure to never reload this module outside a release upgrade,
 %% as calling l(ranch_conns_sup) twice will kill the process and all
 %% the currently open connections.
+
 -module(ranch_conns_sup).
 
 %% API.
@@ -69,6 +70,9 @@ start_link(Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol) ->
 %% continue.
 -spec start_protocol(pid(), inet:socket()) -> ok.
 start_protocol(SupPid, Socket) ->
+	%% 想本模块发送start_protocol,如果连接数已经
+	%% 超过了最大连接数，那么服务器接受当前链接
+	%% 并且不返回信息，那么当前链接卡在这个地方
 	SupPid ! {?MODULE, start_protocol, self(), Socket},
 	receive SupPid -> ok end.
 
@@ -76,6 +80,7 @@ start_protocol(SupPid, Socket) ->
 %% called from anywhere.
 -spec active_connections(pid()) -> non_neg_integer().
 active_connections(SupPid) ->
+	%% 监控该
 	Tag = erlang:monitor(process, SupPid),
 	catch erlang:send(SupPid, {?MODULE, active_connections, self(), Tag},
 		[noconnect]),
@@ -111,28 +116,45 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		ack_timeout=AckTimeout, max_conns=MaxConns},
 		CurConns, NbChildren, Sleepers) ->
 	receive
+		%% 接受start_protocol请求，启动protocol进程
+		%% ?MODULE:本模块,start_protocol:启动protocol
+		%% To:发送该信息的源
+		%% Socket: 需要进行操作的socket
 		{?MODULE, start_protocol, To, Socket} ->
+			%% 用start_link启动后如果该自己成死掉，那么我们会收到
+			%% EXIT消息，流程跳转到下面的EXIT('唤醒睡眠者')
 			case Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
+					%% 执行以后，发给该socket的信息也可以发给该进程
 					Transport:controlling_process(Socket, Pid),
+					%% 想对应的进程发送shoot信息
 					Pid ! {shoot, Ref, Transport, Socket, AckTimeout},
+					%% 将当前进程的Pid放到进程字典里面
 					put(Pid, true),
+					%% 计算出当前的总连接数
 					CurConns2 = CurConns + 1,
 					if CurConns2 < MaxConns ->
+							%% 如果当前总连接数还没超过了最大连接数
+							%% 发送返回信息,当前总连接数加一，继续
 							To ! self(),
 							loop(State, CurConns2, NbChildren + 1,
 								Sleepers);
 						true ->
+							%% 否则，不返回信息，并且将对方放到Sleepers里面
 							loop(State, CurConns2, NbChildren + 1,
 								[To|Sleepers])
 					end;
 				Ret ->
+					%% 启动对应的用户自定义协议解析模块失败
 					To ! self(),
+					%% 写日志
 					error_logger:error_msg(
 						"Ranch listener ~p connection process start failure; "
 						"~p:start_link/4 returned: ~999999p~n",
 						[Ref, Protocol, Ret]),
+					%% 调用对应的关闭函数
 					Transport:close(Socket),
+					%% 继续loop
 					loop(State, CurConns, NbChildren, Sleepers)
 			end;
 		{?MODULE, active_connections, To, Tag} ->
@@ -155,16 +177,26 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			loop(State#state{opts=Opts2},
 				CurConns, NbChildren, Sleepers);
 		{'EXIT', Parent, Reason} ->
+			%% ?? TODO Parent是什么？
 			terminate(State, Reason, NbChildren);
 		{'EXIT', Pid, Reason} when Sleepers =:= [] ->
+			%% 一个链接死掉了，并且没有conn在等待
+			%% 报告错误
 			report_error(Ref, Protocol, Pid, Reason),
+			%% 从进程字典摸掉该进程
 			erase(Pid),
+			%% 继续loop
 			loop(State, CurConns - 1, NbChildren - 1, Sleepers);
 		%% Resume a sleeping acceptor if needed.
 		{'EXIT', Pid, Reason} ->
+			%% 有acceptor在等待
+			%% 报告错误
 			report_error(Ref, Protocol, Pid, Reason),
+			%% 摸掉pid
 			erase(Pid),
+			%% 取出地一个进程
 			[To|Sleepers2] = Sleepers,
+			%% 唤醒地一个进程
 			To ! self(),
 			loop(State, CurConns - 1, NbChildren - 1, Sleepers2);
 		{system, From, Request} ->

@@ -27,6 +27,14 @@ start_link(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 		Ref, NbAcceptors, Transport, TransOpts, Protocol
 	}).
 
+%% 用于启动ranch_conns_sup,ranch_acceptors_sup
+%% 				ranch_sup
+%%				/		\
+%%			ranch_server ranch_listener_sup
+%%				|->			/ 	\
+%%					ranch_conns_sup ranch_acceptors_sup
+%%										/
+%%									ranch_acceptor ...
 init({Ref, NbAcceptors, Transport, TransOpts, Protocol}) ->
 	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
 	ConnType = proplists:get_value(connection_type, TransOpts, worker),
