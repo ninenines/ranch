@@ -31,10 +31,3 @@ are not ordered.
 
     We should be able to add more acceptors to a pool but also
     to remove some of them as needed.
-
-*   Add Transport:secure/0.
-
-    Currently Ranch checks if a connection is secure by
-    checking if its name is 'ssl'. This isn't a very modular
-    solution,  adding an API function that returns whether
-    a connection is secure would fix that issue.
