@@ -57,7 +57,7 @@ Transport:send(Socket, ["Ranch", [<<"is">>, "cool!"]]).
 ```
 
 You can receive data either in passive or in active mode. Passive mode
-means that you will perform a blocking `Transport:recv/2` call, while
+means that you will perform a blocking `Transport:recv/3` call, while
 active mode means that you will receive the data as a message.
 
 By default, all data will be received as binary. It is possible to
