@@ -19,7 +19,8 @@
 	{registered, [ranch_sup, ranch_server]},
 	{applications, [
 		kernel,
-		stdlib
+		stdlib,
+		ssl
 	]},
 	{mod, {ranch_app, []}},
 	{env, []}
