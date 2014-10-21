@@ -51,6 +51,8 @@
 	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
 	| {nodelay, boolean()}
+	| {partial_chain, fun(([Der::binary()]) ->
+		{trusted_ca, Der::binary()} | unknown_ca)}
 	| {password, string()}
 	| {port, inet:port_number()}
 	| {raw, non_neg_integer(), non_neg_integer(),
@@ -90,7 +92,7 @@ listen(Opts) ->
 			fail_if_no_peer_cert, hibernate_after,
 			honor_cipher_order, ip, key, keyfile, linger,
 			next_protocols_advertised, nodelay,
-			log_alert, password, port, raw,
+			log_alert, partial_chain, password, port, raw,
 			reuse_session, reuse_sessions, secure_renegotiate,
 			send_timeout, send_timeout_close, verify, verify_fun,
 			versions],
