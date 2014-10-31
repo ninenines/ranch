@@ -16,20 +16,23 @@
 -behaviour(gen_server).
 
 %% API.
+%% 这个gen_server的作用相当与存放了很多全局的配置，管理很多的全局
+%% 状态，变量，进程id
 -export([start_link/0]).
--export([set_new_listener_opts/3]).
--export([cleanup_listener_opts/1]).
--export([set_connections_sup/2]).
--export([get_connections_sup/1]).
--export([set_port/2]).
--export([get_port/1]).
--export([set_max_connections/2]).
--export([get_max_connections/1]).
--export([set_protocol_options/2]).
--export([get_protocol_options/1]).
--export([count_connections/1]).
+-export([set_new_listener_opts/3]). %% 设置监听者参数
+-export([cleanup_listener_opts/1]). %% 清除监听者参数
+-export([set_connections_sup/2]). %% 设置conns_sup
+-export([get_connections_sup/1]). %% 获取conns_sup
+-export([set_port/2]). %% 设置端口
+-export([get_port/1]). %% 获取端口
+-export([set_max_connections/2]). %% 设置最大连接数 
+-export([get_max_connections/1]). %% 获取最大连接数
+-export([set_protocol_options/2]). %% 设置protocol参数
+-export([get_protocol_options/1]). %% 获取protocol参数
+-export([count_connections/1]). %% 计算当前连接数??? TODO
 
 %% gen_server.
+%% gen_server必须到处的API接口
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -37,7 +40,7 @@
 -export([terminate/2]).
 -export([code_change/3]).
 
--define(TAB, ?MODULE).
+-define(TAB, ?MODULE). %% 表格的名字是ranch_server
 
 -type monitors() :: [{{reference(), pid()}, any()}].
 -record(state, {
@@ -46,27 +49,32 @@
 
 %% API.
 
+%% 启动本模块
 -spec start_link() -> {ok, pid()}.
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 -spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any()) -> ok.
+%% API
 set_new_listener_opts(Ref, MaxConns, Opts) ->
 	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, Opts}).
 
 -spec cleanup_listener_opts(ranch:ref()) -> ok.
+%% 删除几个选项
 cleanup_listener_opts(Ref) ->
-	_ = ets:delete(?TAB, {port, Ref}),
-	_ = ets:delete(?TAB, {max_conns, Ref}),
-	_ = ets:delete(?TAB, {opts, Ref}),
+	_ = ets:delete(?TAB, {port, Ref}), %% 端口
+	_ = ets:delete(?TAB, {max_conns, Ref}), %% 最大连接数
+	_ = ets:delete(?TAB, {opts, Ref}), %% 选项
 	ok.
 
 -spec set_connections_sup(ranch:ref(), pid()) -> ok.
+%% API
 set_connections_sup(Ref, Pid) ->
 	true = gen_server:call(?MODULE, {set_connections_sup, Ref, Pid}),
 	ok.
 
 -spec get_connections_sup(ranch:ref()) -> pid().
+%% 从ets表格中找到事先放在这里的conns_sup的pid
 get_connections_sup(Ref) ->
 	ets:lookup_element(?TAB, {conns_sup, Ref}, 2).
 
@@ -101,6 +109,8 @@ count_connections(Ref) ->
 %% gen_server.
 
 init([]) ->
+	%% 监听每个conns_sup的子进程??? TODO
+	%% ets表格实在ranch_sup里面创建的
 	Monitors = [{{erlang:monitor(process, Pid), Pid}, Ref} ||
 		[Ref, Pid] <- ets:match(?TAB, {{conns_sup, '$1'}, '$2'})],
 	{ok, #state{monitors=Monitors}}.
@@ -111,12 +121,15 @@ handle_call({set_new_listener_opts, Ref, MaxConns, Opts}, _, State) ->
 	{reply, ok, State};
 handle_call({set_connections_sup, Ref, Pid}, _,
 		State=#state{monitors=Monitors}) ->
+	%% 往ets表格中插入新的conn_sup
 	case ets:insert_new(?TAB, {{conns_sup, Ref}, Pid}) of
 		true ->
+			%% 监控该conn_sup
 			MonitorRef = erlang:monitor(process, Pid),
 			{reply, true,
 				State#state{monitors=[{{MonitorRef, Pid}, Ref}|Monitors]}};
 		false ->
+			%% 失败
 			{reply, false, State}
 	end;
 handle_call({set_port, Ref, Port}, _, State) ->

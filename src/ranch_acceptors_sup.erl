@@ -24,7 +24,9 @@ start_link(Ref, NbAcceptors, Transport, TransOpts) ->
 	supervisor:start_link(?MODULE, [Ref, NbAcceptors, Transport, TransOpts]).
 
 init([Ref, NbAcceptors, Transport, TransOpts]) ->
+	%% 从ranch_server获取连接管理者
 	ConnsSup = ranch_server:get_connections_sup(Ref),
+	%% 从参数里面获取监听套接子,如果没有的话，就监听
 	LSocket = case proplists:get_value(socket, TransOpts) of
 		undefined ->
 			{ok, Socket} = Transport:listen(TransOpts),
@@ -32,9 +34,12 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 		Socket ->
 			Socket
 	end,
+	%% TODO: 这个sockname是啥意思啊？
 	{ok, {_, Port}} = Transport:sockname(LSocket),
+	%% TODO: 这个Ref到底哪里干嘛的？
 	ranch_server:set_port(Ref, Port),
 	Procs = [
+		%% 子进程spec,一共有n个
 		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
 			LSocket, Transport, ConnsSup
 		]}, permanent, brutal_kill, worker, []}
