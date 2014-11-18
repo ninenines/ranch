@@ -124,7 +124,7 @@ accept_ack(Ref) ->
 -spec remove_connection(ref()) -> ok.
 remove_connection(Ref) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
-	ConnsSup ! {remove_connection, Ref},
+	ConnsSup ! {remove_connection, Ref, self()},
 	ok.
 
 -spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()}.
