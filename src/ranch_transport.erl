@@ -22,7 +22,7 @@
 -export_type([sendfile_opts/0]).
 
 -callback name() -> atom().
-%% @todo -callback caps(secure | sendfile) -> boolean().
+-callback secure() -> boolean().
 -callback messages() -> {OK::atom(), Closed::atom(), Error::atom()}.
 -callback listen(opts()) -> {ok, socket()} | {error, atom()}.
 -callback accept(socket(), timeout())
