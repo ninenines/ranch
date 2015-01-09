@@ -16,6 +16,7 @@
 -behaviour(ranch_transport).
 
 -export([name/0]).
+-export([secure/0]).
 -export([messages/0]).
 -export([listen/1]).
 -export([accept/2]).
@@ -50,6 +51,8 @@
 	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
 	| {nodelay, boolean()}
+	| {partial_chain, fun(([Der::binary()]) ->
+		{trusted_ca, Der::binary()} | unknown_ca)}
 	| {password, string()}
 	| {port, inet:port_number()}
 	| {raw, non_neg_integer(), non_neg_integer(),
@@ -65,6 +68,10 @@
 -export_type([opts/0]).
 
 name() -> ssl.
+
+-spec secure() -> boolean().
+secure() ->
+    true.
 
 messages() -> {ssl, ssl_closed, ssl_error}.
 
@@ -85,7 +92,7 @@ listen(Opts) ->
 			fail_if_no_peer_cert, hibernate_after,
 			honor_cipher_order, ip, key, keyfile, linger,
 			next_protocols_advertised, nodelay,
-			log_alert, password, port, raw,
+			log_alert, partial_chain, password, port, raw,
 			reuse_session, reuse_sessions, secure_renegotiate,
 			send_timeout, send_timeout_close, verify, verify_fun,
 			versions],
@@ -107,7 +114,7 @@ accept_ack(CSocket, Timeout) ->
 			ok = close(CSocket),
 			exit(normal);
 		%% Socket most likely stopped responding, don't error out.
-		{error, timeout} ->
+		{error, Reason} when Reason =:= timeout; Reason =:= closed ->
 			ok = close(CSocket),
 			exit(normal);
 		{error, Reason} ->

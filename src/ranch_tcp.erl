@@ -16,6 +16,7 @@
 -behaviour(ranch_transport).
 
 -export([name/0]).
+-export([secure/0]).
 -export([messages/0]).
 -export([listen/1]).
 -export([accept/2]).
@@ -46,6 +47,10 @@
 -export_type([opts/0]).
 
 name() -> tcp.
+
+-spec secure() -> boolean().
+secure() ->
+    false.
 
 messages() -> {tcp, tcp_closed, tcp_error}.
 
