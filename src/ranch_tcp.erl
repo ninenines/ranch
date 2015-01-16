@@ -42,6 +42,7 @@
 	| {port, inet:port_number()}
 	| {raw, non_neg_integer(), non_neg_integer(),
 		non_neg_integer() | binary()}
+	| {max_connections, non_neg_integer()}
 	| {send_timeout, timeout()}
 	| {send_timeout_close, boolean()}].
 -export_type([opts/0]).

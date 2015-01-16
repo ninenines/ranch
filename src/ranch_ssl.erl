@@ -57,6 +57,7 @@
 	| {port, inet:port_number()}
 	| {raw, non_neg_integer(), non_neg_integer(),
 		non_neg_integer() | binary()}
+	| {max_connections, non_neg_integer()}
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
