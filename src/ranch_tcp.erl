@@ -37,11 +37,12 @@
 -export([close/1]).
 
 -type opts() :: [{backlog, non_neg_integer()}
-	| {ip, inet:ip_address()}
-	| {nodelay, boolean()}
-	| {port, inet:port_number()}
-	| {raw, non_neg_integer(), non_neg_integer(),
-		non_neg_integer() | binary()}].
+    | {ip, inet:ip_address()}
+    | {nodelay, boolean()}
+    | {port, inet:port_number()}
+    | {raw, non_neg_integer(), non_neg_integer(),
+        non_neg_integer() | binary()}
+    | {max_connections, non_neg_integer()}].
 -export_type([opts/0]).
 
 %% @doc Name of this transport, <em>tcp</em>.
@@ -74,56 +75,56 @@ messages() -> {tcp, tcp_closed, tcp_error}.
 %% @see gen_tcp:listen/2
 -spec listen(opts()) -> {ok, inet:socket()} | {error, atom()}.
 listen(Opts) ->
-	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	%% We set the port to 0 because it is given in the Opts directly.
-	%% The port in the options takes precedence over the one in the
-	%% first argument.
-	gen_tcp:listen(0, ranch:filter_options(Opts2, [backlog, ip, nodelay, port, raw],
-		[binary, {active, false}, {packet, raw},
-			{reuseaddr, true}, {nodelay, true}])).
+    Opts2 = ranch:set_option_default(Opts, backlog, 1024),
+    %% We set the port to 0 because it is given in the Opts directly.
+    %% The port in the options takes precedence over the one in the
+    %% first argument.
+    gen_tcp:listen(0, ranch:filter_options(Opts2, [backlog, ip, nodelay, port, raw],
+        [binary, {active, false}, {packet, raw},
+            {reuseaddr, true}, {nodelay, true}])).
 
 %% @doc Accept connections with the given listening socket.
 %% @see gen_tcp:accept/2
 -spec accept(inet:socket(), timeout())
-	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.
+    -> {ok, inet:socket()} | {error, closed | timeout | atom()}.
 accept(LSocket, Timeout) ->
-	gen_tcp:accept(LSocket, Timeout).
+    gen_tcp:accept(LSocket, Timeout).
 
 %% @private Experimental. Open a connection to the given host and port number.
 %% @see gen_tcp:connect/3
 %% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
-	inet:port_number(), any())
-	-> {ok, inet:socket()} | {error, atom()}.
+    inet:port_number(), any())
+    -> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts) when is_integer(Port) ->
-	gen_tcp:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}]).
+    gen_tcp:connect(Host, Port,
+        Opts ++ [binary, {active, false}, {packet, raw}]).
 
 %% @doc Receive data from a socket in passive mode.
 %% @see gen_tcp:recv/3
 -spec recv(inet:socket(), non_neg_integer(), timeout())
-	-> {ok, any()} | {error, closed | atom()}.
+    -> {ok, any()} | {error, closed | atom()}.
 recv(Socket, Length, Timeout) ->
-	gen_tcp:recv(Socket, Length, Timeout).
+    gen_tcp:recv(Socket, Length, Timeout).
 
 %% @doc Send data on a socket.
 %% @see gen_tcp:send/2
 -spec send(inet:socket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
-	gen_tcp:send(Socket, Packet).
+    gen_tcp:send(Socket, Packet).
 
 %% @equiv sendfile(Socket, File, Offset, Bytes, [])
 -spec sendfile(inet:socket(), file:name_all())
-	-> {ok, non_neg_integer()} | {error, atom()}.
+    -> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, Filename) ->
-	sendfile(Socket, Filename, 0, 0, []).
+    sendfile(Socket, Filename, 0, 0, []).
 
 %% @equiv sendfile(Socket, File, Offset, Bytes, [])
 -spec sendfile(inet:socket(), file:name_all() | file:fd(), non_neg_integer(),
-		non_neg_integer())
-	-> {ok, non_neg_integer()} | {error, atom()}.
+        non_neg_integer())
+    -> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, File, Offset, Bytes) ->
-	sendfile(Socket, File, Offset, Bytes, []).
+    sendfile(Socket, File, Offset, Bytes, []).
 
 %% @doc Send part of a file on a socket.
 %%
@@ -133,42 +134,42 @@ sendfile(Socket, File, Offset, Bytes) ->
 %%
 %% @see file:sendfile/5
 -spec sendfile(inet:socket(), file:name_all() | file:fd(), non_neg_integer(),
-		non_neg_integer(), [{chunk_size, non_neg_integer()}])
-	-> {ok, non_neg_integer()} | {error, atom()}.
+        non_neg_integer(), [{chunk_size, non_neg_integer()}])
+    -> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, Filename, Offset, Bytes, Opts)
-		when is_list(Filename) orelse is_atom(Filename)
-		orelse is_binary(Filename) ->
-	case file:open(Filename, [read, raw, binary]) of
-		{ok, RawFile} ->
-			try sendfile(Socket, RawFile, Offset, Bytes, Opts) of
-				Result -> Result
-			after
-				ok = file:close(RawFile)
-			end;
-		{error, _} = Error ->
-			Error
-	end;
+        when is_list(Filename) orelse is_atom(Filename)
+        orelse is_binary(Filename) ->
+    case file:open(Filename, [read, raw, binary]) of
+        {ok, RawFile} ->
+            try sendfile(Socket, RawFile, Offset, Bytes, Opts) of
+                Result -> Result
+            after
+                ok = file:close(RawFile)
+            end;
+        {error, _} = Error ->
+            Error
+    end;
 sendfile(Socket, RawFile, Offset, Bytes, Opts) ->
-	Opts2 = case Opts of
-		[] -> [{chunk_size, 16#1FFF}];
-		_ -> Opts
-	end,
-	try file:sendfile(RawFile, Socket, Offset, Bytes, Opts2) of
-		Result -> Result
-	catch
-		error:{badmatch, {error, enotconn}} ->
-			%% file:sendfile/5 might fail by throwing a {badmatch, {error, enotconn}}
-			%% this is because its internal implementation fails with a badmatch in
-			%% prim_file:sendfile/10 if the socket is not connected.
-			{error, closed}
-	end.
+    Opts2 = case Opts of
+        [] -> [{chunk_size, 16#1FFF}];
+        _ -> Opts
+    end,
+    try file:sendfile(RawFile, Socket, Offset, Bytes, Opts2) of
+        Result -> Result
+    catch
+        error:{badmatch, {error, enotconn}} ->
+            %% file:sendfile/5 might fail by throwing a {badmatch, {error, enotconn}}
+            %% this is because its internal implementation fails with a badmatch in
+            %% prim_file:sendfile/10 if the socket is not connected.
+            {error, closed}
+    end.
 
 %% @doc Set options on the given socket.
 %% @see inet:setopts/2
 %% @todo Probably filter Opts?
 -spec setopts(inet:socket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
-	inet:setopts(Socket, Opts).
+    inet:setopts(Socket, Opts).
 
 %% @doc Give control of the socket to a new process.
 %%
@@ -177,26 +178,26 @@ setopts(Socket, Opts) ->
 %%
 %% @see gen_tcp:controlling_process/2
 -spec controlling_process(inet:socket(), pid())
-	-> ok | {error, closed | not_owner | atom()}.
+    -> ok | {error, closed | not_owner | atom()}.
 controlling_process(Socket, Pid) ->
-	gen_tcp:controlling_process(Socket, Pid).
+    gen_tcp:controlling_process(Socket, Pid).
 
 %% @doc Return the remote address and port of the connection.
 %% @see inet:peername/1
 -spec peername(inet:socket())
-	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+    -> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 peername(Socket) ->
-	inet:peername(Socket).
+    inet:peername(Socket).
 
 %% @doc Return the local address and port of the connection.
 %% @see inet:sockname/1
 -spec sockname(inet:socket())
-	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+    -> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 sockname(Socket) ->
-	inet:sockname(Socket).
+    inet:sockname(Socket).
 
 %% @doc Close the given socket.
 %% @see gen_tcp:close/1
 -spec close(inet:socket()) -> ok.
 close(Socket) ->
-	gen_tcp:close(Socket).
+    gen_tcp:close(Socket).
