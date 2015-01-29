@@ -109,14 +109,6 @@ accept_ack(CSocket, Timeout) ->
 	case ssl:ssl_accept(CSocket, Timeout) of
 		ok ->
 			ok;
-		%% Garbage was most likely sent to the socket, don't error out.
-		{error, {tls_alert, _}} ->
-			ok = close(CSocket),
-			exit(normal);
-		%% Socket most likely stopped responding, don't error out.
-		{error, Reason} when Reason =:= timeout; Reason =:= closed ->
-			ok = close(CSocket),
-			exit(normal);
 		{error, Reason} ->
 			ok = close(CSocket),
 			error(Reason)
