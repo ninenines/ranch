@@ -12,7 +12,7 @@ $ make
 To start the release in the foreground:
 
 ``` bash
-$ ./_rel/bin/tcp_echo_example console
+$ ./_rel/tcp_echo_example/bin/tcp_echo_example console
 ```
 
 Then start a telnet session to port 5555:

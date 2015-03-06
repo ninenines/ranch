@@ -18,7 +18,7 @@ $ make
 To start the release in the foreground:
 
 ``` bash
-$ ./_rel/bin/tcp_reverse_example console
+$ ./_rel/tcp_reverse_example/bin/tcp_reverse_example console
 ```
 
 Then start a telnet session to port 5555:
