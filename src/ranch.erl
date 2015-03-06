@@ -35,7 +35,7 @@
 -export_type([ref/0]).
 
 -spec start_listener(ref(), non_neg_integer(), module(), any(), module(), any())
-	-> {ok, pid()} | {error, badarg}.
+	-> supervisor:startchild_ret().
 start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NbAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
