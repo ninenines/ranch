@@ -114,17 +114,23 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{?MODULE, start_protocol, To, Socket} ->
 			case Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
-					Transport:controlling_process(Socket, Pid),
-					Pid ! {shoot, Ref, Transport, Socket, AckTimeout},
-					put(Pid, true),
-					CurConns2 = CurConns + 1,
-					if CurConns2 < MaxConns ->
-							To ! self(),
-							loop(State, CurConns2, NbChildren + 1,
-								Sleepers);
-						true ->
-							loop(State, CurConns2, NbChildren + 1,
-								[To|Sleepers])
+					case Transport:controlling_process(Socket, Pid) of
+						ok ->
+							Pid ! {shoot, Ref, Transport, Socket, AckTimeout},
+							put(Pid, true),
+							CurConns2 = CurConns + 1,
+							if CurConns2 < MaxConns ->
+									To ! self(),
+									loop(State, CurConns2, NbChildren + 1,
+										Sleepers);
+								true ->
+									loop(State, CurConns2, NbChildren + 1,
+										[To|Sleepers])
+							end;
+						{error, _} ->
+							Transport:close(Socket),
+							exit(Pid, kill),
+							loop(State, CurConns, NbChildren, Sleepers)
 					end;
 				Ret ->
 					To ! self(),
