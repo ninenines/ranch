@@ -94,13 +94,13 @@ the normal `gen_server` execution loop.
 start_link(Ref, Socket, Transport, Opts) ->
     gen_server:start_link(?MODULE, [Ref, Socket, Transport, Opts], []).
 
-init([Ref, Socket, Transport, TransportOpts=[]]) ->
+init([Ref, Socket, Transport, ProtocolOpts]) ->
     ok = proc_lib:init_ack({ok, self()}),
     %% Perform any required state initialization here.
     ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}]),
     gen_server:enter_loop(?MODULE, [],
-        #state{ref=Ref, socket=Socket, transport=Transport, opts= TransportOpts}).
+        #state{ref=Ref, socket=Socket, transport=Transport, opts= ProtocolOpts}).
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -111,7 +111,7 @@ handle_cast(_Msg, State) ->
 
 handle_info({tcp, Socket, Data},
     State=#state{socket=Socket, transport=Transport}) ->
-    Transport:setopts(Socket, [{active, once}] ++ State#state.opts),
+    Transport:setopts(Socket, [{active, once}]),
     Transport:send(Socket, reverse_binary(Data)),
     {noreply, State};
 handle_info({tcp_closed, Socket}, State) ->
@@ -144,12 +144,13 @@ ends. If you return a timeout value of `0` then the `gen_server` will call
 -define(SERVER, ?MODULE).
 
 start_link(Ref, Socket, Transport, Opts) ->
-    gen_server:start_link(?MODULE, [Ref, Socket, Transport, TransportOpts], []).
+    gen_server:start_link(?MODULE, [Ref, Socket, Transport, ProtocolOpts], []).
 
-init([Ref, Socket, Transport, TransportOpts]) ->
+init([Ref, Socket, Transport, ProtocolOpts]) ->
     %% the 0 at the follwing line sets the timeout to 0, thus
     %% the timeout is called immediately after
-    {ok, #state{ref=Ref, socket=Socket, transport=Transport, opts= Opts}, 0}.
+    {ok,
+    #state{ref=Ref, socket=Socket, transport=Transport, opts= ProtocolOpts}, 0}.
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -159,14 +160,15 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 %% Here the timeout handling
-handle_info(timeout, State=#state{ref=Ref, socket=Socket, transport=Transport}) ->
+handle_info(timeout,
+    State=#state{ref=Ref, socket=Socket, transport=Transport}) ->
     ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
 
 handle_info({tcp, Socket, Data},
     State=#state{socket=Socket, transport=Transport}) ->
-    Transport:setopts(Socket, [{active, once}] ++ State#state.opts),
+    Transport:setopts(Socket, [{active, once}]),
     Transport:send(Socket, reverse_binary(Data)),
     {noreply, State};
 handle_info({tcp_closed, Socket}, State) ->
