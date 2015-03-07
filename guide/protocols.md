@@ -78,23 +78,48 @@ processes), then perform any needed operations before falling back into
 the normal `gen_server` execution loop.
 
 ``` erlang
--module(my_protocol).
+-module(echo_protocol).
 -behaviour(gen_server).
 -behaviour(ranch_protocol).
 
 -export([start_link/4]).
--export([init/4]).
-%% Exports of other gen_server callbacks here.
+
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+     terminate/2, code_change/3]).
+
+-record(state, {ref, socket, transport, opts}).
+
+-define(SERVER, ?MODULE).
 
 start_link(Ref, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, init, [Ref, Socket, Transport, Opts]).
+    gen_server:start_link(?MODULE, [Ref, Socket, Transport, Opts], []).
 
-init(Ref, Socket, Transport, _Opts = []) ->
+init([Ref, Socket, Transport, TransportOpts=[]]) ->
     ok = proc_lib:init_ack({ok, self()}),
     %% Perform any required state initialization here.
     ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}]),
-    gen_server:enter_loop(?MODULE, [], {state, Socket, Transport}).
+    gen_server:enter_loop(?MODULE, [],
+        #state{ref=Ref, socket=Socket, transport=Transport, opts= TransportOpts}).
+
+handle_call(_Request, _From, State) ->
+    Reply = ok,
+    {reply, Reply, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info({tcp, Socket, Data},
+    State=#state{socket=Socket, transport=Transport}) ->
+    Transport:setopts(Socket, [{active, once}] ++ State#state.opts),
+    Transport:send(Socket, reverse_binary(Data)),
+    {noreply, State};
+handle_info({tcp_closed, Socket}, State) ->
+    {stop, normal, State};
+handle_info({tcp_error, Socket, Reason}, State) ->
+    {stop, Reason, State}.
+handle_info(_Info, State) ->
+    {noreply, State}.
 
 %% Other gen_server callbacks here.
 ```
@@ -104,18 +129,51 @@ ends. If you return a timeout value of `0` then the `gen_server` will call
 `handle_info(timeout, _, _)` right away.
 
 ``` erlang
--module(my_protocol).
+-module(echo_protocol).
 -behaviour(gen_server).
 -behaviour(ranch_protocol).
 
-%% Exports go here.
 
-init([Ref, Socket, Transport]) ->
-    {ok, {state, Ref, Socket, Transport}, 0}.
+-export([start_link/4]).
 
-handle_info(timeout, State={state, Ref, Socket, Transport}) ->
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+     terminate/2, code_change/3]).
+
+-record(state, {ref, socket, transport, opts}).
+
+-define(SERVER, ?MODULE).
+
+start_link(Ref, Socket, Transport, Opts) ->
+    gen_server:start_link(?MODULE, [Ref, Socket, Transport, TransportOpts], []).
+
+init([Ref, Socket, Transport, TransportOpts]) ->
+    %% the 0 at the follwing line sets the timeout to 0, thus
+    %% the timeout is called immediately after
+    {ok, #state{ref=Ref, socket=Socket, transport=Transport, opts= Opts}, 0}.
+
+handle_call(_Request, _From, State) ->
+    Reply = ok,
+    {reply, Reply, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+%% Here the timeout handling
+handle_info(timeout, State=#state{ref=Ref, socket=Socket, transport=Transport}) ->
     ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}]),
     {noreply, State};
+
+handle_info({tcp, Socket, Data},
+    State=#state{socket=Socket, transport=Transport}) ->
+    Transport:setopts(Socket, [{active, once}] ++ State#state.opts),
+    Transport:send(Socket, reverse_binary(Data)),
+    {noreply, State};
+handle_info({tcp_closed, Socket}, State) ->
+    {stop, normal, State};
+handle_info({tcp_error, Socket, Reason}, State) ->
+    {stop, Reason, State}.
+handle_info(_Info, State) ->
+    {noreply, State}.
 %% ...
 ```
