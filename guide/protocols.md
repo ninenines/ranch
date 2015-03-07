@@ -143,7 +143,7 @@ ends. If you return a timeout value of `0` then the `gen_server` will call
 
 -define(SERVER, ?MODULE).
 
-start_link(Ref, Socket, Transport, Opts) ->
+start_link(Ref, Socket, Transport, ProtocolOpts) ->
     gen_server:start_link(?MODULE, [Ref, Socket, Transport, ProtocolOpts], []).
 
 init([Ref, Socket, Transport, ProtocolOpts]) ->
