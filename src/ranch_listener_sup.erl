@@ -31,12 +31,25 @@ init({Ref, NbAcceptors, Transport, TransOpts, Protocol}) ->
 	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
 	ConnType = proplists:get_value(connection_type, TransOpts, worker),
 	Shutdown = proplists:get_value(shutdown, TransOpts, 5000),
+	TransOptsFiltered = remove_control_opts(TransOpts),
 	ChildSpecs = [
 		{ranch_conns_sup, {ranch_conns_sup, start_link,
 				[Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol]},
 			permanent, infinity, supervisor, [ranch_conns_sup]},
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,
-				[Ref, NbAcceptors, Transport, TransOpts]},
+				[Ref, NbAcceptors, Transport, TransOptsFiltered]},
 			permanent, infinity, supervisor, [ranch_acceptors_sup]}
 	],
 	{ok, {{rest_for_one, 10, 10}, ChildSpecs}}.
+
+remove_control_opts(TransOpts) ->
+	Options = [max_connections, ack_timeout, connection_type, shutdown],
+	lists:foldl(fun remove/2, TransOpts, Options).
+
+remove(Key, Opts) ->
+	case lists:keytake(Key, 1, Opts) of
+		false ->
+			Opts;
+		{value, _Tuple, Opts2} ->
+			Opts2
+	end.
