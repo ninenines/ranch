@@ -17,6 +17,11 @@ CI_OTP = \
 	OTP-17.0.2 OTP-17.1.2 OTP-17.2.2 OTP-17.3.4 OTP-17.4.1 OTP-17.5.6.2 \
 	OTP-18.0.2
 
+# CI setup.
+
+ci-setup::
+	cp ~/.kerl/builds/$(CI_OTP_RELEASE)/otp_src_git/lib/ssl/test/erl_make_certs.erl deps/ct_helper/src/
+
 # Standard targets.
 
 include erlang.mk
