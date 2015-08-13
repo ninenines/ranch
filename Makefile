@@ -19,7 +19,7 @@ CI_OTP = \
 
 # CI setup.
 
-ci-setup::
+ci-setup:: $(DEPS_DIR)/ct_helper
 	cp ~/.kerl/builds/$(CI_OTP_RELEASE)/otp_src_git/lib/ssl/test/erl_make_certs.erl deps/ct_helper/src/
 
 # Standard targets.
