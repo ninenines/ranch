@@ -35,7 +35,7 @@
 -export([shutdown/2]).
 -export([close/1]).
 
--type opts() :: [{backlog, non_neg_integer()}
+-type opt() :: {backlog, non_neg_integer()}
 	| {cacertfile, string()}
 	| {cacerts, [Der::binary()]}
 	| {cert, Der::binary()}
@@ -64,7 +64,10 @@
 	| {send_timeout_close, boolean()}
 	| {verify, ssl:verify_type()}
 	| {verify_fun, {fun(), InitialUserState::term()}}
-	| {versions, [atom()]}].
+	| {versions, [atom()]}.
+-export_type([opt/0]).
+
+-type opts() :: [opt()].
 -export_type([opts/0]).
 
 name() -> ssl.

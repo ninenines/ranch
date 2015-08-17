@@ -35,7 +35,7 @@
 -export([shutdown/2]).
 -export([close/1]).
 
--type opts() :: [{backlog, non_neg_integer()}
+-type opt() :: {backlog, non_neg_integer()}
 	| {ip, inet:ip_address()}
 	| {linger, {boolean(), non_neg_integer()}}
 	| {nodelay, boolean()}
@@ -43,7 +43,10 @@
 	| {raw, non_neg_integer(), non_neg_integer(),
 		non_neg_integer() | binary()}
 	| {send_timeout, timeout()}
-	| {send_timeout_close, boolean()}].
+	| {send_timeout_close, boolean()}.
+-export_type([opt/0]).
+
+-type opts() :: [opt()].
 -export_type([opts/0]).
 
 name() -> tcp.

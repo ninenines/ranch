@@ -27,7 +27,12 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	LSocket = case proplists:get_value(socket, TransOpts) of
 		undefined ->
-			{ok, Socket} = Transport:listen(TransOpts),
+			TransOpts2 = proplists:delete(ack_timeout,
+				proplists:delete(connection_type,
+				proplists:delete(max_connections,
+				proplists:delete(shutdown,
+				proplists:delete(socket, TransOpts))))),
+			{ok, Socket} = Transport:listen(TransOpts2),
 			Socket;
 		Socket ->
 			Socket

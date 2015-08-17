@@ -31,6 +31,13 @@
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
 
+-type opt() :: {ack_timeout, timeout()}
+	| {connection_type, worker | supervisor}
+	| {max_connections, max_conns()}
+	| {shutdown, timeout() | brutal_kill}
+	| {socket, any()}.
+-export_type([opt/0]).
+
 -type ref() :: any().
 -export_type([ref/0]).
 

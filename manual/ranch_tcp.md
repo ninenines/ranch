@@ -11,20 +11,24 @@ the threads stuck indefinitely.
 Types
 -----
 
-### opts() = [{backlog, non_neg_integer()}
+### opt() = {backlog, non_neg_integer()}
 	| {ip, inet:ip_address()}
 	| {linger, {boolean(), non_neg_integer()}}
 	| {nodelay, boolean()}
 	| {port, inet:port_number()}
 	| {raw, non_neg_integer(), non_neg_integer(), non_neg_integer() | binary()}
 	| {send_timeout, timeout()}
-	| {send_timeout_close, boolean()}]
+	| {send_timeout_close, boolean()}
 
 > Listen options.
 >
 > This does not represent the entirety of the options that can
 > be set on the socket, but only the options that should be
 > set independently of protocol implementation.
+
+### opts() = [opt()]
+
+> Listen options.
 
 Option descriptions
 -------------------

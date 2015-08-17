@@ -17,6 +17,17 @@ Types
 > also be removed from this count explicitly by the user
 > code.
 
+### opt() = {ack_timeout, timeout()}
+	| {connection_type, worker | supervisor}
+	| {max_connections, max_conns()}
+	| {shutdown, timeout() | brutal_kill}
+	| {socket, any()}
+
+> Ranch-specific transport options.
+>
+> These options are not passed on to the transports.
+> They are used by Ranch while setting up the listeners.
+
 ### ref() = any()
 
 > Unique name used to refer to a listener.
