@@ -28,8 +28,15 @@
 -export([set_option_default/3]).
 -export([require/1]).
 
--type max_conns() :: non_neg_integer() | infinity.
--export_type([max_conns/0]).
+-type max_conns() :: non_neg_integer() | 'infinity'.
+
+-type opts() :: [{max_connections, max_conns()}
+                 | {ack_timeout, timeout()}
+                 | {connection_type, 'worker' | 'supervisor'}
+                 | {shutdown, timeout() | 'brutal_kill'}
+                 | {socket, inet:socket()}].
+
+-export_type([max_conns/0, opts/0]).
 
 -type opt() :: {ack_timeout, timeout()}
 	| {connection_type, worker | supervisor}
