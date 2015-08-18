@@ -45,6 +45,7 @@
 	| {hibernate_after, integer() | undefined}
 	| {honor_cipher_order, boolean()}
 	| {ip, inet:ip_address()}
+	| {keepalive, boolean()}
 	| {key, Der::binary()}
 	| {keyfile, string()}
 	| {linger, {boolean(), non_neg_integer()}}
@@ -93,7 +94,7 @@ listen(Opts) ->
 	ssl:listen(0, ranch:filter_options(Opts5,
 		[backlog, cacertfile, cacerts, cert, certfile, ciphers,
 			fail_if_no_peer_cert, hibernate_after,
-			honor_cipher_order, ip, key, keyfile, linger,
+			honor_cipher_order, ip, keepalive, key, keyfile, linger,
 			next_protocols_advertised, nodelay,
 			log_alert, partial_chain, password, port, raw,
 			reuse_session, reuse_sessions, secure_renegotiate,
