@@ -6,43 +6,47 @@ The `ranch_ssl` module implements an SSL Ranch transport.
 Types
 -----
 
-### opt() = {backlog, non_neg_integer()}
+### ssl_opt() = {alpn_preferred_protocols, [binary()]}
 	| {cacertfile, string()}
-	| {cacerts, [Der::binary()]}
-	| {cert, Der::binary()}
+	| {cacerts, [public_key:der_encoded()]}
+	| {cert, public_key:der_encoded()}
 	| {certfile, string()}
 	| {ciphers, [ssl:erl_cipher_suite()] | string()}
+	| {client_renegotiation, boolean()}
+	| {crl_cache, {module(), {internal | any(), list()}}}
+	| {crl_check, boolean() | peer | best_effort}
+	| {depth, 0..255}
+	| {dh, public_key:der_encoded()}
+	| {dhfile, string()}
 	| {fail_if_no_peer_cert, boolean()}
 	| {hibernate_after, integer() | undefined}
 	| {honor_cipher_order, boolean()}
-	| {ip, inet:ip_address()}
-	| {key, Der::binary()}
+	| {key, {'RSAPrivateKey' | 'DSAPrivateKey' | 'PrivateKeyInfo', public_key:der_encoded()}}
 	| {keyfile, string()}
-	| {linger, {boolean(), non_neg_integer()}}
 	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
-	| {nodelay, boolean()}
+	| {partial_chain, fun(([public_key:der_encoded()]) -> {trusted_ca, public_key:der_encoded()} | unknown_ca)}
 	| {password, string()}
-	| {port, inet:port_number()}
-	| {raw, non_neg_integer(), non_neg_integer(), non_neg_integer() | binary()}
+	| {psk_identity, string()}
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
-	| {send_timeout, timeout()}
-	| {send_timeout_close, boolean()}
+	| {sni_fun, fun()}
+	| {sni_hosts, [{string(), ssl_opt()}]}
+	| {user_lookup_fun, {fun(), any()}}
 	| {verify, ssl:verify_type()}
-	| {verify_fun, {fun(), InitialUserState::term()}},
-	| {versions, [atom()]}
+	| {verify_fun, {fun(), any()}}
+	| {versions, [atom()]}.
+
+> SSL-specific listen options.
+
+### opt() = ranch_tcp:opt() | ssl_opt()
 
 > Listen options.
->
-> This does not represent the entirety of the options that can
-> be set on the socket, but only the options that should be
-> set independently of protocol implementation.
 
 ### opts() = [opt()]
 
-> Listen options.
+> List of listen options.
 
 Option descriptions
 -------------------
@@ -52,8 +56,8 @@ or the `certfile` option. None of the other options are required.
 
 The default value is given next to the option name.
 
- -  backlog (1024)
-   -  Max length of the queue of pending connections.
+ -  alpn_preferred_protocols
+   -  Perform Application-Layer Protocol Negotiation with the given list of preferred protocols.
  -  cacertfile
    -  Path to PEM encoded trusted certificates file used to verify peer certificates.
  -  cacerts
@@ -64,40 +68,52 @@ The default value is given next to the option name.
    -  Path to the PEM encoded user certificate file. May also contain the private key.
  -  ciphers
    -  List of ciphers that clients are allowed to use.
+ -  client_renegotiation (true)
+   -  Whether to allow client-initiated renegotiation.
+ -  crl_cache ({ssl_crl_cache, {internal, []}})
+   -  Customize the module used to cache Certificate Revocation Lists.
+ -  crl_check (false)
+   -  Whether to perform CRL check on all certificates in the chain during validation.
+ -  depth (1)
+   -  Maximum of intermediate certificates allowed in the certification path.
+ -  dh
+   -  DER encoded Diffie-Hellman parameters.
+ -  dhfile
+   -  Path to the PEM encoded Diffie-Hellman parameters file.
  -  fail_if_no_peer_cert (false)
    -  Whether to refuse the connection if the client sends an empty certificate.
  -  hibernate_after (undefined)
    -  Time in ms after which SSL socket processes go into hibernation to reduce memory usage.
  -  honor_cipher_order (false)
-   -  If true, use the server's preference for cipher selection. If false (the default), use the client's preference.
- -  ip
-   -  Interface to listen on. Listen on all interfaces by default.
+   -  If true, use the server's preference for cipher selection. If false, use the client's preference.
  -  key
    -  DER encoded user private key.
  -  keyfile
    -  Path to the PEM encoded private key file, if different than the certfile.
- -  linger ({false, 0})
-   -  Whether to wait and how long to flush data sent before closing the socket.
  -  log_alert (true)
    -  If false, error reports will not be displayed.
  -  next_protocols_advertised
    -  List of protocols to send to the client if it supports the Next Protocol extension.
  -  nodelay (true)
    -  Whether to enable TCP_NODELAY.
+ -  partial_chain
+   -  Claim an intermediate CA in the chain as trusted.
  -  password
    -  Password to the private key file, if password protected.
- -  port (0)
-   -  TCP port number to listen on. 0 means a random port will be used.
+ -  psk_identity
+   -  Provide the given PSK identity hint to the client during the handshake.
  -  reuse_session
    -  Custom policy to decide whether a session should be reused.
  -  reuse_sessions (false)
    -  Whether to allow session reuse.
  -  secure_renegotiate (false)
    -  Whether to reject renegotiation attempts that do not conform to RFC5746.
- -  send_timeout (30000)
-   -  How long the send call may wait for confirmation before returning.
- -  send_timeout_close (true)
-   -  Whether to close the socket when the confirmation wasn't received.
+ -  sni_fun
+   -  Function called when the client requests a host using Server Name Indication. Returns options to apply.
+ -  sni_hosts
+   -  Options to apply for the host that matches what the client requested with Server Name Indication.
+ -  user_lookup_fun
+   -  Function called to determine the shared secret when using PSK, or provide parameters when using SRP.
  -  verify (verify_none)
    -  Use `verify_peer` to request a certificate from the client.
  -  verify_fun
@@ -111,7 +127,7 @@ means that the `fail_if_no_peer_cert` only apply when combined
 with the `verify` option. The `verify_fun` option allows
 greater control over the client certificate validation.
 
-The `raw` option is unsupported.
+The options `sni_fun` and `sni_hosts` are mutually exclusive.
 
 Exports
 -------

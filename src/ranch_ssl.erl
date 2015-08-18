@@ -19,6 +19,7 @@
 -export([secure/0]).
 -export([messages/0]).
 -export([listen/1]).
+-export([listen_options/0]).
 -export([accept/2]).
 -export([accept_ack/2]).
 -export([connect/3]).
@@ -35,36 +36,40 @@
 -export([shutdown/2]).
 -export([close/1]).
 
--type opt() :: {backlog, non_neg_integer()}
+-type ssl_opt() :: {alpn_preferred_protocols, [binary()]}
 	| {cacertfile, string()}
-	| {cacerts, [Der::binary()]}
-	| {cert, Der::binary()}
+	| {cacerts, [public_key:der_encoded()]}
+	| {cert, public_key:der_encoded()}
 	| {certfile, string()}
 	| {ciphers, [ssl:erl_cipher_suite()] | string()}
+	| {client_renegotiation, boolean()}
+	| {crl_cache, {module(), {internal | any(), list()}}}
+	| {crl_check, boolean() | peer | best_effort}
+	| {depth, 0..255}
+	| {dh, public_key:der_encoded()}
+	| {dhfile, string()}
 	| {fail_if_no_peer_cert, boolean()}
 	| {hibernate_after, integer() | undefined}
 	| {honor_cipher_order, boolean()}
-	| {ip, inet:ip_address()}
-	| {key, Der::binary()}
+	| {key, {'RSAPrivateKey' | 'DSAPrivateKey' | 'PrivateKeyInfo', public_key:der_encoded()}}
 	| {keyfile, string()}
-	| {linger, {boolean(), non_neg_integer()}}
 	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
-	| {nodelay, boolean()}
-	| {partial_chain, fun(([Der::binary()]) ->
-		{trusted_ca, Der::binary()} | unknown_ca)}
+	| {partial_chain, fun(([public_key:der_encoded()]) -> {trusted_ca, public_key:der_encoded()} | unknown_ca)}
 	| {password, string()}
-	| {port, inet:port_number()}
-	| {raw, non_neg_integer(), non_neg_integer(),
-		non_neg_integer() | binary()}
+	| {psk_identity, string()}
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
-	| {send_timeout, timeout()}
-	| {send_timeout_close, boolean()}
+	| {sni_fun, fun()}
+	| {sni_hosts, [{string(), ssl_opt()}]}
+	| {user_lookup_fun, {fun(), any()}}
 	| {verify, ssl:verify_type()}
-	| {verify_fun, {fun(), InitialUserState::term()}}
+	| {verify_fun, {fun(), any()}}
 	| {versions, [atom()]}.
+-export_type([ssl_opt/0]).
+
+-type opt() :: ranch_tcp:opt() | ssl_opt().
 -export_type([opt/0]).
 
 -type opts() :: [opt()].
@@ -84,23 +89,25 @@ listen(Opts) ->
 	true = lists:keymember(cert, 1, Opts)
 		orelse lists:keymember(certfile, 1, Opts),
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, send_timeout, 30000),
-	Opts4 = ranch:set_option_default(Opts3, send_timeout_close, true),
-	Opts5 = ranch:set_option_default(Opts4, ciphers, unbroken_cipher_suites()),
+	Opts3 = ranch:set_option_default(Opts2, ciphers, unbroken_cipher_suites()),
+	Opts4 = ranch:set_option_default(Opts3, nodelay, true),
+	Opts5 = ranch:set_option_default(Opts4, send_timeout, 30000),
+	Opts6 = ranch:set_option_default(Opts5, send_timeout_close, true),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(Opts5,
-		[backlog, cacertfile, cacerts, cert, certfile, ciphers,
-			fail_if_no_peer_cert, hibernate_after,
-			honor_cipher_order, ip, key, keyfile, linger,
-			next_protocols_advertised, nodelay,
-			log_alert, partial_chain, password, port, raw,
-			reuse_session, reuse_sessions, secure_renegotiate,
-			send_timeout, send_timeout_close, verify, verify_fun,
-			versions],
+	ssl:listen(0, ranch:filter_options(Opts6, listen_options(),
 		[binary, {active, false}, {packet, raw},
 			{reuseaddr, true}, {nodelay, true}])).
+
+listen_options() ->
+	[alpn_preferred_protocols, cacertfile, cacerts, cert, certfile,
+		ciphers, client_renegotiation, crl_cache, crl_check, depth,
+		dh, dhfile, fail_if_no_peer_cert, hibernate_after, honor_cipher_order,
+		key, keyfile, log_alert, next_protocols_advertised, partial_chain,
+		password, psk_identity, reuse_session, reuse_sessions, secure_renegotiate,
+		sni_fun, sni_hosts, user_lookup_fun, verify, verify_fun, versions
+		|ranch_tcp:listen_options()].
 
 -spec accept(ssl:sslsocket(), timeout())
 	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom()}.

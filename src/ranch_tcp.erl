@@ -19,6 +19,7 @@
 -export([secure/0]).
 -export([messages/0]).
 -export([listen/1]).
+-export([listen_options/0]).
 -export([accept/2]).
 -export([accept_ack/2]).
 -export([connect/3]).
@@ -36,14 +37,29 @@
 -export([close/1]).
 
 -type opt() :: {backlog, non_neg_integer()}
+	| {buffer, non_neg_integer()}
+	| {delay_send, boolean()}
+	| {dontroute, boolean()}
+	| {exit_on_close, boolean()}
+	| {fd, non_neg_integer()}
+	| {high_msgq_watermark, non_neg_integer()}
+	| {high_watermark, non_neg_integer()}
+	| inet
+	| inet6
 	| {ip, inet:ip_address()}
+	| {keepalive, boolean()}
 	| {linger, {boolean(), non_neg_integer()}}
+	| {low_msgq_watermark, non_neg_integer()}
+	| {low_watermark, non_neg_integer()}
 	| {nodelay, boolean()}
 	| {port, inet:port_number()}
-	| {raw, non_neg_integer(), non_neg_integer(),
-		non_neg_integer() | binary()}
+	| {priority, integer()}
+	| {raw, non_neg_integer(), non_neg_integer(), binary()}
+	| {recbuf, non_neg_integer()}
 	| {send_timeout, timeout()}
-	| {send_timeout_close, boolean()}.
+	| {send_timeout_close, boolean()}
+	| {sndbuf, non_neg_integer()}
+	| {tos, integer()}.
 -export_type([opt/0]).
 
 -type opts() :: [opt()].
@@ -60,16 +76,25 @@ messages() -> {tcp, tcp_closed, tcp_error}.
 -spec listen(opts()) -> {ok, inet:socket()} | {error, atom()}.
 listen(Opts) ->
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, send_timeout, 30000),
-	Opts4 = ranch:set_option_default(Opts3, send_timeout_close, true),
+	Opts3 = ranch:set_option_default(Opts2, nodelay, true),
+	Opts4 = ranch:set_option_default(Opts3, send_timeout, 30000),
+	Opts5 = ranch:set_option_default(Opts4, send_timeout_close, true),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	gen_tcp:listen(0, ranch:filter_options(Opts4,
-		[backlog, ip, linger, nodelay, port, raw,
-			send_timeout, send_timeout_close],
-		[binary, {active, false}, {packet, raw},
-			{reuseaddr, true}, {nodelay, true}])).
+	gen_tcp:listen(0, ranch:filter_options(Opts5, listen_options(),
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
+
+%% 'inet' and 'inet6' are also allowed but they are handled
+%% specifically as they do not have 2-tuple equivalents.
+%%
+%% The 4-tuple 'raw' option is also handled specifically.
+listen_options() ->
+	[backlog, buffer, delay_send, dontroute, exit_on_close, fd,
+		high_msgq_watermark, high_watermark, ip,
+		keepalive, linger, low_msgq_watermark,
+		low_watermark, nodelay, port, priority, recbuf,
+		send_timeout, send_timeout_close, sndbuf, tos].
 
 -spec accept(inet:socket(), timeout())
 	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.

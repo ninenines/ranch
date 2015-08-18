@@ -131,11 +131,17 @@ filter_options(UserOptions, AllowedKeys, DefaultOptions) ->
 	AllowedOptions = filter_user_options(UserOptions, AllowedKeys),
 	lists:foldl(fun merge_options/2, DefaultOptions, AllowedOptions).
 
+%% 2-tuple options.
 filter_user_options([Opt = {Key, _}|Tail], AllowedKeys) ->
 	case lists:member(Key, AllowedKeys) of
 		true -> [Opt|filter_user_options(Tail, AllowedKeys)];
 		false -> filter_user_options(Tail, AllowedKeys)
 	end;
+%% Special option forms.
+filter_user_options([inet|Tail], AllowedKeys) ->
+	[inet|filter_user_options(Tail, AllowedKeys)];
+filter_user_options([inet6|Tail], AllowedKeys) ->
+	[inet6|filter_user_options(Tail, AllowedKeys)];
 filter_user_options([Opt = {raw, _, _, _}|Tail], AllowedKeys) ->
 	case lists:member(raw, AllowedKeys) of
 		true -> [Opt|filter_user_options(Tail, AllowedKeys)];
