@@ -42,6 +42,8 @@ groups() ->
 	]}, {misc, [
 		misc_bad_transport
 	]}, {supervisor, [
+		connection_type_supervisor,
+		connection_type_supervisor_separate_from_connection,
 		supervisor_clean_child_restart,
 		supervisor_clean_conns_sup_restart,
 		supervisor_clean_restart,
@@ -297,6 +299,42 @@ tcp_upgrade(_) ->
 	ok = ranch:stop_listener(Name).
 
 %% Supervisor tests
+
+connection_type_supervisor(_) ->
+	doc("The supervisor connection type must be reflected in the specifications."),
+	Name = connection_type_supervisor,
+	{ok, _} = ranch:start_listener(Name, 1,
+		ranch_tcp, [{connection_type, supervisor}],
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	[{echo_protocol, _, supervisor, [echo_protocol]}] = supervisor:which_children(ConnsSup),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+connection_type_supervisor_separate_from_connection(_) ->
+	doc("The supervisor connection type allows separate supervised and connection processes."),
+	Name = connection_type_supervisor,
+	{ok, _} = ranch:start_listener(Name, 1,
+		ranch_tcp, [{connection_type, supervisor}],
+		supervisor_separate, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	[{supervisor_separate, _, supervisor, [supervisor_separate]}] = supervisor:which_children(ConnsSup),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
 
 supervisor_clean_child_restart(_) ->
 	%% Then we verify that only parts of the supervision tree

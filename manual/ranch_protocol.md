@@ -12,7 +12,7 @@ None.
 Callbacks
 ---------
 
-### start_link(Ref, Socket, Transport, ProtoOpts) -> {ok, pid()}
+### start_link(Ref, Socket, Transport, ProtoOpts) -> {ok, pid()} | {ok, pid(), pid()}
 
 > Types:
 >  *  Ref = ranch:ref()
@@ -27,9 +27,16 @@ Callbacks
 > then return the new pid. This function will always be called
 > from inside a supervisor.
 >
+> This callback can also return two pids. The first pid is the
+> pid of the process that will be supervised. The second pid is
+> the pid of the process that will receive ownership of the
+> socket. This second process must be a child of the first. This
+> form is only available when `connection_type` is set to
+> `supervisor`.
+>
 > If any other value is returned, the supervisor will close the
 > socket and assume no process has been started.
 >
-> Do not perform any operation in this callback, as this would
+> Do not perform any operations in this callback, as this would
 > block the supervisor responsible for starting connection
 > processes and degrade performance severely.

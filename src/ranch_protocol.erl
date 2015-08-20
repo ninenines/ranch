@@ -20,4 +20,5 @@
 		Socket::any(),
 		Transport::module(),
 		ProtocolOptions::any())
-	-> {ok, ConnectionPid::pid()}.
+	-> {ok, ConnectionPid::pid()}
+	| {ok, SupPid::pid(), ConnectionPid::pid()}.
