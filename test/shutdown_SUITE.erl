@@ -1,4 +1,4 @@
-%% Copyright (c) 2013, Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) 2013-2015, Loïc Hoguin <essen@ninenines.eu>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,7 @@
 -compile(export_all).
 
 -import(ct_helper, [doc/1]).
+-import(ct_helper, [name/0]).
 
 %% ct.
 
@@ -25,7 +26,8 @@ all() ->
 %% Tests.
 
 brutal_kill(_) ->
-	Name = brutal_kill,
+	doc("Shutdown Ranch listener with shutdown option set to brutal_kill."),
+	Name = name(),
 	{ok, ListenerSup} = ranch:start_listener(Name, 1,
 		ranch_tcp, [{port, 0}, {shutdown, brutal_kill}],
 		echo_protocol, []),
@@ -33,8 +35,7 @@ brutal_kill(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _}
-		= lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
+	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
 	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
 	true = is_process_alive(Pid),
 	ok = ranch:stop_listener(Name),
@@ -45,7 +46,8 @@ brutal_kill(_) ->
 	ok.
 
 infinity(_) ->
-	Name = infinity,
+	doc("Shutdown Ranch listener with shutdown option set to infinity."),
+	Name = name(),
 	{ok, ListenerSup} = ranch:start_listener(Name, 1,
 		ranch_tcp, [{port, 0}, {shutdown, infinity}],
 		echo_protocol, []),
@@ -53,8 +55,7 @@ infinity(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _}
-		= lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
+	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
 	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
 	true = is_process_alive(Pid),
 	ok = ranch:stop_listener(Name),
@@ -65,7 +66,10 @@ infinity(_) ->
 	ok.
 
 infinity_trap_exit(_) ->
-	Name = infinity_trap_exit,
+	doc("Shutdown Ranch listener with shutdown option set to infinity "
+		"and protocol process trapping exits. The listener must not stop "
+		"until the protocol process terminates."),
+	Name = name(),
 	{ok, ListenerSup} = ranch:start_listener(Name, 1,
 		ranch_tcp, [{port, 0}, {shutdown, infinity}],
 		trap_exit_protocol, []),
@@ -73,8 +77,7 @@ infinity_trap_exit(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _}
-		= lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
+	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
 	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
 	true = is_process_alive(Pid),
 	%% This call will block infinitely.
@@ -93,9 +96,9 @@ infinity_trap_exit(_) ->
 	false = is_process_alive(SpawnPid),
 	ok.
 
-%% Same as infinity because the protocol doesn't trap exits.
 timeout(_) ->
-	Name = timeout,
+	doc("Shutdown Ranch listener with shutdown option set to 500ms."),
+	Name = name(),
 	{ok, ListenerSup} = ranch:start_listener(Name, 1,
 		ranch_tcp, [{port, 0}, {shutdown, 500}],
 		echo_protocol, []),
@@ -103,8 +106,7 @@ timeout(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _}
-		= lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
+	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
 	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
 	true = is_process_alive(Pid),
 	ok = ranch:stop_listener(Name),
@@ -115,7 +117,10 @@ timeout(_) ->
 	ok.
 
 timeout_trap_exit(_) ->
-	Name = timeout_trap_exit,
+	doc("Shutdown Ranch listener with shutdown option set to 500ms "
+		"and protocol process trapping exits. The listener will only stop "
+		"after the 500ms timeout."),
+	Name = name(),
 	{ok, ListenerSup} = ranch:start_listener(Name, 1,
 		ranch_tcp, [{port, 0}, {shutdown, 500}],
 		trap_exit_protocol, []),
@@ -123,8 +128,7 @@ timeout_trap_exit(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _}
-		= lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
+	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
 	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
 	true = is_process_alive(Pid),
 	%% This call will block for the duration of the shutdown.

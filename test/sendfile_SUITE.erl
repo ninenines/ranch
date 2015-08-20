@@ -1,4 +1,5 @@
 %% Copyright (c) 2013, James Fish <james@fishcakez.com>
+%% Copyright (c) 2015, Loïc Hoguin <essen@ninenines.eu>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -58,9 +59,8 @@ init_per_group(tcp, Config) ->
 end_per_group(_, _) ->
 	ok.
 
-%% Check can send a whole file given with filename.
-
 filename(Config) ->
+	doc("Use sendfile with a filename."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -73,9 +73,8 @@ filename(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check can send a whole file with rawfile.
-
 rawfile(Config) ->
+	doc("Use sendfile with a file descriptor (raw file)."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -91,9 +90,8 @@ rawfile(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check can send a file where Bytes is larger than file size.
-
 rawfile_bytes_large(Config) ->
+	doc("Use sendfile with a file descriptor. Try to send a size larger than file size."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -110,9 +108,8 @@ rawfile_bytes_large(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check can send whole file when Bytes =:= 0.
-
 rawfile_bytes_zero(Config) ->
+	doc("Use sendfile with a file descriptor. Ensure using a size of 0 sends the whole file."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -128,9 +125,8 @@ rawfile_bytes_zero(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check can send file where chunk_size is greater than file size.
-
 rawfile_chunk_size_large(Config) ->
+	doc("Use sendfile with a file descriptor. Try to use a chunk size larger than file size."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -138,8 +134,7 @@ rawfile_chunk_size_large(Config) ->
 	{ok, {Server, Client}} = sockets(Config),
 	{ok, RawFile} = file:open(Filename, [read, raw, binary]),
 	Ref = recv(Transport, Server, Size),
-	{ok, Size} = Transport:sendfile(Client, RawFile, 0, Size,
-			[{chunk_size, Size * 2}]),
+	{ok, Size} = Transport:sendfile(Client, RawFile, 0, Size, [{chunk_size, Size * 2}]),
 	{ok, Binary} = result(Ref),
 	{error, timeout} = Transport:recv(Server, 1, 100),
 	{ok, 0} = file:position(RawFile, {cur, 0}),
@@ -147,10 +142,8 @@ rawfile_chunk_size_large(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check send file where offset is larger than file size sends no bytes and
-%% returns {ok, 0}.
-
 rawfile_offset_large(Config) ->
+	doc("Use sendfile with a file descriptor. Ensure using an offset larger than file size sends nothing."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -163,10 +156,9 @@ rawfile_offset_large(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check can send file with positive Offset and Offset + Bytes larger than file
-%% size.
-
 rawfile_range_large(Config) ->
+	doc("Use sendfile with a file descriptor. "
+		"Set an offset and try to send a size larger than remaining file size."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -188,10 +180,9 @@ rawfile_range_large(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check can send file with positive Offset and Offset + Bytes less than file
-%% size.
-
 rawfile_range_medium(Config) ->
+	doc("Use sendfile with a file descriptor. "
+		"Set an offset and try to send a size lower than remaining file size."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -212,10 +203,10 @@ rawfile_range_medium(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check can send file with positive Offset, Offset + Bytes less than file
-%% size and Bytes less than chunk_size.
-
 rawfile_range_small(Config) ->
+	doc("Use sendfile with a file descriptor. "
+		"Set an offset and try to send a size lower than remaining file size, "
+		"which is in turn lower than the chunk size."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -226,8 +217,7 @@ rawfile_range_small(Config) ->
 	Offset = 7,
 	Bytes = 19,
 	Ref = recv(Transport, Server, Bytes),
-	{ok, Bytes} = Transport:sendfile(Client, RawFile, Offset, Bytes,
-			[{chunk_size, 16#FFFF}]),
+	{ok, Bytes} = Transport:sendfile(Client, RawFile, Offset, Bytes, [{chunk_size, 16#FFFF}]),
 	Binary2 = binary:part(Binary, Offset, Bytes),
 	{ok, Binary2} = result(Ref),
 	{error, timeout} = Transport:recv(Server, 1, 100),
@@ -236,9 +226,8 @@ rawfile_range_small(Config) ->
 	ok = Transport:close(Client),
 	ok = Transport:close(Server).
 
-%% Check ssl obeys chunk_size.
-
 ssl_chunk_size(Config) ->
+	doc("Use sendfile with SSL. Ensure the sendfile fallback respects the chunk size."),
 	Transport = config(transport, Config),
 	Filename = config(filename, Config),
 	{ok, Binary} = file:read_file(Filename),
@@ -250,8 +239,7 @@ ssl_chunk_size(Config) ->
 		{ok, {Server, Client}} = sockets(Config),
 		{ok, RawFile} = file:open(Filename, [read, raw, binary]),
 		Ref = recv(Transport, Server, Size),
-		{ok, Size} = Transport:sendfile(Client, RawFile, 0, Size,
-				[{chunk_size, ChunkSize}]),
+		{ok, Size} = Transport:sendfile(Client, RawFile, 0, Size, [{chunk_size, ChunkSize}]),
 		{ok, Binary} = result(Ref),
 		{error, timeout} = Transport:recv(Server, 1, 100),
 		Self ! done,
