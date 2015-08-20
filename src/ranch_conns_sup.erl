@@ -108,30 +108,14 @@ init(Parent, Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol) ->
 
 loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
-		ack_timeout=AckTimeout, max_conns=MaxConns},
-		CurConns, NbChildren, Sleepers) ->
+		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
 			case Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
-					case Transport:controlling_process(Socket, Pid) of
-						ok ->
-							Pid ! {shoot, Ref, Transport, Socket, AckTimeout},
-							put(Pid, true),
-							CurConns2 = CurConns + 1,
-							if CurConns2 < MaxConns ->
-									To ! self(),
-									loop(State, CurConns2, NbChildren + 1,
-										Sleepers);
-								true ->
-									loop(State, CurConns2, NbChildren + 1,
-										[To|Sleepers])
-							end;
-						{error, _} ->
-							Transport:close(Socket),
-							exit(Pid, kill),
-							loop(State, CurConns, NbChildren, Sleepers)
-					end;
+					shoot(State, CurConns, NbChildren, Sleepers, To, Socket, Pid, Pid);
+				{ok, SupPid, ProtocolPid} when ConnType =:= supervisor ->
+					shoot(State, CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid);
 				Ret ->
 					To ! self(),
 					error_logger:error_msg(
@@ -198,6 +182,27 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			error_logger:error_msg(
 				"Ranch listener ~p received unexpected message ~p~n",
 				[Ref, Msg])
+	end.
+
+shoot(State=#state{ref=Ref, transport=Transport, ack_timeout=AckTimeout, max_conns=MaxConns},
+		CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid) ->
+	case Transport:controlling_process(Socket, ProtocolPid) of
+		ok ->
+			ProtocolPid ! {shoot, Ref, Transport, Socket, AckTimeout},
+			put(SupPid, true),
+			CurConns2 = CurConns + 1,
+			if CurConns2 < MaxConns ->
+					To ! self(),
+					loop(State, CurConns2, NbChildren + 1, Sleepers);
+				true ->
+					loop(State, CurConns2, NbChildren + 1, [To|Sleepers])
+			end;
+		{error, _} ->
+			Transport:close(Socket),
+			%% Only kill the supervised pid, because the connection's pid,
+			%% when different, is supposed to be sitting under it and linked.
+			exit(SupPid, kill),
+			loop(State, CurConns, NbChildren, Sleepers)
 	end.
 
 -spec terminate(#state{}, any(), non_neg_integer()) -> no_return().

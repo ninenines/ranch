@@ -192,6 +192,30 @@ ranch:set_max_connections(tcp_echo, MaxConns).
 
 The change will occur immediately.
 
+Using a supervisor for connection processes
+-------------------------------------------
+
+Ranch allows you to define the type of process that will be used
+for the connection processes. By default it expects a `worker`.
+When the `connection_type` configuration value is set to `supervisor`,
+Ranch will consider that the connection process it manages is a
+supervisor and will reflect that in its supervision tree.
+
+Connection processes of type `supervisor` can either handle the
+socket directly or through one of their children. In the latter
+case the start function for the connection process must return
+two pids: the pid of the supervisor you created (that will be
+supervised) and the pid of the protocol handling process (that
+will receive the socket).
+
+Instead of returning `{ok, ConnPid}`, simply return
+`{ok, SupPid, ConnPid}`.
+
+It is very important that the connection process be created
+under the supervisor process so that everything works as intended.
+If not, you will most likely experience issues when the supervised
+process is stopped.
+
 Upgrading
 ---------
 
