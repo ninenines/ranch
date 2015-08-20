@@ -444,7 +444,7 @@ supervisor_conns_alive(_) ->
 	LSocket = receive
 		{trace, _, return_from, {ranch_tcp, listen, 1}, {ok, S}} ->
 			S
-	after 0 ->
+	after 500 ->
 		error(lsocket_unknown)
 	end,
 	TcpPort = ranch:get_port(Name),
