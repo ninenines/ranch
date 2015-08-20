@@ -450,6 +450,7 @@ supervisor_conns_alive(_) ->
 	TcpPort = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", TcpPort,
 		[binary, {active, true}, {packet, raw}]),
+	receive after 500 -> ok end,
 	%% Shut the socket down
 	ok = gen_tcp:close(LSocket),
 	%% Assert that client is still viable.
