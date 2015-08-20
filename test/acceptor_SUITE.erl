@@ -27,13 +27,13 @@ groups() ->
 		tcp_accept_socket,
 		tcp_active_echo,
 		tcp_echo,
+		tcp_inherit_options,
 		tcp_max_connections,
-		tcp_infinity_max_connections,
 		tcp_max_connections_and_beyond,
+		tcp_max_connections_infinity,
 		tcp_set_max_connections,
-		tcp_clean_set_max_connections,
-		tcp_upgrade,
-		tcp_inherit_options
+		tcp_set_max_connections_clean,
+		tcp_upgrade
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_accept_socket,
@@ -42,11 +42,11 @@ groups() ->
 	]}, {misc, [
 		misc_bad_transport
 	]}, {supervisor, [
-		supervisor_clean_restart,
 		supervisor_clean_child_restart,
+		supervisor_clean_conns_sup_restart,
+		supervisor_clean_restart,
 		supervisor_conns_alive,
-		supervisor_server_recover_state,
-		supervisor_clean_conns_sup_restart
+		supervisor_server_recover_state
 	]}].
 
 %% misc.
@@ -166,6 +166,19 @@ tcp_echo(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+tcp_inherit_options(_) ->
+	Name = tcp_inherit_options,
+	TcpOptions = [{nodelay, false}, {send_timeout_close, false}],
+	{ok, _} = ranch:start_listener(Name, 4, ranch_tcp,
+			TcpOptions,
+			check_tcp_options, [{pid, self()} | TcpOptions]),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+			[binary, {active, true}, {packet, raw}]),
+	receive checked -> ok after 1000 -> error(timeout) end,
+	ok = gen_tcp:close(Socket),
+	ok = ranch:stop_listener(Name).
+
 tcp_max_connections(_) ->
 	Name = tcp_max_connections,
 	{ok, _} = ranch:start_listener(Name, 1,
@@ -208,23 +221,8 @@ tcp_max_connections_and_beyond(_) ->
 	{_, 20} = lists:keyfind(workers, 1, Counts2),
 	ok = ranch:stop_listener(Name).
 
-tcp_set_max_connections(_) ->
-	Name = tcp_set_max_connections,
-	{ok, _} = ranch:start_listener(Name, 1,
-		ranch_tcp, [{max_connections, 10}],
-		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
-	Port = ranch:get_port(Name),
-	ok = connect_loop(Port, 20, 0),
-	10 = ranch_server:count_connections(Name),
-	10 = receive_loop(connected, 1000),
-	10 = ranch:get_max_connections(Name),
-	ranch:set_max_connections(Name, 20),
-	10 = receive_loop(connected, 1000),
-	20 = ranch:get_max_connections(Name),
-	ok = ranch:stop_listener(Name).
-
-tcp_infinity_max_connections(_) ->
-	Name = tcp_infinity_max_connections,
+tcp_max_connections_infinity(_) ->
+	Name = tcp_max_connections_infinity,
 	{ok, _} = ranch:start_listener(Name, 1,
 		ranch_tcp, [{max_connections, 10}],
 		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
@@ -243,10 +241,25 @@ tcp_infinity_max_connections(_) ->
 	10 = receive_loop(connected, 1000),
 	ok = ranch:stop_listener(Name).
 
-tcp_clean_set_max_connections(_) ->
+tcp_set_max_connections(_) ->
+	Name = tcp_set_max_connections,
+	{ok, _} = ranch:start_listener(Name, 1,
+		ranch_tcp, [{max_connections, 10}],
+		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
+	Port = ranch:get_port(Name),
+	ok = connect_loop(Port, 20, 0),
+	10 = ranch_server:count_connections(Name),
+	10 = receive_loop(connected, 1000),
+	10 = ranch:get_max_connections(Name),
+	ranch:set_max_connections(Name, 20),
+	10 = receive_loop(connected, 1000),
+	20 = ranch:get_max_connections(Name),
+	ok = ranch:stop_listener(Name).
+
+tcp_set_max_connections_clean(_) ->
 	%% This is a regression test to check that setting max connections does not
 	%% cause any processes to crash.
-	Name = tcp_clean_set_max_connections,
+	Name = tcp_set_max_connections_clean,
 	{ok, ListSupPid} = ranch:start_listener(Name, 4, ranch_tcp,
 			[{max_connections, 4}],
 			notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
@@ -254,11 +267,11 @@ tcp_clean_set_max_connections(_) ->
 	{_, AccSupPid, _, _} = lists:keyfind(ranch_acceptors_sup, 1, Children),
 	1 = erlang:trace(ListSupPid, true, [procs]),
 	1 = erlang:trace(AccSupPid, true, [procs]),
-	Port = ranch:get_port(tcp_clean_set_max_connections),
+	Port = ranch:get_port(Name),
 	N = 20,
 	ok = connect_loop(Port, N*5, 0),
 	%% Randomly set max connections.
-	[spawn(ranch, set_max_connections, [tcp_clean_set_max_connections, Max]) ||
+	[spawn(ranch, set_max_connections, [Name, Max]) ||
 		Max <- lists:flatten(lists:duplicate(N, [6, 4, 8, infinity]))],
 	receive
 		{trace, _, spawn, _, _} ->
@@ -283,54 +296,7 @@ tcp_upgrade(_) ->
 	receive upgraded -> ok after 1000 -> error(timeout) end,
 	ok = ranch:stop_listener(Name).
 
-tcp_inherit_options(_) ->
-	Name = tcp_inherit_options,
-	TcpOptions = [{nodelay, false}, {send_timeout_close, false}],
-	{ok, _} = ranch:start_listener(Name, 4, ranch_tcp,
-			TcpOptions,
-			check_tcp_options, [{pid, self()} | TcpOptions]),
-	Port = ranch:get_port(Name),
-	{ok, Socket} = gen_tcp:connect("localhost", Port,
-			[binary, {active, true}, {packet, raw}]),
-	receive checked -> ok after 1000 -> error(timeout) end,
-	ok = gen_tcp:close(Socket),
-	ok = ranch:stop_listener(Name).
-
 %% Supervisor tests
-
-supervisor_clean_restart(_) ->
-	%% There we verify that mature listener death will not let
-	%% whole supervisor down and also the supervisor itself will
-	%% restart everything properly.
-	Name = supervisor_clean_restart,
-	NbAcc = 4,
-	{ok, Pid} = ranch:start_listener(Name,
-		NbAcc, ranch_tcp, [], echo_protocol, []),
-	%% Trace supervisor spawns.
-	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
-	ConnsSup0 = ranch_server:get_connections_sup(Name),
-	erlang:exit(ConnsSup0, kill),
-	receive after 1000 -> ok end,
-	%% Verify that supervisor is alive
-	true = is_process_alive(Pid),
-	%% ...but children are dead.
-	false = is_process_alive(ConnsSup0),
-	%% Receive traces from newly started children
-	ConnsSup = receive {trace, Pid, spawn, Pid2, _} -> Pid2 end,
-	AccSupPid = receive {trace, Pid, spawn, Pid3, _} -> Pid3 end,
-	%% ...and its acceptors.
-	[receive {trace, AccSupPid, spawn, _Pid, _} -> ok end ||
-		_ <- lists:seq(1, NbAcc)],
-	%% No more traces then.
-	receive
-		{trace, EPid, spawn, _, _} when EPid == Pid; EPid == AccSupPid ->
-			error(invalid_restart)
-	after 1000 -> ok end,
-	%% Verify that new children registered themselves properly.
-	ConnsSup = ranch_server:get_connections_sup(Name),
-	_ = erlang:trace(all, false, [all]),
-	ok = clean_traces(),
-	ok = ranch:stop_listener(Name).
 
 supervisor_clean_child_restart(_) ->
 	%% Then we verify that only parts of the supervision tree
@@ -367,6 +333,60 @@ supervisor_clean_child_restart(_) ->
 	%% Verify that children still registered right.
 	ConnsSup = ranch_server:get_connections_sup(Name),
 	_ = erlang:trace_pattern({ranch_tcp, listen, 1}, false, []),
+	_ = erlang:trace(all, false, [all]),
+	ok = clean_traces(),
+	ok = ranch:stop_listener(Name).
+
+supervisor_clean_conns_sup_restart(_) ->
+	%% Verify that a conns_sup can not register with the same Name as an already
+	%% registered conns_sup that is still alive. Make sure this does not crash
+	%% the ranch_server.
+	Name = supervisor_clean_conns_sup_restart,
+	{ok, _} = ranch:start_listener(Name,
+		1, ranch_tcp, [], echo_protocol, []),
+	Server = erlang:whereis(ranch_server),
+	ServerMonRef = erlang:monitor(process, Server),
+	%% Exit because Name already registered and is alive.
+	{'EXIT', _}  = (catch ranch_server:set_connections_sup(Name, self())),
+	receive
+		{'DOWN', ServerMonRef, process, Server, _} ->
+			error(ranch_server_down)
+	after
+		1000 ->
+			ok
+	end,
+	ok = ranch:stop_listener(Name).
+
+supervisor_clean_restart(_) ->
+	%% There we verify that mature listener death will not let
+	%% whole supervisor down and also the supervisor itself will
+	%% restart everything properly.
+	Name = supervisor_clean_restart,
+	NbAcc = 4,
+	{ok, Pid} = ranch:start_listener(Name,
+		NbAcc, ranch_tcp, [], echo_protocol, []),
+	%% Trace supervisor spawns.
+	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
+	ConnsSup0 = ranch_server:get_connections_sup(Name),
+	erlang:exit(ConnsSup0, kill),
+	receive after 1000 -> ok end,
+	%% Verify that supervisor is alive
+	true = is_process_alive(Pid),
+	%% ...but children are dead.
+	false = is_process_alive(ConnsSup0),
+	%% Receive traces from newly started children
+	ConnsSup = receive {trace, Pid, spawn, Pid2, _} -> Pid2 end,
+	AccSupPid = receive {trace, Pid, spawn, Pid3, _} -> Pid3 end,
+	%% ...and its acceptors.
+	[receive {trace, AccSupPid, spawn, _Pid, _} -> ok end ||
+		_ <- lists:seq(1, NbAcc)],
+	%% No more traces then.
+	receive
+		{trace, EPid, spawn, _, _} when EPid == Pid; EPid == AccSupPid ->
+			error(invalid_restart)
+	after 1000 -> ok end,
+	%% Verify that new children registered themselves properly.
+	ConnsSup = ranch_server:get_connections_sup(Name),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
 	ok = ranch:stop_listener(Name).
@@ -429,26 +449,6 @@ supervisor_server_recover_state(_) ->
 	{'EXIT', {badarg, _}} = (catch ranch_server:get_connections_sup(Name)),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces().
-
-supervisor_clean_conns_sup_restart(_) ->
-	%% Verify that a conns_sup can not register with the same Name as an already
-	%% registered conns_sup that is still alive. Make sure this does not crash
-	%% the ranch_server.
-	Name = supervisor_clean_conns_sup_restart,
-	{ok, _} = ranch:start_listener(Name,
-		1, ranch_tcp, [], echo_protocol, []),
-	Server = erlang:whereis(ranch_server),
-	ServerMonRef = erlang:monitor(process, Server),
-	%% Exit because Name already registered and is alive.
-	{'EXIT', _}  = (catch ranch_server:set_connections_sup(Name, self())),
-	receive
-		{'DOWN', ServerMonRef, process, Server, _} ->
-			error(ranch_server_down)
-	after
-		1000 ->
-			ok
-	end,
-	ok = ranch:stop_listener(Name).
 
 %% Utility functions.
 
