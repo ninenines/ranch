@@ -48,6 +48,7 @@ groups() ->
 		supervisor_clean_conns_sup_restart,
 		supervisor_clean_restart,
 		supervisor_conns_alive,
+		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state
 	]}].
 
@@ -457,6 +458,17 @@ supervisor_conns_alive(_) ->
 	receive {tcp_closed, _} -> ok end,
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
+	ok = ranch:stop_listener(Name).
+
+supervisor_protocol_start_link_crash(_) ->
+	doc("Ensure a protocol start crash does not kill all connections."),
+	Name = supervisor_protocol_start_link_crash,
+	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], crash_protocol, []),
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	Port = ranch:get_port(Name),
+	{ok, _} = gen_tcp:connect("localhost", Port, [binary, {active, true}, {packet, raw}]),
+	receive after 500 -> ok end,
+	ConnsSup = ranch_server:get_connections_sup(Name),
 	ok = ranch:stop_listener(Name).
 
 supervisor_server_recover_state(_) ->

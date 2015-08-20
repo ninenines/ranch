@@ -111,7 +111,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
-			case Protocol:start_link(Ref, Socket, Transport, Opts) of
+			try Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
 					shoot(State, CurConns, NbChildren, Sleepers, To, Socket, Pid, Pid);
 				{ok, SupPid, ProtocolPid} when ConnType =:= supervisor ->
@@ -124,6 +124,13 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 						[Ref, Protocol, Ret]),
 					Transport:close(Socket),
 					loop(State, CurConns, NbChildren, Sleepers)
+			catch Class:Reason ->
+				To ! self(),
+				error_logger:error_msg(
+					"Ranch listener ~p connection process start failure; "
+					"~p:start_link/4 crashed with reason: ~p:~999999p~n",
+					[Ref, Protocol, Class, Reason]),
+				loop(State, CurConns, NbChildren, Sleepers)
 			end;
 		{?MODULE, active_connections, To, Tag} ->
 			To ! {Tag, CurConns},
