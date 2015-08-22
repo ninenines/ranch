@@ -1,0 +1,28 @@
+= CHANGELOG
+
+== 1.2.0
+
+
+* Allow the supervised process and the process owning the socket to be different
+* Add many transport options (please refer to the documentation)
+* Don't pass Ranch-specific options down to transports
+** Should make Dialyzer happy in user projects.
+** New types ranch:opt(), ranch_tcp:opt(), ranch_ssl:ssl_opt() and ranch_ssl:opt()
+* Fix crash when filtering unknown options out
+* Print a warning for each option filtered out
+* Handle Transport:controlling_socket/2 errors and close the socket
+* Handle Protocol:start_link/4 crashes to avoid killing all active connections
+* Use Asciidoc for documentation.
+* Test Ranch across 14 Erlang versions on CircleCI.
+* Improve and document test suites with recent ct_helper improvements.
+* Fix a number of intermittent test issues.
+
+== 1.1.0
+
+* Add Transport:secure/0
+* Add SSL partial_chain option
+* Stop reporting errors on {error, closed} in accept_ack
+
+== 1.0.0
+
+* Initial release.
