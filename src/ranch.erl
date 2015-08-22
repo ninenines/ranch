@@ -134,8 +134,11 @@ filter_options(UserOptions, AllowedKeys, DefaultOptions) ->
 %% 2-tuple options.
 filter_user_options([Opt = {Key, _}|Tail], AllowedKeys) ->
 	case lists:member(Key, AllowedKeys) of
-		true -> [Opt|filter_user_options(Tail, AllowedKeys)];
-		false -> filter_user_options(Tail, AllowedKeys)
+		true ->
+			[Opt|filter_user_options(Tail, AllowedKeys)];
+		false ->
+			filter_options_warning(Opt),
+			filter_user_options(Tail, AllowedKeys)
 	end;
 %% Special option forms.
 filter_user_options([inet|Tail], AllowedKeys) ->
@@ -143,14 +146,15 @@ filter_user_options([inet|Tail], AllowedKeys) ->
 filter_user_options([inet6|Tail], AllowedKeys) ->
 	[inet6|filter_user_options(Tail, AllowedKeys)];
 filter_user_options([Opt = {raw, _, _, _}|Tail], AllowedKeys) ->
-	case lists:member(raw, AllowedKeys) of
-		true -> [Opt|filter_user_options(Tail, AllowedKeys)];
-		false -> filter_user_options(Tail, AllowedKeys)
-	end;
-filter_user_options([_|Tail], AllowedKeys) ->
+	[Opt|filter_user_options(Tail, AllowedKeys)];
+filter_user_options([Opt|Tail], AllowedKeys) ->
+	filter_options_warning(Opt),
 	filter_user_options(Tail, AllowedKeys);
 filter_user_options([], _) ->
 	[].
+
+filter_options_warning(Opt) ->
+	error_logger:warning_msg("Transport option ~p unknown or invalid.~n", [Opt]).
 
 merge_options({Key, _} = Option, OptionList) ->
 	lists:keystore(Key, 1, OptionList, Option);

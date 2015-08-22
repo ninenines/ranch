@@ -41,7 +41,8 @@ groups() ->
 		ssl_active_echo,
 		ssl_echo
 	]}, {misc, [
-		misc_bad_transport
+		misc_bad_transport,
+		misc_bad_transport_options
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -59,6 +60,12 @@ misc_bad_transport(_) ->
 	doc("Reject invalid transport modules."),
 	{error, badarg} = ranch:start_listener(misc_bad_transport, 1,
 		bad_transport, [], echo_protocol, []),
+	ok.
+
+misc_bad_transport_options(_) ->
+	doc("Reject invalid transport modules."),
+	{ok, _} = ranch:start_listener(misc_bad_transport, 1,
+		ranch_tcp, [binary, {packet, 4}, <<"garbage">>, raw, backlog], echo_protocol, []),
 	ok.
 
 %% ssl.
