@@ -1,10 +1,12 @@
+.erlang.mk
 .ranch.plt
-.eunit
 deps
-doc/*.css
-doc/*.html
-doc/*.png
-doc/edoc-info
+doc/guide.pdf
+doc/html
+doc/man3
+doc/man7
 ebin
+examples/*/_rel
+examples/*/relx
 logs
 test/*.beam
