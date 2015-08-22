@@ -1,8 +1,6 @@
-SSL client authentication
-=========================
+== SSL client authentication
 
-Purpose
--------
+=== Purpose
 
 SSL client authentication is a mechanism allowing applications to
 identify certificates. This allows your application to make sure that
@@ -19,8 +17,7 @@ non-SSL transports, you need to make sure you are in an SSL context
 before attempting to perform an SSL client authentication. This
 can be done by checking the return value of `Transport:name/0`.
 
-Obtaining client certificates
------------------------------
+=== Obtaining client certificates
 
 You can obtain client certificates from various sources. You can
 generate them yourself, or you can use a service like CAcert.org
@@ -31,26 +28,27 @@ Following are the steps you need to take to create a CAcert.org
 account, generate a certificate and install it in your favorite
 browser.
 
- *  Open [CAcert.org](http://cacert.org) in your favorite browser
- *  Root Certificate link: install both certificates
- *  Join (Register an account)
- *  Verify your account (check your email inbox!)
- *  Log in
- *  Client Certificates: New
- *  Follow instructions to create the certificate
- *  Install the certificate in your browser
+* Open [CAcert.org](http://cacert.org) in your favorite browser
+* Root Certificate link: install both certificates
+* Join (Register an account)
+* Verify your account (check your email inbox!)
+* Log in
+* Client Certificates: New
+* Follow instructions to create the certificate
+* Install the certificate in your browser
 
 You can optionally save the certificate for later use, for example
 to extract the `IssuerID` information as will be detailed later on.
 
-Transport configuration
------------------------
+=== Transport configuration
 
 The SSL transport does not request a client certificate by default.
 You need to specify the `{verify, verify_peer}` option when starting
 the listener to enable this behavior.
 
-``` erlang
+.Configure a listener for SSL authentication
+
+[source,erlang]
 {ok, _} = ranch:start_listener(my_ssl, 100,
 	ranch_ssl, [
 		{port, SSLPort},
@@ -60,7 +58,6 @@ the listener to enable this behavior.
 	],
 	my_protocol, []
 ).
-```
 
 In this example we set the required `port` and `certfile`, but also
 the `cacertfile` containing the CACert.org root certificate, and
@@ -71,20 +68,22 @@ not have a client certificate configured for your domain, then no
 certificate will be sent. This allows you to use SSL for more than
 just authenticated clients.
 
-Authentication
---------------
+=== Authentication
 
 To authenticate users, you must first save the certificate information
 required. If you have your users' certificate files, you can simply
 load the certificate and retrieve the information directly.
 
-``` erlang
+.Retrieve the issuer ID from a certificate
+
+[source,erlang]
+----
 certfile_to_issuer_id(Filename) ->
 	{ok, Data} = file:read_file(Filename),
 	[{'Certificate', Cert, not_encrypted}] = public_key:pem_decode(Data),
 	{ok, IssuerID} = public_key:pkix_issuer_id(Cert, self),
 	IssuerID.
-```
+----
 
 The `IssuerID` variable contains both the certificate serial number
 and the certificate issuer stored in a tuple, so this value alone can
@@ -103,7 +102,10 @@ The following function returns the `IssuerID` or `false` if no client
 certificate was found. This snippet is intended to be used from your
 protocol code.
 
-``` erlang
+.Retrieve the issuer ID from the certificate for the current connection
+
+[source,erlang]
+----
 socket_to_issuer_id(Socket) ->
 	case ssl:peercert(Socket) of
 		{error, no_peercert} ->
@@ -112,7 +114,7 @@ socket_to_issuer_id(Socket) ->
 			{ok, IssuerID} = public_key:pkix_issuer_id(Cert, self),
 			IssuerID
 	end.
-```
+----
 
 You then only need to match the `IssuerID` value to authenticate the
 user.

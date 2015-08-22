@@ -1,10 +1,10 @@
-The Ranch Application
-=====================
+= ranch(7)
 
-Socket acceptor pool for TCP protocols.
+== Name
 
-Dependencies
-------------
+ranch - Socket acceptor pool for TCP protocols.
+
+== Dependencies
 
 The `ranch` application has no particular dependency required
 to start.
@@ -14,15 +14,14 @@ listening for SSL connections. The dependencies are `crypto`,
 `asn1`, `public_key` and `ssl`. They are started automatically
 if they weren't before.
 
-Environment
------------
+== Environment
 
 The `ranch` application defines one application environment
 configuration parameter.
 
- -  profile (false)
-   -  When enabled, Ranch will start `eprof` profiling automatically.
+profile (false)::
+	When enabled, Ranch will start `eprof` profiling automatically.
 
 You can use the `ranch_app:profile_output/0` function to stop
-profiling and output the results to the files `procs.profile`
-and `total.profile`. Do not use in production.
+profiling and output the results to the files 'procs.profile'
+and 'total.profile'. Do not use in production.

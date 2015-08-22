@@ -1,8 +1,4 @@
-Transports
-==========
-
-Purpose
--------
+== Transports
 
 A transport defines the interface to interact with a socket.
 
@@ -11,13 +7,11 @@ connections, but also for receiving and sending data. Both
 passive and active mode are supported, although all sockets
 are initialized as passive.
 
-TCP transport
--------------
+=== TCP transport
 
 The TCP transport is a thin wrapper around `gen_tcp`.
 
-SSL transport
--------------
+=== SSL transport
 
 The SSL transport is a thin wrapper around `ssl`. It requires
 the `crypto`, `asn1`, `public_key` and `ssl` applications
@@ -25,9 +19,10 @@ to be started. When starting an SSL listener, Ranch will attempt
 to automatically start them. It will not try to stop them when
 the listener is removed, however.
 
-``` erlang
+.Starting the SSL application
+
+[source,erlang]
 ssl:start().
-```
 
 In a proper OTP setting, you will need to make your application
 depend on the `crypto`, `public_key` and `ssl` applications.
@@ -38,8 +33,7 @@ and SSL accepts. Errors occurring during the SSL accept phase
 are returned as `{error, {ssl_accept, atom()}}` to differentiate
 on which socket the problem occurred.
 
-Sending and receiving data
---------------------------
+=== Sending and receiving data
 
 This section assumes that `Transport` is a valid transport handler
 (like `ranch_tcp` or `ranch_ssl`) and `Socket` is a connected
@@ -49,12 +43,15 @@ You can send data to a socket by calling the `Transport:send/2`
 function. The data can be given as `iodata()`, which is defined as
 `binary() | iolist()`. All the following calls will work:
 
-``` erlang
+.Sending data to the socket
+
+[source,erlang]
+----
 Transport:send(Socket, <<"Ranch is cool!">>).
 Transport:send(Socket, "Ranch is cool!").
 Transport:send(Socket, ["Ranch", ["is", "cool!"]]).
 Transport:send(Socket, ["Ranch", [<<"is">>, "cool!"]]).
-```
+----
 
 You can receive data either in passive or in active mode. Passive mode
 means that you will perform a blocking `Transport:recv/3` call, while
@@ -73,9 +70,10 @@ The function will wait for data until it has received exactly this amount.
 If you are not expecting a precise size, you can specify 0 which will make
 this call return as soon as data was read, regardless of its size.
 
-``` erlang
+.Receiving data from the socket in passive mode
+
+[source,erlang]
 {ok, Data} = Transport:recv(Socket, 0, 5000).
-```
 
 Active mode requires you to inform the socket that you want to receive
 data as a message and to write the code to actually receive it.
@@ -88,67 +86,73 @@ flood your process mailbox. It's better to keep the data in the socket
 and read it only when required.
 
 Three different messages can be received:
- *  `{OK, Socket, Data}`
- *  `{Closed, Socket}`
- *  `{Error, Socket, Reason}`
+
+* `{OK, Socket, Data}`
+* `{Closed, Socket}`
+* `{Error, Socket, Reason}`
 
 The value of `OK`, `Closed` and `Error` can be different
 depending on the transport being used. To be able to properly match
 on them you must first call the `Transport:messages/0` function.
 
-``` erlang
+.Retrieving the transport's active message identifiers
+
+[source,erlang]
 {OK, Closed, Error} = Transport:messages().
-```
 
 To start receiving messages you will need to call the `Transport:setopts/2`
 function, and do so every time you want to receive data.
 
-``` erlang
+.Receiving messages from the socket in active mode
+
+[source,erlang]
+----
 {OK, Closed, Error} = Transport:messages(),
 Transport:setopts(Socket, [{active, once}]),
 receive
-    {OK, Socket, Data} ->
-        io:format("data received: ~p~n", [Data]);
-    {Closed, Socket} ->
-        io:format("socket got closed!~n");
-    {Error, Socket, Reason} ->
-        io:format("error happened: ~p~n", [Reason])
+	{OK, Socket, Data} ->
+		io:format("data received: ~p~n", [Data]);
+	{Closed, Socket} ->
+		io:format("socket got closed!~n");
+	{Error, Socket, Reason} ->
+		io:format("error happened: ~p~n", [Reason])
 end.
-```
+----
 
 You can easily integrate active sockets with existing Erlang code as all
 you really need is just a few more clauses when receiving messages.
 
-Sending files
--------------
+=== Sending files
 
 As in the previous section it is assumed `Transport` is a valid transport
 handler and `Socket` is a connected socket obtained through the listener.
 
 To send a whole file, with name `Filename`, over a socket:
 
-```erlang
+.Sending a file by filename
+
+[source,erlang]
 {ok, SentBytes} = Transport:sendfile(Socket, Filename).
-```
 
 Or part of a file, with `Offset` greater than or equal to 0, `Bytes` number of
 bytes and chunks of size `ChunkSize`:
 
-```erlang
+.Sending part of a file by filename in chunks
+
+[source,erlang]
 Opts = [{chunk_size, ChunkSize}],
 {ok, SentBytes} = Transport:sendfile(Socket, Filename, Offset, Bytes, Opts).
-```
 
 To improve efficiency when sending multiple parts of the same file it is also
 possible to use a file descriptor opened in raw mode:
 
-```erlang
+.Sending a file opened in raw mode
+
+[source,erlang]
 {ok, RawFile} = file:open(Filename, [raw, read, binary]),
 {ok, SentBytes} = Transport:sendfile(Socket, RawFile, Offset, Bytes, Opts).
-```
 
-Writing a transport handler
----------------------------
+=== Writing a transport handler
 
 A transport handler is a module implementing the `ranch_transport` behavior.
 It defines a certain number of callbacks that must be written in order to

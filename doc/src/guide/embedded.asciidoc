@@ -1,16 +1,11 @@
-Embedded mode
-=============
-
-Purpose
--------
+== Embedded mode
 
 Embedded mode allows you to insert Ranch listeners directly
 in your supervision tree. This allows for greater fault tolerance
 control by permitting the shutdown of a listener due to the
 failure of another part of the application and vice versa.
 
-Embedding
----------
+=== Embedding
 
 To embed Ranch in your application you can simply add the child specs
 to your supervision tree. This can all be done in the `init/1` function
@@ -31,16 +26,19 @@ convenience function.
 The following example adds both `ranch_sup` and one listener to another
 application's supervision tree.
 
-``` erlang
+.Embed Ranch directly in your supervision tree
+
+[source,erlang]
+----
 init([]) ->
-    RanchSupSpec = {ranch_sup, {ranch_sup, start_link, []},
-        permanent, 5000, supervisor, [ranch_sup]},
-    ListenerSpec = ranch:child_spec(echo, 100,
-        ranch_tcp, [{port, 5555}],
-        echo_protocol, []
-    ),
-    {ok, {{one_for_one, 10, 10}, [RanchSupSpec, ListenerSpec]}}.
-```
+	RanchSupSpec = {ranch_sup, {ranch_sup, start_link, []},
+		permanent, 5000, supervisor, [ranch_sup]},
+	ListenerSpec = ranch:child_spec(echo, 100,
+		ranch_tcp, [{port, 5555}],
+		echo_protocol, []
+	),
+	{ok, {{one_for_one, 10, 10}, [RanchSupSpec, ListenerSpec]}}.
+----
 
 Remember, you can add as many listener child specs as needed, but only
 one `ranch_sup` spec!

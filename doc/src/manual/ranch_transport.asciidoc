@@ -1,0 +1,194 @@
+= ranch_transport(3)
+
+== Name
+
+ranch_transport - behaviour for transport modules
+
+== Description
+
+The `ranch_transport` behaviour defines the interface used
+by Ranch transports.
+
+== Types
+
+=== sendfile_opts() = [{chunk_size, non_neg_integer()}]
+
+Options used by the sendfile function and callbacks.
+
+Allows configuring the chunk size, in bytes. Defaults to 8191 bytes.
+
+== Callbacks
+
+=== accept(LSocket, Timeout) -> {ok, CSocket} | {error, closed | timeout | atom()}
+
+LSocket = CSocket = any():: Listening socket.
+Timeout = timeout():: Accept timeout.
+
+Accept a connection on the given listening socket.
+
+The `accept_ack` callback will be used to initialize the socket
+after accepting the connection. This is most useful when the
+transport is not raw TCP, like with SSL for example.
+
+=== accept_ack(CSocket, Timeout) -> ok
+
+CSocket = any():: Socket for this connection.
+Timeout = timeout():: Ack timeout.
+
+Perform post-accept initialization of the connection.
+
+This function will be called by connection processes
+before performing any socket operation. It allows
+transports that require extra initialization to perform
+their task and make the socket ready to use.
+
+=== close(Socket) -> ok
+
+Socket = any():: Socket opened with listen/1 or accept/2.
+
+Close the given socket.
+
+=== controlling_process(Socket, Pid) -> ok | {error, closed | not_owner | atom()}
+
+Socket = any():: Socket opened with listen/1 or accept/2.
+Pid = pid():: Pid of the new owner of the socket.
+
+Change the controlling process for the given socket.
+
+The controlling process is the process that is allowed to
+perform operations on the socket, and that will receive
+messages from the socket when active mode is used. When
+the controlling process dies, the socket is closed.
+
+=== listen(TransOpts) -> {ok, LSocket} | {error, atom()}
+
+TransOpts = any():: Transport options.
+LSocket = any():: Listening socket.
+
+Listen for connections on the given port.
+
+The port is given as part of the transport options under
+the key `port`. Any other option is transport dependent.
+
+The socket returned by this call can then be used to
+accept connections. It is not possible to send or receive
+data from the listening socket.
+
+=== messages() -> {OK, Closed, Error}
+
+OK = Closed = Error = atom():: Tuple names.
+
+Return the atoms used to identify messages sent in active mode.
+
+=== name() -> Name
+
+Name = atom():: Transport module name.
+
+Return the name of the transport.
+
+=== peername(CSocket) -> {ok, {IP, Port}} | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+IP = inet:ip_address():: IP of the remote endpoint.
+Port = inet:port_number():: Port of the remote endpoint.
+
+Return the IP and port of the remote endpoint.
+
+=== recv(CSocket, Length, Timeout) -> {ok, Packet} | {error, closed | timeout | atom()}
+
+CSocket = any():: Socket for this connection.
+Length = non_neg_integer():: Requested length.
+Timeout = timeout():: Receive timeout.
+Packet = iodata() | any():: Data received.
+
+Receive data from the given socket when in passive mode.
+
+Trying to receive data from a socket that is in active mode
+will return an error.
+
+A length of 0 will return any data available on the socket.
+
+While it is possible to use the timeout value `infinity`,
+this is highly discouraged as this could cause your process
+to get stuck waiting for data that will never come. This may
+happen when a socket becomes half-open due to a crash of the
+remote endpoint. Wi-Fi going down is another common culprit
+of this issue.
+
+=== send(CSocket, Packet) -> ok | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+Packet = iodata():: Data to be sent.
+
+Send data to the given socket.
+
+=== sendfile(CSocket, File) -> sendfile(CSocket, File, 0, 0, [])
+
+Alias of `ranch_transport:sendfile/5`.
+
+=== sendfile(CSocket, File, Offset, Bytes) -> sendfile(CSocket, File, Offset, Bytes, [])
+
+Alias of `ranch_transport:sendfile/5`.
+
+=== sendfile(CSocket, File, Offset, Bytes, SfOpts) -> {ok, SentBytes} | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+File = file:filename_all() | file:fd():: Filename or file descriptor for the file to be sent.
+Offset = non_neg_integer():: Begin sending at this position in the file.
+Bytes = non_neg_integer():: Send this many bytes.
+SentBytes = non_neg_integer():: This many bytes were sent.
+SfOpts = sendfile_opts():: Sendfile options.
+
+Send data from a file to the given socket.
+
+The file may be sent full or in parts, and may be specified
+by its filename or by an already open file descriptor.
+
+Transports that manipulate TCP directly may use the
+`file:sendfile/{2,4,5}` function, which calls the sendfile
+syscall where applicable (on Linux, for example). Other
+transports can use the `sendfile/6` function exported from
+this module.
+
+=== setopts(CSocket, SockOpts) -> ok | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+SockOpts = any():: Socket options.
+
+Change options for the given socket.
+
+This is mainly useful for switching to active or passive mode
+or to set protocol-specific options.
+
+=== shutdown(CSocket, How) -> ok | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+How = read | write | read_write:: Which side(s) of the socket to close.
+
+Immediately close the socket in one or two directions.
+
+=== sockname(Socket) -> {ok, {IP, Port}} | {error, atom()}
+
+Socket = any():: Socket opened with listen/1 or accept/2.
+IP = inet:ip_address():: IP of the local endpoint.
+Port = inet:port_number():: Port of the local endpoint.
+
+Return the IP and port of the local endpoint.
+
+== Exports
+
+=== sendfile(Transport, CSocket, File, Offset, Bytes, SfOpts) -> {ok, SentBytes} | {error, atom()}
+
+Transport = module():: Transport module for this socket.
+CSocket = any():: Socket for this connection.
+File = file:filename_all() | file:fd():: Filename or file descriptor for the file to be sent.
+Offset = non_neg_integer():: Begin sending at this position in the file.
+Bytes = non_neg_integer():: Send this many bytes.
+SentBytes = non_neg_integer():: This many bytes were sent.
+SfOpts = sendfile_opts():: Sendfile options.
+
+Send data from a file to the given socket.
+
+This function emulates the function `file:sendfile/{2,4,5}`
+and may be used when transports are not manipulating TCP
+directly.

@@ -1,0 +1,170 @@
+= ranch(3)
+
+== Name
+
+ranch - socket acceptor pool
+
+== Description
+
+The `ranch` module provides functions for starting and
+manipulating Ranch listeners.
+
+== Types
+
+=== max_conns() = non_neg_integer() | infinity
+
+Maximum number of connections allowed on this listener.
+
+This is a soft limit. The actual number of connections
+might be slightly above the limit due to concurrency
+when accepting new connections. Some connections may
+also be removed from this count explicitly by the user
+code.
+
+=== opt()
+
+[source,erlang]
+----
+opt() = {ack_timeout, timeout()}
+	| {connection_type, worker | supervisor}
+	| {max_connections, max_conns()}
+	| {shutdown, timeout() | brutal_kill}
+	| {socket, any()}
+----
+
+Ranch-specific transport options.
+
+These options are not passed on to the transports.
+They are used by Ranch while setting up the listeners.
+
+=== ref() = any()
+
+Unique name used to refer to a listener.
+
+== Option descriptions
+
+None of the options are required.
+
+ack_timeout (5000)::
+	Maximum allowed time for the `ranch:accept_ack/1` call to finish.
+connection_type (worker)::
+	Type of process that will handle the connection.
+max_connections (1024)::
+	Maximum number of active connections. Soft limit. Using `infinity` will disable the limit entirely.
+shutdown (5000)::
+	Maximum allowed time for children to stop on listener shutdown.
+socket::
+	Listening socket opened externally to be used instead of calling `Transport:listen/1`.
+
+== Exports
+
+=== accept_ack(Ref) -> ok
+
+Ref = ref():: Listener name.
+
+Acknowledge that the connection is accepted.
+
+This function MUST be used by a connection process to inform
+Ranch that it initialized properly and let it perform any
+additional operations before the socket can be safely used.
+
+=== child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> supervisor:child_spec()
+
+Ref = ref():: Listener name.
+NbAcceptors = non_neg_integer():: Number of acceptor processes.
+Transport = module():: Transport module.
+TransOpts = any():: Transport options.
+Protocol = module():: Protocol module.
+ProtoOpts = any():: Protocol options.
+
+Return child specifications for a new listener.
+
+This function can be used to embed a listener directly
+in an application instead of letting Ranch handle it.
+
+=== get_max_connections(Ref) -> MaxConns
+
+Ref = ref():: Listener name.
+MaxConns = max_conns():: Current maximum number of connections.
+
+Return the max number of connections allowed for the given listener.
+
+=== get_port(Ref) -> Port
+
+Ref = ref():: Listener name.
+Port = inet:port_number():: Port number used by this listener.
+
+Return the port for the given listener.
+
+=== get_protocol_options(Ref) -> ProtoOpts
+
+Ref = ref():: Listener name.
+ProtoOpts = any():: Current protocol options.
+
+Return the protocol options set for the given listener.
+
+=== remove_connection(Ref) -> ok
+
+Ref = ref():: Listener name.
+
+Do not count this connection when limiting the number of connections.
+
+You can use this function for long-running connection processes
+which spend most of their time idling rather than consuming
+resources. This allows Ranch to accept a lot more connections
+without sacrificing the latency of the system.
+
+This function may only be called from a connection process.
+
+=== set_max_connections(Ref, MaxConns) -> ok
+
+Ref = ref():: Listener name.
+MaxConns = max_conns():: New maximum number of connections.
+
+Set the max number of connections for the given listener.
+
+The change will be applied immediately. If the new value is
+smaller than the previous one, Ranch will not kill the extra
+connections, but will wait for them to terminate properly.
+
+=== set_protocol_options(Ref, ProtoOpts) -> ok
+
+Ref = ref():: Listener name.
+ProtoOpts = any():: New protocol options.
+
+Set the protocol options for the given listener.
+
+The change will be applied immediately for all new connections.
+Old connections will not receive the new options.
+
+=== start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> {ok, pid()} | {error, badarg}
+
+Ref = ref():: Listener name.
+NbAcceptors = non_neg_integer():: Number of acceptor processes.
+Transport = module():: Transport module.
+TransOpts = any():: Transport options.
+Protocol = module():: Protocol module.
+ProtoOpts = any():: Protocol options.
+
+Start listening for connections using the given transport
+and protocol. Returns the pid for this listener's supervisor.
+
+There are additional transport options that apply
+regardless of transport. They allow configuring how the
+connections are supervised, rate limited and more. Please
+consult the previous section for more details.
+
+=== stop_listener(Ref) -> ok | {error, not_found}
+
+Ref = ref():: Listener name.
+
+Stop the given listener.
+
+The listener is stopped gracefully, first by closing the
+listening port, then by stopping the connection processes.
+These processes are stopped according to the `shutdown`
+transport option, which may be set to brutally kill all
+connection processes or give them some time to stop properly.
+
+This function does not return until the listener is
+completely stopped.
