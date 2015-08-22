@@ -19,12 +19,12 @@ to close any of the currently opened sockets.
 
 == Getting started
 
-* [Read the guide](doc/src/guide/book.asciidoc)
-* [Check the manual](doc/src/manual/)
+* link:doc/src/guide/book.asciidoc[Read the guide]
+* link:doc/src/manual/[Check the manual]
 * Look at the examples in the `examples/` directory
 
 == Support
 
 * Official IRC Channel: #ninenines on irc.freenode.net
-* [Mailing Lists](http://lists.ninenines.eu)
-* [Commercial Support](http://ninenines.eu/support)
+* http://lists.ninenines.eu[Mailing Lists]
+* http://ninenines.eu/support[Commercial Support]
