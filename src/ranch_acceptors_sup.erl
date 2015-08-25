@@ -32,8 +32,10 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 				proplists:delete(max_connections,
 				proplists:delete(shutdown,
 				proplists:delete(socket, TransOpts))))),
-			{ok, Socket} = Transport:listen(TransOpts2),
-			Socket;
+			case Transport:listen(TransOpts2) of
+				{ok, Socket} -> Socket;
+				{error, Reason} -> listen_error(Ref, Transport, TransOpts2, Reason)
+			end;
 		Socket ->
 			Socket
 	end,
@@ -45,3 +47,10 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 		]}, permanent, brutal_kill, worker, []}
 			|| N <- lists:seq(1, NbAcceptors)],
 	{ok, {{one_for_one, 10, 10}, Procs}}.
+
+-spec listen_error(any(), module(), any(), atom()) -> no_return().
+listen_error(Ref, Transport, TransOpts2, Reason) ->
+	error_logger:error_msg(
+		"Failed to start Ranch listener ~p in ~p:listen(~p) for reason ~p (~s)~n",
+		[Ref, Transport, TransOpts2, Reason, inet:format_error(Reason)]),
+	exit({listen_error, Ref, Reason}).
