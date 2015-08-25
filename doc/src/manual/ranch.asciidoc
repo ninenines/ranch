@@ -82,6 +82,14 @@ Return child specifications for a new listener.
 This function can be used to embed a listener directly
 in an application instead of letting Ranch handle it.
 
+=== get_addr(Ref) -> {IP, Port}
+
+Ref = ref():: Listener name.
+IP = inet:ip_address():: IP of the interface used by this listener.
+Port = inet:port_number():: Port number used by this listener.
+
+Return the IP address and port for the given listener.
+
 === get_max_connections(Ref) -> MaxConns
 
 Ref = ref():: Listener name.

@@ -19,6 +19,7 @@
 -export([child_spec/6]).
 -export([accept_ack/1]).
 -export([remove_connection/1]).
+-export([get_addr/1]).
 -export([get_port/1]).
 -export([get_max_connections/1]).
 -export([set_max_connections/2]).
@@ -105,9 +106,14 @@ remove_connection(Ref) ->
 	ConnsSup ! {remove_connection, Ref},
 	ok.
 
+-spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()}.
+get_addr(Ref) ->
+	ranch_server:get_addr(Ref).
+
 -spec get_port(ref()) -> inet:port_number().
 get_port(Ref) ->
-	ranch_server:get_port(Ref).
+	{_, Port} = get_addr(Ref),
+	Port.
 
 -spec get_max_connections(ref()) -> max_conns().
 get_max_connections(Ref) ->

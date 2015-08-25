@@ -5,6 +5,7 @@
 
 * Allow the supervised process and the process owning the socket to be different
 * Add many transport options (please refer to the documentation)
+* Add function ranch:get_addr/1 to retrieve both IP and port of listener
 * Don't pass Ranch-specific options down to transports
 ** Should make Dialyzer happy in user projects.
 ** New types ranch:opt(), ranch_tcp:opt(), ranch_ssl:ssl_opt() and ranch_ssl:opt()

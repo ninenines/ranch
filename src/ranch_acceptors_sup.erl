@@ -37,8 +37,8 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 		Socket ->
 			Socket
 	end,
-	{ok, {_, Port}} = Transport:sockname(LSocket),
-	ranch_server:set_port(Ref, Port),
+	{ok, Addr} = Transport:sockname(LSocket),
+	ranch_server:set_addr(Ref, Addr),
 	Procs = [
 		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
 			LSocket, Transport, ConnsSup
