@@ -87,7 +87,9 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 listen(Opts) ->
 	ranch:require([crypto, asn1, public_key, ssl]),
 	true = lists:keymember(cert, 1, Opts)
-		orelse lists:keymember(certfile, 1, Opts),
+		orelse lists:keymember(certfile, 1, Opts)
+		orelse lists:keymember(sni_hosts, 1, Opts)
+		orelse lists:keymember(sni_fun, 1, Opts),
 	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
 	Opts3 = ranch:set_option_default(Opts2, ciphers, unbroken_cipher_suites()),
 	Opts4 = ranch:set_option_default(Opts3, nodelay, true),
