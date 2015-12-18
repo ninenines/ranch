@@ -39,4 +39,4 @@ init({Ref, NbAcceptors, Transport, TransOpts, Protocol}) ->
 				[Ref, NbAcceptors, Transport, TransOpts]},
 			permanent, infinity, supervisor, [ranch_acceptors_sup]}
 	],
-	{ok, {{rest_for_one, 10, 10}, ChildSpecs}}.
+	{ok, {{rest_for_one, 1, 5}, ChildSpecs}}.

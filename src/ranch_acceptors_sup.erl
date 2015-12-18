@@ -46,7 +46,7 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 			LSocket, Transport, ConnsSup
 		]}, permanent, brutal_kill, worker, []}
 			|| N <- lists:seq(1, NbAcceptors)],
-	{ok, {{one_for_one, 10, 10}, Procs}}.
+	{ok, {{one_for_one, 1, 5}, Procs}}.
 
 -spec listen_error(any(), module(), any(), atom()) -> no_return().
 listen_error(Ref, Transport, TransOpts2, Reason) ->

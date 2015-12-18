@@ -29,4 +29,4 @@ init([]) ->
 		{ranch_server, {ranch_server, start_link, []},
 			permanent, 5000, worker, [ranch_server]}
 	],
-	{ok, {{one_for_one, 10, 10}, Procs}}.
+	{ok, {{one_for_one, 1, 5}, Procs}}.
