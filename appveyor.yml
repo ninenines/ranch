@@ -1,0 +1,7 @@
+build_script:
+- C:\msys64\usr\bin\bash -lc "pacman --needed --noconfirm -Sy pacman-mirrors"
+- C:\msys64\usr\bin\bash -lc "pacman --noconfirm -Sy"
+- C:\msys64\usr\bin\bash -lc "pacman --noconfirm -S git make"
+test_script:
+- C:\msys64\usr\bin\bash -lc "cd $APPVEYOR_BUILD_FOLDER && make dialyze"
+- C:\msys64\usr\bin\bash -lc "cd $APPVEYOR_BUILD_FOLDER && make tests"
