@@ -17,6 +17,6 @@ dependencies:
 
 test:
   override:
-    - source $HOME/erlang/OTP-18.0.2/activate && make dialyze
+    - source $HOME/erlang/OTP-*/activate && make dialyze
     - make -k ci:
         timeout: 3600
