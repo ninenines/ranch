@@ -39,6 +39,7 @@ loop(LSocket, Transport, ConnsSup) ->
 		%% We can't accept anymore anyway, so we might as well wait
 		%% a little for the situation to resolve itself.
 		{error, emfile} ->
+			error_logger:warning_msg("Ranch acceptor reducing accept rate: out of file descriptors~n"),
 			receive after 100 -> ok end;
 		%% We want to crash if the listening socket got closed.
 		{error, Reason} when Reason =/= closed ->
