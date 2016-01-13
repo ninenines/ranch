@@ -203,6 +203,24 @@ ranch:set_max_connections(tcp_echo, MaxConns).
 
 The change will occur immediately.
 
+=== When running out of file descriptors
+
+Operating systems have limits on the number of sockets
+which can be opened by applications. When this maximum is
+reached the listener can no longer accept new connections. The
+accept rate of the listener will be automatically reduced, and a
+warning message will be logged.
+
+----
+=ERROR REPORT==== 13-Jan-2016::12:24:38 ===
+Ranch acceptor reducing accept rate: out of file descriptors
+----
+
+If you notice messages like this you should increase the number
+of file-descriptors which can be opened by your application. How
+this should be done is operating-system dependent. Please consult
+the documentation of your operating system.
+
 === Using a supervisor for connection processes
 
 Ranch allows you to define the type of process that will be used
