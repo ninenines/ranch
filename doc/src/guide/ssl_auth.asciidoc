@@ -28,7 +28,7 @@ Following are the steps you need to take to create a CAcert.org
 account, generate a certificate and install it in your favorite
 browser.
 
-* Open [CAcert.org](http://cacert.org) in your favorite browser
+* Open http://cacert.org in your favorite browser
 * Root Certificate link: install both certificates
 * Join (Register an account)
 * Verify your account (check your email inbox!)
