@@ -74,8 +74,19 @@ start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 				_ ->
 					ok
 			end,
-			Res
+			maybe_started(Res)
 	end.
+
+maybe_started({error, {{shutdown,
+		{failed_to_start_child, ranch_acceptors_sup,
+			{listen_error, _, Reason}}}, _}} = Error) ->
+	start_error(Reason, Error);
+maybe_started(Res) ->
+	Res.
+
+start_error(E=eaddrinuse, _) -> {error, E};
+start_error(E=no_cert, _) -> {error, E};
+start_error(_, Error) -> Error.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
