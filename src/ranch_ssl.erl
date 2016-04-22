@@ -84,20 +84,19 @@ secure() ->
 messages() -> {ssl, ssl_closed, ssl_error}.
 
 -spec listen(opts()) -> {ok, ssl:sslsocket()} | {error, atom()}.
-listen(Opts) ->
-	true = lists:keymember(cert, 1, Opts)
-		orelse lists:keymember(certfile, 1, Opts),
-	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, ciphers, unbroken_cipher_suites()),
-	Opts4 = ranch:set_option_default(Opts3, nodelay, true),
-	Opts5 = ranch:set_option_default(Opts4, send_timeout, 30000),
-	Opts6 = ranch:set_option_default(Opts5, send_timeout_close, true),
-	%% We set the port to 0 because it is given in the Opts directly.
-	%% The port in the options takes precedence over the one in the
-	%% first argument.
-	ssl:listen(0, ranch:filter_options(Opts6, listen_options(),
-		[binary, {active, false}, {packet, raw},
-			{reuseaddr, true}, {nodelay, true}])).
+listen(Opts0) ->
+    case validate_options(Opts0) of
+		ok ->
+			Opts1 = set_listen_defaults(Opts0),
+			%% We set the port to 0 because it is given in the Opts directly.
+			%% The port in the options takes precedence over the one in the
+			%% first argument.
+			ssl:listen(0, ranch:filter_options(Opts1, listen_options(),
+						[binary, {active, false}, {packet, raw},
+							{reuseaddr, true}, {nodelay, true}]));
+		Err ->
+			Err
+    end.
 
 listen_options() ->
 	[alpn_preferred_protocols, cacertfile, cacerts, cert, certfile,
@@ -224,3 +223,22 @@ unbroken_cipher_suites() ->
 		_ ->
 			ssl:cipher_suites()
 	end.
+
+-spec validate_options(opts()) -> ok | {'error', atom()}.
+validate_options(Opts) ->
+	HasAnyCert = lists:keymember(cert, 1, Opts)
+		orelse lists:keymember(certfile, 1, Opts),
+	case HasAnyCert of
+		true ->
+			ok;
+		false ->
+			{error, no_certificate_specified}
+	end.
+
+-spec set_listen_defaults(opts()) -> opts().
+set_listen_defaults(Opts0) ->
+	Opts1 = ranch:set_option_default(Opts0, backlog, 1024),
+	Opts2 = ranch:set_option_default(Opts1, ciphers, unbroken_cipher_suites()),
+	Opts3 = ranch:set_option_default(Opts2, nodelay, true),
+	Opts4 = ranch:set_option_default(Opts3, send_timeout, 30000),
+	ranch:set_option_default(Opts4, send_timeout_close, true).

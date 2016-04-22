@@ -52,5 +52,11 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 listen_error(Ref, Transport, TransOpts2, Reason) ->
 	error_logger:error_msg(
 		"Failed to start Ranch listener ~p in ~p:listen(~p) for reason ~p (~s)~n",
-		[Ref, Transport, TransOpts2, Reason, inet:format_error(Reason)]),
+		[Ref, Transport, TransOpts2, Reason, format_error(Reason)]),
 	exit({listen_error, Ref, Reason}).
+
+-spec format_error(atom()) -> string().
+format_error(no_certificate_specified) ->
+	"both 'cert' and 'certfile' options are missing";
+format_error(Reason) ->
+	inet:format_error(Reason).
