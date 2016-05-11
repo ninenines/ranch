@@ -4,7 +4,7 @@ A listener is a set of processes whose role is to listen on a port
 for new connections. It manages a pool of acceptor processes, each
 of them indefinitely accepting connections. When it does, it starts
 a new process executing the protocol handler code. All the socket
-programming is abstracted through the user of transport handlers.
+programming is abstracted through the use of transport handlers.
 
 The listener takes care of supervising all the acceptor and connection
 processes, allowing developers to focus on building their application.
