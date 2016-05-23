@@ -20,10 +20,10 @@
 
 -spec start_link(ranch:ref(), non_neg_integer(), module(), any())
 	-> {ok, pid()}.
-start_link(Ref, NbAcceptors, Transport, TransOpts) ->
-	supervisor:start_link(?MODULE, [Ref, NbAcceptors, Transport, TransOpts]).
+start_link(Ref, NumAcceptors, Transport, TransOpts) ->
+	supervisor:start_link(?MODULE, [Ref, NumAcceptors, Transport, TransOpts]).
 
-init([Ref, NbAcceptors, Transport, TransOpts]) ->
+init([Ref, NumAcceptors, Transport, TransOpts]) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	LSocket = case proplists:get_value(socket, TransOpts) of
 		undefined ->
@@ -45,7 +45,7 @@ init([Ref, NbAcceptors, Transport, TransOpts]) ->
 		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
 			LSocket, Transport, ConnsSup
 		]}, permanent, brutal_kill, worker, []}
-			|| N <- lists:seq(1, NbAcceptors)],
+			|| N <- lists:seq(1, NumAcceptors)],
 	{ok, {{one_for_one, 1, 5}, Procs}}.
 
 -spec listen_error(any(), module(), any(), atom()) -> no_return().

@@ -68,10 +68,10 @@ This function MUST be used by a connection process to inform
 Ranch that it initialized properly and let it perform any
 additional operations before the socket can be safely used.
 
-=== child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> supervisor:child_spec()
+=== child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> supervisor:child_spec()
 
 Ref = ref():: Listener name.
-NbAcceptors = non_neg_integer():: Number of acceptor processes.
+NumAcceptors = non_neg_integer():: Number of acceptor processes.
 Transport = module():: Transport module.
 TransOpts = any():: Transport options.
 Protocol = module():: Protocol module.
@@ -145,10 +145,10 @@ Set the protocol options for the given listener.
 The change will be applied immediately for all new connections.
 Old connections will not receive the new options.
 
-=== start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> {ok, pid()} | {error, badarg}
+=== start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> {ok, pid()} | {error, badarg}
 
 Ref = ref():: Listener name.
-NbAcceptors = non_neg_integer():: Number of acceptor processes.
+NumAcceptors = non_neg_integer():: Number of acceptor processes.
 Transport = module():: Transport module.
 TransOpts = any():: Transport options.
 Protocol = module():: Protocol module.

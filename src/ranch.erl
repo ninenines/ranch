@@ -44,8 +44,8 @@
 
 -spec start_listener(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> supervisor:startchild_ret().
-start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
-		when is_integer(NbAcceptors) andalso is_atom(Transport)
+start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
+		when is_integer(NumAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
 	_ = code:ensure_loaded(Transport),
 	%% @todo Remove in Ranch 2.0 and simply require ssl.
@@ -54,7 +54,7 @@ start_listener(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		false ->
 			{error, badarg};
 		true ->
-			Res = supervisor:start_child(ranch_sup, child_spec(Ref, NbAcceptors,
+			Res = supervisor:start_child(ranch_sup, child_spec(Ref, NumAcceptors,
 					Transport, TransOpts, Protocol, ProtoOpts)),
 			Socket = proplists:get_value(socket, TransOpts),
 			case Res of
@@ -89,13 +89,13 @@ stop_listener(Ref) ->
 
 -spec child_spec(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> supervisor:child_spec().
-child_spec(Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
-		when is_integer(NbAcceptors) andalso is_atom(Transport)
+child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
+		when is_integer(NumAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
 	%% @todo Remove in Ranch 2.0 and simply require ssl.
 	_ = ensure_ssl(Transport),
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
-		Ref, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
+		Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts
 	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
 
 %% @todo Remove in Ranch 2.0 and simply require ssl.
