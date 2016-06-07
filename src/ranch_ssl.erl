@@ -61,6 +61,7 @@
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
+	| {signature_algs, [{atom(), atom()}]}
 	| {sni_fun, fun()}
 	| {sni_hosts, [{string(), ssl_opt()}]}
 	| {user_lookup_fun, {fun(), any()}}
@@ -105,7 +106,7 @@ listen_options() ->
 		dh, dhfile, fail_if_no_peer_cert, hibernate_after, honor_cipher_order,
 		key, keyfile, log_alert, next_protocols_advertised, partial_chain,
 		password, psk_identity, reuse_session, reuse_sessions, secure_renegotiate,
-		sni_fun, sni_hosts, user_lookup_fun, verify, verify_fun, versions
+		signature_algs, sni_fun, sni_hosts, user_lookup_fun, verify, verify_fun, versions
 		|ranch_tcp:listen_options()].
 
 -spec accept(ssl:sslsocket(), timeout())
