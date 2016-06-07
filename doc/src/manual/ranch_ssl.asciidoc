@@ -39,6 +39,7 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
+	| {signature_algs, [{atom(), atom()}]}
 	| {sni_fun, fun()}
 	| {sni_hosts, [{string(), ssl_opt()}]}
 	| {user_lookup_fun, {fun(), any()}}
@@ -116,6 +117,8 @@ reuse_sessions (false)::
 	Whether to allow session reuse.
 secure_renegotiate (false)::
 	Whether to reject renegotiation attempts that do not conform to RFC5746.
+signature_algs::
+	The TLS signature algorithm extension may be used, from TLS 1.2, to negotiate which signature algorithm to use during the TLS handshake.
 sni_fun::
 	Function called when the client requests a host using Server Name Indication. Returns options to apply.
 sni_hosts::
