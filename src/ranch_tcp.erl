@@ -47,6 +47,7 @@
 	| inet
 	| inet6
 	| {ip, inet:ip_address()}
+	| {ipv6_v6only, boolean()}
 	| {keepalive, boolean()}
 	| {linger, {boolean(), non_neg_integer()}}
 	| {low_msgq_watermark, non_neg_integer()}
@@ -91,7 +92,7 @@ listen(Opts) ->
 %% The 4-tuple 'raw' option is also handled specifically.
 listen_options() ->
 	[backlog, buffer, delay_send, dontroute, exit_on_close, fd,
-		high_msgq_watermark, high_watermark, ip,
+		high_msgq_watermark, high_watermark, ip, ipv6_v6only,
 		keepalive, linger, low_msgq_watermark,
 		low_watermark, nodelay, port, priority, recbuf,
 		send_timeout, send_timeout_close, sndbuf, tos].
