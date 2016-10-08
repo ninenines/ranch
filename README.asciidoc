@@ -26,5 +26,4 @@ to close any of the currently opened sockets.
 == Support
 
 * Official IRC Channel: #ninenines on irc.freenode.net
-* http://lists.ninenines.eu[Mailing Lists]
-* http://ninenines.eu/support[Commercial Support]
+* http://ninenines.eu/services[Commercial Support]
