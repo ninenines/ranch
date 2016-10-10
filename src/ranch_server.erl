@@ -59,6 +59,14 @@ cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {addr, Ref}),
 	_ = ets:delete(?TAB, {max_conns, Ref}),
 	_ = ets:delete(?TAB, {opts, Ref}),
+	%% We also remove the pid of the connections supervisor.
+	%% Depending on the timing, it might already have been deleted
+	%% when we handled the monitor DOWN message. However, in some
+	%% cases when calling stop_listener followed by get_connections_sup,
+	%% we could end up with the pid still being returned, when we
+	%% expected a crash (because the listener was stopped).
+	%% Deleting it explictly here removes any possible confusion.
+	_ = ets:delete(?TAB, {conns_sup, Ref}),
 	ok.
 
 -spec set_connections_sup(ranch:ref(), pid()) -> ok.
