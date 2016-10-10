@@ -141,7 +141,7 @@ handle_cast(_Request, State) ->
 handle_info({'DOWN', MonitorRef, process, Pid, _},
 		State=#state{monitors=Monitors}) ->
 	{_, Ref} = lists:keyfind({MonitorRef, Pid}, 1, Monitors),
-	true = ets:delete(?TAB, {conns_sup, Ref}),
+	_ = ets:delete(?TAB, {conns_sup, Ref}),
 	Monitors2 = lists:keydelete({MonitorRef, Pid}, 1, Monitors),
 	{noreply, State#state{monitors=Monitors2}};
 handle_info(_Info, State) ->
