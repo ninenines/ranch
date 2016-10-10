@@ -479,10 +479,10 @@ supervisor_server_recover_state(_) ->
 	doc("Ensure that when ranch_server crashes and restarts, it recovers "
 		"its state and continues monitoring the same processes."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], echo_protocol, []),
 	_ = erlang:trace(new, true, [call]),
 	1 = erlang:trace_pattern({ranch_server, init, 1},
 		[{'_', [], [{return_trace}]}], [global]),
+	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], echo_protocol, []),
 	ConnsSup = ranch_server:get_connections_sup(Name),
 	ServerPid = erlang:whereis(ranch_server),
 	{monitors, Monitors} = erlang:process_info(ServerPid, monitors),
