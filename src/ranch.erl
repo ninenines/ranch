@@ -74,7 +74,7 @@ start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 				_ ->
 					ok
 			end,
-			Res
+			maybe_simplify_error(Res)
 	end.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
@@ -194,3 +194,20 @@ require([App|Tail]) ->
 		{error, {already_started, App}} -> ok
 	end,
 	require(Tail).
+
+-spec simple_reason(term()) -> boolean().
+simple_reason(eaddrinuse) -> true;
+simple_reason(no_certificate_specified) -> true;
+simple_reason(_) -> false.
+
+-spec maybe_simplify_error(term()) -> term().
+maybe_simplify_error({error,
+					  {{shutdown,
+						{failed_to_start_child, ranch_acceptors_sup,
+						 {listen_error, _, Reason}}}, _}} = Error) ->
+	case simple_reason(Reason) of
+		true -> {error, Reason};
+		_ -> Error
+	end;
+maybe_simplify_error(Anything) ->
+	Anything.
