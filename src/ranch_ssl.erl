@@ -49,7 +49,6 @@
 	| {depth, 0..255}
 	| {dh, public_key:der_encoded()}
 	| {dhfile, string()}
-	| {fallback, boolean()}
 	| {fail_if_no_peer_cert, boolean()}
 	| {hibernate_after, integer() | undefined}
 	| {honor_cipher_order, boolean()}
@@ -107,8 +106,8 @@ listen(Opts) ->
 listen_options() ->
 	[alpn_preferred_protocols, beast_mitigation, cacertfile, cacerts, cert, certfile,
 	 	ciphers, client_renegotiation, crl_cache, crl_check, depth, dh, dhfile,
-	 	fallback, fail_if_no_peer_cert, hibernate_after, honor_cipher_order, key,
-	 	keyfile, log_alert, next_protocols_advertised, partial_chain, password, padding_check,
+		fail_if_no_peer_cert, hibernate_after, honor_cipher_order, key, keyfile,
+	 	log_alert, next_protocols_advertised, partial_chain, password, padding_check,
 		psk_identity, reuse_session, reuse_sessions, secure_renegotiate, signature_algs,
 	 	sni_fun, sni_hosts, user_lookup_fun, v2_hello_compatible, verify, verify_fun, versions
 		|ranch_tcp:listen_options()].
