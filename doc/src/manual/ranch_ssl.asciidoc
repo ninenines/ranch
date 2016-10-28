@@ -15,6 +15,7 @@ The `ranch_ssl` module implements an SSL Ranch transport.
 [source,erlang]
 ----
 ssl_opt() = {alpn_preferred_protocols, [binary()]}
+	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
 	| {cacertfile, string()}
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
@@ -65,8 +66,12 @@ or the `certfile` option. None of the other options are required.
 
 The default value is given next to the option name.
 
+alpn_advertised_protocols::
+	The protocols supported by the client to be sent to the server to be used for an ALPN
 alpn_preferred_protocols::
 	Perform Application-Layer Protocol Negotiation with the given list of preferred protocols.
+beast_mitigation::
+	Used to change the BEAST mitigation strategy to interoperate with legacy software.
 cacertfile::
 	Path to PEM encoded trusted certificates file used to verify peer certificates.
 cacerts::
@@ -105,6 +110,8 @@ next_protocols_advertised::
 	List of protocols to send to the client if it supports the Next Protocol extension.
 nodelay (true)::
 	Whether to enable TCP_NODELAY.
+padding_check::
+Affects TLS-1.0 connections only. If set to false, it disables the block cipher padding check to be able to interoperate with legacy software.
 partial_chain::
 	Claim an intermediate CA in the chain as trusted.
 password::
@@ -117,13 +124,19 @@ reuse_sessions (false)::
 	Whether to allow session reuse.
 secure_renegotiate (false)::
 	Whether to reject renegotiation attempts that do not conform to RFC5746.
+server_name_indication::
+	Can be specified when upgrading a TCP socket to a TLS socket to use the TLS Server Name Indication extension.
 signature_algs::
 	The TLS signature algorithm extension may be used, from TLS 1.2, to negotiate which signature algorithm to use during the TLS handshake.
 sni_fun::
 	Function called when the client requests a host using Server Name Indication. Returns options to apply.
 sni_hosts::
 	Options to apply for the host that matches what the client requested with Server Name Indication.
+srp_identity::
+	Specifies the username and password to use to authenticate to the server.
 user_lookup_fun::
+v2_hello_compatible::
+The server accepts clients that send hello messages on SSL-2.0 format but offers supported SSL/TLS versions.
 	Function called to determine the shared secret when using PSK, or provide parameters when using SRP.
 verify (verify_none)::
 	Use `verify_peer` to request a certificate from the client.
