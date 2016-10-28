@@ -10,4 +10,3 @@ examples/*/_rel
 examples/*/relx
 logs
 test/*.beam
-*.d
