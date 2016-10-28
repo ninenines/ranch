@@ -37,6 +37,7 @@
 -export([close/1]).
 
 -type ssl_opt() :: {alpn_preferred_protocols, [binary()]}
+	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
 	| {cacertfile, string()}
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
@@ -55,6 +56,7 @@
 	| {keyfile, string()}
 	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
+	| {padding_check, boolean()}
 	| {partial_chain, fun(([public_key:der_encoded()]) -> {trusted_ca, public_key:der_encoded()} | unknown_ca)}
 	| {password, string()}
 	| {psk_identity, string()}
@@ -65,6 +67,7 @@
 	| {sni_fun, fun()}
 	| {sni_hosts, [{string(), ssl_opt()}]}
 	| {user_lookup_fun, {fun(), any()}}
+	| {v2_hello_compatible, boolean()}
 	| {verify, ssl:verify_type()}
 	| {verify_fun, {fun(), any()}}
 	| {versions, [atom()]}.
@@ -101,12 +104,12 @@ listen(Opts) ->
 			{reuseaddr, true}, {nodelay, true}])).
 
 listen_options() ->
-	[alpn_preferred_protocols, cacertfile, cacerts, cert, certfile,
-		ciphers, client_renegotiation, crl_cache, crl_check, depth,
-		dh, dhfile, fail_if_no_peer_cert, hibernate_after, honor_cipher_order,
-		key, keyfile, log_alert, next_protocols_advertised, partial_chain,
-		password, psk_identity, reuse_session, reuse_sessions, secure_renegotiate,
-		signature_algs, sni_fun, sni_hosts, user_lookup_fun, verify, verify_fun, versions
+	[alpn_preferred_protocols, beast_mitigation, cacertfile, cacerts, cert, certfile,
+		ciphers, client_renegotiation, crl_cache, crl_check, depth, dh, dhfile,
+		fail_if_no_peer_cert, hibernate_after, honor_cipher_order, key, keyfile,
+		log_alert, next_protocols_advertised, partial_chain, password, padding_check,
+		psk_identity, reuse_session, reuse_sessions, secure_renegotiate, signature_algs,
+		sni_fun, sni_hosts, user_lookup_fun, v2_hello_compatible, verify, verify_fun, versions
 		|ranch_tcp:listen_options()].
 
 -spec accept(ssl:sslsocket(), timeout())
