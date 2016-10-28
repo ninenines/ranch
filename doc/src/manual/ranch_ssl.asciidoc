@@ -15,6 +15,7 @@ The `ranch_ssl` module implements an SSL Ranch transport.
 [source,erlang]
 ----
 ssl_opt() = {alpn_preferred_protocols, [binary()]}
+	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
 	| {cacertfile, string()}
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
@@ -33,6 +34,7 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
 	| {keyfile, string()}
 	| {log_alert, boolean()}
 	| {next_protocols_advertised, [binary()]}
+	| {padding_check, boolean()}
 	| {partial_chain, fun(([public_key:der_encoded()]) -> {trusted_ca, public_key:der_encoded()} | unknown_ca)}
 	| {password, string()}
 	| {psk_identity, string()}
@@ -43,6 +45,7 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
 	| {sni_fun, fun()}
 	| {sni_hosts, [{string(), ssl_opt()}]}
 	| {user_lookup_fun, {fun(), any()}}
+	| {v2_hello_compatible, boolean()}
 	| {verify, ssl:verify_type()}
 	| {verify_fun, {fun(), any()}}
 	| {versions, [atom()]}.
@@ -67,6 +70,8 @@ The default value is given next to the option name.
 
 alpn_preferred_protocols::
 	Perform Application-Layer Protocol Negotiation with the given list of preferred protocols.
+beast_mitigation::
+	Used to change the BEAST mitigation strategy to interoperate with legacy software.
 cacertfile::
 	Path to PEM encoded trusted certificates file used to verify peer certificates.
 cacerts::
@@ -105,6 +110,8 @@ next_protocols_advertised::
 	List of protocols to send to the client if it supports the Next Protocol extension.
 nodelay (true)::
 	Whether to enable TCP_NODELAY.
+padding_check::
+Affects TLS-1.0 connections only. If set to false, it disables the block cipher padding check to be able to interoperate with legacy software.
 partial_chain::
 	Claim an intermediate CA in the chain as trusted.
 password::
@@ -124,6 +131,8 @@ sni_fun::
 sni_hosts::
 	Options to apply for the host that matches what the client requested with Server Name Indication.
 user_lookup_fun::
+v2_hello_compatible::
+The server accepts clients that send hello messages on SSL-2.0 format but offers supported SSL/TLS versions.
 	Function called to determine the shared secret when using PSK, or provide parameters when using SRP.
 verify (verify_none)::
 	Use `verify_peer` to request a certificate from the client.
