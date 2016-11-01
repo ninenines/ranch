@@ -14,13 +14,6 @@ CI_OTP ?= \
 	OTP-18.0.3 OTP-18.1.5 OTP-18.2.4.1 OTP-18.3.4.4 \
 	OTP-19.0.7 OTP-19.1.5
 
-# Only test on the most recent version on public CI services.
-ifdef CI
-ifndef BUILDKITE
-CI_OTP := $(lastword $(CI_OTP))
-endif
-endif
-
 # Dependencies.
 
 TEST_DEPS = ct_helper
