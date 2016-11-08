@@ -143,18 +143,18 @@ set_protocol_options(Ref, Opts) ->
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].
-filter_options(UserOptions, AllowedKeys, DefaultOptions) ->
-	AllowedOptions = filter_user_options(UserOptions, AllowedKeys),
+filter_options(UserOptions, DisallowedKeys, DefaultOptions) ->
+	AllowedOptions = filter_user_options(UserOptions, DisallowedKeys),
 	lists:foldl(fun merge_options/2, DefaultOptions, AllowedOptions).
 
 %% 2-tuple options.
-filter_user_options([Opt = {Key, _}|Tail], AllowedKeys) ->
-	case lists:member(Key, AllowedKeys) of
-		true ->
-			[Opt|filter_user_options(Tail, AllowedKeys)];
+filter_user_options([Opt = {Key, _}|Tail], DisallowedKeys) ->
+	case lists:member(Key, DisallowedKeys) of
 		false ->
+			[Opt|filter_user_options(Tail, DisallowedKeys)];
+		true ->
 			filter_options_warning(Opt),
-			filter_user_options(Tail, AllowedKeys)
+			filter_user_options(Tail, DisallowedKeys)
 	end;
 %% Special option forms.
 filter_user_options([inet|Tail], AllowedKeys) ->
@@ -163,9 +163,9 @@ filter_user_options([inet6|Tail], AllowedKeys) ->
 	[inet6|filter_user_options(Tail, AllowedKeys)];
 filter_user_options([Opt = {raw, _, _, _}|Tail], AllowedKeys) ->
 	[Opt|filter_user_options(Tail, AllowedKeys)];
-filter_user_options([Opt|Tail], AllowedKeys) ->
+filter_user_options([Opt|Tail], DisallowedKeys) ->
 	filter_options_warning(Opt),
-	filter_user_options(Tail, AllowedKeys);
+	filter_user_options(Tail, DisallowedKeys);
 filter_user_options([], _) ->
 	[].
 

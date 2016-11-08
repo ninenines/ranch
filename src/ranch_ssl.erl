@@ -19,7 +19,7 @@
 -export([secure/0]).
 -export([messages/0]).
 -export([listen/1]).
--export([listen_options/0]).
+-export([disallowed_listen_options/0]).
 -export([accept/2]).
 -export([accept_ack/2]).
 -export([connect/3]).
@@ -99,18 +99,15 @@ listen(Opts) ->
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(Opts6, listen_options(),
-		[binary, {active, false}, {packet, raw},
-			{reuseaddr, true}, {nodelay, true}])).
+	ssl:listen(0, ranch:filter_options(Opts6, disallowed_listen_options(),
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
 
-listen_options() ->
-	[alpn_preferred_protocols, beast_mitigation, cacertfile, cacerts, cert, certfile,
-		ciphers, client_renegotiation, crl_cache, crl_check, depth, dh, dhfile,
-		fail_if_no_peer_cert, hibernate_after, honor_cipher_order, key, keyfile,
-		log_alert, next_protocols_advertised, partial_chain, password, padding_check,
-		psk_identity, reuse_session, reuse_sessions, secure_renegotiate, signature_algs,
-		sni_fun, sni_hosts, user_lookup_fun, v2_hello_compatible, verify, verify_fun, versions
-		|ranch_tcp:listen_options()].
+%% 'binary' and 'list' are disallowed but they are handled
+%% specifically as they do not have 2-tuple equivalents.
+disallowed_listen_options() ->
+	[alpn_advertised_protocols, client_preferred_next_protocols,
+		fallback, server_name_indication, srp_identity
+		|ranch_tcp:disallowed_listen_options()].
 
 -spec accept(ssl:sslsocket(), timeout())
 	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom()}.
