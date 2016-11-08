@@ -134,6 +134,13 @@ ssl_echo(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+-ifdef(TEST_NO_SNI).
+ssl_sni_echo(_) ->
+	{skip, "No SNI support."}.
+
+ssl_sni_fail(_) ->
+	{skip, "No SNI support."}.
+-else.
 ssl_sni_echo(_) ->
 	doc("Ensure that SNI works with SSL transport."),
 	Name = name(),
@@ -160,6 +167,7 @@ ssl_sni_fail(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
+-endif.
 
 %% tcp.
 
