@@ -134,14 +134,15 @@ ssl_echo(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
--ifdef(TEST_NO_SNI).
 ssl_sni_echo(_) ->
-	{skip, "No SNI support."}.
+	case application:get_key(ssl, vsn) of
+		{ok, Vsn} when Vsn >= "7.0" ->
+			do_ssl_sni_echo();
+		_ ->
+			{skip, "No SNI support."}
+	end.
 
-ssl_sni_fail(_) ->
-	{skip, "No SNI support."}.
--else.
-ssl_sni_echo(_) ->
+do_ssl_sni_echo() ->
 	doc("Ensure that SNI works with SSL transport."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
@@ -157,6 +158,14 @@ ssl_sni_echo(_) ->
 	ok.
 
 ssl_sni_fail(_) ->
+	case application:get_key(ssl, vsn) of
+		{ok, Vsn} when Vsn >= "7.0" ->
+			do_ssl_sni_fail();
+		_ ->
+			{skip, "No SNI support."}
+	end.
+
+do_ssl_sni_fail() ->
 	doc("Ensure that connection fails when host is not in SNI list."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
@@ -167,7 +176,6 @@ ssl_sni_fail(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
--endif.
 
 %% tcp.
 
