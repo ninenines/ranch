@@ -39,7 +39,9 @@ groups() ->
 		ssl_accept_error,
 		ssl_accept_socket,
 		ssl_active_echo,
-		ssl_echo
+		ssl_echo,
+		ssl_sni_echo,
+		ssl_sni_fail
 	]}, {misc, [
 		misc_bad_transport,
 		misc_bad_transport_options
@@ -128,6 +130,33 @@ ssl_echo(_) ->
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_sni_echo(_) ->
+	doc("Ensure that SNI works with SSL transport."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, [{sni_hosts, [{"localhost", Opts}]}], echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
+	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_sni_fail(_) ->
+	doc("Ensure that connection fails when host is not in SNI list."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, [{sni_hosts, [{"pouet", Opts}]}], echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{error, _} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
