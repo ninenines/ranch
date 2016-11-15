@@ -95,3 +95,5 @@ init({Ref, Socket, Transport, _Opts = []}) ->
 
 %% Other gen_server callbacks here.
 ----
+
+Check the `tcp_reverse` example for a complete example.
