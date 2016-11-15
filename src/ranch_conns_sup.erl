@@ -234,6 +234,7 @@ shoot(State=#state{ref=Ref, transport=Transport, ack_timeout=AckTimeout, max_con
 			%% Only kill the supervised pid, because the connection's pid,
 			%% when different, is supposed to be sitting under it and linked.
 			exit(SupPid, kill),
+			To ! self(),
 			loop(State, CurConns, NbChildren, Sleepers)
 	end.
 
