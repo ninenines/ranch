@@ -1,6 +1,9 @@
 # See LICENSE for licensing information.
 
 PROJECT = ranch
+PROJECT_DESCRIPTION = Socket acceptor pool for TCP protocols.
+PROJECT_VERSION = 1.3.0
+PROJECT_REGISTERED = ranch_server
 
 # Options.
 
@@ -17,6 +20,8 @@ CI_HIPE ?= $(lastword $(CI_OTP))
 CI_ERLLVM ?= $(CI_HIPE)
 
 # Dependencies.
+
+LOCAL_DEPS = ssl
 
 TEST_DEPS = ct_helper
 dep_ct_helper = git https://github.com/ninenines/ct_helper master

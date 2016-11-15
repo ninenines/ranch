@@ -17,7 +17,7 @@
 -export([init/2]).
 
 init(_, _) ->
-	ct_helper:start([ranch, ssl]),
+	ct_helper:start([ranch]),
 	ct_helper:make_certs_in_ets(),
 	error_logger:add_report_handler(ct_helper_error_h),
 	{ok, undefined}.
