@@ -32,6 +32,7 @@ groups() ->
 		tcp_max_connections,
 		tcp_max_connections_and_beyond,
 		tcp_max_connections_infinity,
+		tcp_remove_connections,
 		tcp_set_max_connections,
 		tcp_set_max_connections_clean,
 		tcp_upgrade,
@@ -68,7 +69,7 @@ misc_bad_transport(_) ->
 	ok.
 
 misc_bad_transport_options(_) ->
-	doc("Reject invalid transport modules."),
+	doc("Ignore invalid transport options."),
 	{ok, _} = ranch:start_listener(misc_bad_transport, 1,
 		ranch_tcp, [binary, {packet, 4}, <<"garbage">>, raw, backlog], echo_protocol, []),
 	ok.
@@ -272,7 +273,7 @@ tcp_max_connections_and_beyond(_) ->
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name, 1,
 		ranch_tcp, [{max_connections, 10}],
-		remove_conn_and_wait_protocol, [{remove, true}]),
+		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 10, 0),
 	receive after 250 -> ok end,
@@ -283,7 +284,7 @@ tcp_max_connections_and_beyond(_) ->
 	{_, 0} = lists:keyfind(supervisors, 1, Counts),
 	{_, 10} = lists:keyfind(active, 1, Counts),
 	{_, 10} = lists:keyfind(workers, 1, Counts),
-	ranch:set_protocol_options(Name, [{remove, false}]),
+	ranch:set_protocol_options(Name, [{remove, false, 2500}]),
 	receive after 250 -> ok end,
 	ok = connect_loop(Port, 10, 0),
 	receive after 250 -> ok end,
@@ -313,6 +314,18 @@ tcp_max_connections_infinity(_) ->
 	ranch:set_max_connections(Name, 10),
 	20 = ranch_server:count_connections(Name),
 	10 = receive_loop(connected, 1000),
+	ok = ranch:stop_listener(Name).
+
+tcp_remove_connections(_) ->
+	doc("Ensure that removed connections are only removed once."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, 1,
+		ranch_tcp, [],
+		remove_conn_and_wait_protocol, [{remove, true, 0}]),
+	Port = ranch:get_port(Name),
+	ok = connect_loop(Port, 10, 0),
+	receive after 250 -> ok end,
+	0 = ranch_server:count_connections(Name),
 	ok = ranch:stop_listener(Name).
 
 tcp_set_max_connections(_) ->
@@ -520,7 +533,7 @@ supervisor_conns_alive(_) ->
 		[{'_', [], [{return_trace}]}], [global]),
 	{ok, _} = ranch:start_listener(Name, 1,
 		ranch_tcp, [],
-		remove_conn_and_wait_protocol, [{remove, false}]),
+		remove_conn_and_wait_protocol, [{remove, false, 2500}]),
 	%% Get the listener socket
 	LSocket = receive
 		{trace, _, return_from, {ranch_tcp, listen, 1}, {ok, S}} ->
