@@ -38,7 +38,8 @@ init({Ref, Socket, Transport, _Opts = []}) ->
 		?TIMEOUT).
 
 handle_info({tcp, Socket, Data}, State=#state{
-		socket=Socket, transport=Transport}) ->
+		socket=Socket, transport=Transport})
+		when byte_size(Data) > 1 ->
 	Transport:setopts(Socket, [{active, once}]),
 	Transport:send(Socket, reverse_binary(Data)),
 	{noreply, State, ?TIMEOUT};
