@@ -9,7 +9,6 @@
 
 %% gen_server.
 -export([init/1]).
--export([init/4]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
 -export([handle_info/2]).
@@ -23,16 +22,15 @@
 %% API.
 
 start_link(Ref, Socket, Transport, Opts) ->
-	proc_lib:start_link(?MODULE, init, [Ref, Socket, Transport, Opts]).
+	{ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Socket, Transport, Opts}])}.
 
 %% gen_server.
 
 %% This function is never called. We only define it so that
 %% we can use the -behaviour(gen_server) attribute.
-init([]) -> {ok, undefined}.
+%init([]) -> {ok, undefined}.
 
-init(Ref, Socket, Transport, _Opts = []) ->
-	ok = proc_lib:init_ack({ok, self()}),
+init({Ref, Socket, Transport, _Opts = []}) ->
 	ok = ranch:accept_ack(Ref),
 	ok = Transport:setopts(Socket, [{active, once}]),
 	gen_server:enter_loop(?MODULE, [],
