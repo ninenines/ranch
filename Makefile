@@ -16,8 +16,8 @@ CI_OTP ?= \
 	OTP-17.1.2 OTP-17.2.2 OTP-17.3.4 OTP-17.4.1 OTP-17.5.6.6 \
 	OTP-18.0.3 OTP-18.1.5 OTP-18.2.4.1 OTP-18.3.4.4 \
 	OTP-19.0.7 OTP-19.1.6
-CI_HIPE ?= $(lastword $(CI_OTP))
-CI_ERLLVM ?= $(CI_HIPE)
+#CI_HIPE ?= $(lastword $(CI_OTP))
+#CI_ERLLVM ?= $(CI_HIPE)
 
 # Dependencies.
 
