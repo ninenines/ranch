@@ -174,6 +174,16 @@ You can disable this limit by setting its value to the atom `infinity`.
 	echo_protocol, []
 ).
 
+The maximum number of connections is a soft limit. In practice, it
+can reach `max_connections` + the number of acceptors.
+
+When the maximum number of connections is reached, Ranch will stop
+accepting connections. This will not result in further connections
+being rejected, as the kernel option allows queueing incoming
+connections. The size of this queue is determined by the `backlog`
+option and defaults to 1024. Ranch does not know about the number
+of connections that are in the backlog.
+
 You may not always want connections to be counted when checking for
 `max_connections`. For example you might have a protocol where both
 short-lived and long-lived connections are possible. If the long-lived
