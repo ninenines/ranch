@@ -102,7 +102,7 @@ misc_info(_) ->
 	[
 		{{misc_info, act}, [
 			{pid, Pid2},
-			{ip, {0,0,0,0}},
+			{ip, _},
 			{port, Port2},
 			{num_acceptors, 2},
 			{max_connections, infinity}, %% Option was modified.
@@ -115,7 +115,7 @@ misc_info(_) ->
 		]},
 		{{misc_info, ssl}, [
 			{pid, Pid3},
-			{ip, {0,0,0,0}},
+			{ip, _},
 			{port, Port3},
 			{num_acceptors, 3},
 			{max_connections, 1024},
@@ -128,7 +128,7 @@ misc_info(_) ->
 		]},
 		{{misc_info, tcp}, [
 			{pid, Pid1},
-			{ip, {0,0,0,0}},
+			{ip, _},
 			{port, Port1},
 			{num_acceptors, 1},
 			{max_connections, 1024},
