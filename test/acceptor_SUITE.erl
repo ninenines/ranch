@@ -48,7 +48,8 @@ groups() ->
 		ssl_error_no_cert
 	]}, {misc, [
 		misc_bad_transport,
-		misc_bad_transport_options
+		misc_bad_transport_options,
+		misc_info
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -72,6 +73,80 @@ misc_bad_transport_options(_) ->
 	doc("Ignore invalid transport options."),
 	{ok, _} = ranch:start_listener(misc_bad_transport, 1,
 		ranch_tcp, [binary, {packet, 4}, <<"garbage">>, raw, backlog], echo_protocol, []),
+	ok.
+
+misc_info(_) ->
+	doc("Information about listeners."),
+	%% Open a listener with a few connections.
+	{ok, Pid1} = ranch:start_listener({misc_info, tcp}, 1, ranch_tcp, [],
+		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
+	Port1 = ranch:get_port({misc_info, tcp}),
+	%% Open a few more listeners with different arguments.
+	{ok, Pid2} = ranch:start_listener({misc_info, act}, 2, ranch_tcp, [], active_echo_protocol, {}),
+	Port2 = ranch:get_port({misc_info, act}),
+	ranch:set_max_connections({misc_info, act}, infinity),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, Pid3} = ranch:start_listener({misc_info, ssl}, 3, ranch_ssl, Opts, echo_protocol, [{}]),
+	Port3 = ranch:get_port({misc_info, ssl}),
+	%% Open 5 connections, 3 removed from the count.
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	receive after 250 -> ok end,
+	ranch:set_protocol_options({misc_info, tcp}, [{remove, false, 2500}]),
+	receive after 250 -> ok end,
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	%% Confirm the info returned by Ranch is correct.
+	[
+		{{misc_info, act}, [
+			{pid, Pid2},
+			{ip, {0,0,0,0}},
+			{port, Port2},
+			{num_acceptors, 2},
+			{max_connections, infinity}, %% Option was modified.
+			{active_connections, 0},
+			{all_connections, 0},
+			{transport, ranch_tcp},
+			{transport_options, []},
+			{protocol, active_echo_protocol},
+			{protocol_options, {}}
+		]},
+		{{misc_info, ssl}, [
+			{pid, Pid3},
+			{ip, {0,0,0,0}},
+			{port, Port3},
+			{num_acceptors, 3},
+			{max_connections, 1024},
+			{active_connections, 0},
+			{all_connections, 0},
+			{transport, ranch_ssl},
+			{transport_options, Opts},
+			{protocol, echo_protocol},
+			{protocol_options, [{}]}
+		]},
+		{{misc_info, tcp}, [
+			{pid, Pid1},
+			{ip, {0,0,0,0}},
+			{port, Port1},
+			{num_acceptors, 1},
+			{max_connections, 1024},
+			{active_connections, 2},
+			{all_connections, 5},
+			{transport, ranch_tcp},
+			{transport_options, []},
+			{protocol, remove_conn_and_wait_protocol},
+			{protocol_options, [{remove, false, 2500}]} %% Option was modified.
+		]}
+	] = lists:sort([L || L={{misc_info, _}, _} <- ranch:info()]),
+	%% Get acceptors.
+	[_] = ranch:procs({misc_info, tcp}, acceptors),
+	[_, _] = ranch:procs({misc_info, act}, acceptors),
+	[_, _, _] = ranch:procs({misc_info, ssl}, acceptors),
+	%% Get connections.
+	[_, _, _, _, _] = ranch:procs({misc_info, tcp}, connections),
+	[] = ranch:procs({misc_info, act}, connections),
+	[] = ranch:procs({misc_info, ssl}, connections),
 	ok.
 
 %% ssl.

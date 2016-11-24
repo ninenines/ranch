@@ -277,3 +277,26 @@ calling `ranch:get_protocol_options/1`.
 
 [source,erlang]
 Opts = ranch:get_protocol_options(tcp_echo).
+
+=== Obtain information about listeners
+
+Ranch provides two functions for retrieving information about the
+listeners, for reporting and diagnostic purposes.
+
+The `ranch:info/0` function will return detailed information
+about all listeners.
+
+.Retrieving detailed information
+[source,erlang]
+ranch:info().
+
+The `ranch:procs/2` function will return all acceptor or listener
+processes for a given listener.
+
+.Get all acceptor processes
+[source,erlang]
+ranch:procs(tcp_echo, acceptors).
+
+.Get all connection processes
+[source,erlang]
+ranch:procs(tcp_echo, connections).

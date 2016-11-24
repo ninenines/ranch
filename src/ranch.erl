@@ -25,6 +25,8 @@
 -export([set_max_connections/2]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
+-export([info/0]).
+-export([procs/2]).
 -export([filter_options/3]).
 -export([set_option_default/3]).
 -export([require/1]).
@@ -141,6 +143,63 @@ get_protocol_options(Ref) ->
 -spec set_protocol_options(ref(), any()) -> ok.
 set_protocol_options(Ref, Opts) ->
 	ranch_server:set_protocol_options(Ref, Opts).
+
+-spec info() -> [{any(), [{atom(), any()}]}].
+info() ->
+	Children = supervisor:which_children(ranch_sup),
+	[{Ref, listener_info(Ref, Pid)}
+		|| {{ranch_listener_sup, Ref}, Pid, _, [_]} <- Children].
+
+listener_info(Ref, Pid) ->
+	[_, NumAcceptors, Transport, TransOpts, Protocol, _] = listener_start_args(Ref),
+	ConnsSup = ranch_server:get_connections_sup(Ref),
+	{IP, Port} = get_addr(Ref),
+	MaxConns = get_max_connections(Ref),
+	ProtoOpts = get_protocol_options(Ref),
+	[
+		{pid, Pid},
+		{ip, IP},
+		{port, Port},
+		{num_acceptors, NumAcceptors},
+		{max_connections, MaxConns},
+		{active_connections, ranch_conns_sup:active_connections(ConnsSup)},
+		{all_connections, proplists:get_value(active, supervisor:count_children(ConnsSup))},
+		{transport, Transport},
+		{transport_options, TransOpts},
+		{protocol, Protocol},
+		{protocol_options, ProtoOpts}
+	].
+
+listener_start_args(Ref) ->
+	case erlang:function_exported(supervisor, get_childspec, 2) of
+		true ->
+			%% Can't use map syntax before R18.
+			{ok, Map} = supervisor:get_childspec(ranch_sup, {ranch_listener_sup, Ref}),
+			{ranch_listener_sup, start_link, StartArgs} = maps:get(start, Map),
+			StartArgs;
+		false ->
+			%% Awful solution for compatibility with R16 and R17.
+			{status, _, _, [_, _, _, _, [_, _,
+				{data, [{_, {state, _, _, Children, _, _, _, _, _, _}}]}]]}
+				= sys:get_status(ranch_sup),
+			[StartArgs] = [StartArgs || {child, _, {ranch_listener_sup, ChildRef},
+				{ranch_listener_sup, start_link, StartArgs}, _, _, _, _}
+				<- Children, ChildRef =:= Ref],
+			StartArgs
+	end.
+
+-spec procs(ref(), acceptors | connections) -> [pid()].
+procs(Ref, acceptors) ->
+	procs1(Ref, ranch_acceptors_sup);
+procs(Ref, connections) ->
+	procs1(Ref, ranch_conns_sup).
+
+procs1(Ref, Sup) ->
+	{_, ListenerSup, _, _} = lists:keyfind({ranch_listener_sup, Ref}, 1,
+		supervisor:which_children(ranch_sup)),
+	{_, SupPid, _, _} = lists:keyfind(Sup, 1,
+		supervisor:which_children(ListenerSup)),
+	[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)].
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].

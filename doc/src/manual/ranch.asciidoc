@@ -111,6 +111,34 @@ ProtoOpts = any():: Current protocol options.
 
 Return the protocol options set for the given listener.
 
+=== info() -> [{Ref, [{Key, Value}]}]
+
+Ref = ref():: Listener name.
+Key = atom():: Information key.
+Value = any():: Information value.
+
+Return detailed information about all Ranch listeners.
+
+The following keys are defined:
+
+pid:: Pid of the listener's top-level supervisor.
+ip:: Interface Ranch listens on.
+port:: Port number Ranch listens on.
+num_acceptors:: Number of acceptor processes.
+max_connections:: Maximum number of connections.
+active_connections:: Number of active connections.
+all_connections:: Number of connections, including those removed from the count.
+transport:: Transport module.
+transport_options:: Transport options.
+protocol:: Protocol module.
+protocol_options:: Protocol options.
+
+=== procs(Ref, acceptors | connections) -> [pid()]
+
+Ref = ref():: Listener name.
+
+Return all acceptor or connection processes for one listener.
+
 === remove_connection(Ref) -> ok
 
 Ref = ref():: Listener name.
