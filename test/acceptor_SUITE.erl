@@ -97,6 +97,7 @@ misc_info(_) ->
 	receive after 250 -> ok end,
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	receive after 250 -> ok end,
 	%% Confirm the info returned by Ranch is correct.
 	[
 		{{misc_info, act}, [
