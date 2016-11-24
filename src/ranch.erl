@@ -48,8 +48,6 @@ start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NumAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
 	_ = code:ensure_loaded(Transport),
-	%% @todo Remove in Ranch 2.0 and simply require ssl.
-	_ = ensure_ssl(Transport),
 	case erlang:function_exported(Transport, name, 0) of
 		false ->
 			{error, badarg};
@@ -103,17 +101,9 @@ stop_listener(Ref) ->
 child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 		when is_integer(NumAcceptors) andalso is_atom(Transport)
 		andalso is_atom(Protocol) ->
-	%% @todo Remove in Ranch 2.0 and simply require ssl.
-	_ = ensure_ssl(Transport),
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
 		Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts
 	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
-
-%% @todo Remove in Ranch 2.0 and simply require ssl.
-ensure_ssl(ranch_ssl) ->
-	require([crypto, asn1, public_key, ssl]);
-ensure_ssl(_) ->
-	ok.
 
 -spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
