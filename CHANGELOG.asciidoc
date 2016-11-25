@@ -1,5 +1,22 @@
 = CHANGELOG
 
+== 1.3.0
+
+* Tested with OTP R16B+ on Linux, FreeBSD, OSX and Windows
+* Add ssl to the list of dependencies
+* Add ranch:info/0 and ranch:procs/2 to retrieve Ranch state information
+* Allow configuring a listener with only SNI, without a default certificate
+* Blacklist transport options instead of whitelist
+** Unknown options are now allowed, but will result in a Dialyzer warning
+* Add many transport options typespecs and documentation
+* Don't silently drop the accept rate when running out of fds
+* Prevent a race condition when stopping listeners
+* Improve reporting for common errors, for example eaddrinuse
+* Fix double removal of connections bug
+** The number of active connections should now be exact
+* Fix stuck acceptor bug when controlling_socket returned errors
+* Numerous documentation and examples improvements
+
 == 1.2.1
 
 * Fix bug preventing node shutdown when SSL is used with OTP 17.1+
