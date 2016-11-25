@@ -573,8 +573,8 @@ supervisor_clean_restart(_) ->
 	doc("Verify that killing ranch_conns_sup does not crash everything "
 		"and that it restarts properly."),
 	Name = name(),
-	NbAcc = 4,
-	{ok, Pid} = ranch:start_listener(Name, NbAcc, ranch_tcp, [], echo_protocol, []),
+	NumAcc = 4,
+	{ok, Pid} = ranch:start_listener(Name, NumAcc, ranch_tcp, [], echo_protocol, []),
 	%% Trace supervisor spawns.
 	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
 	ConnsSup0 = ranch_server:get_connections_sup(Name),
@@ -589,7 +589,7 @@ supervisor_clean_restart(_) ->
 	AccSupPid = receive {trace, Pid, spawn, Pid3, _} -> Pid3 end,
 	%% ...and its acceptors.
 	[receive {trace, AccSupPid, spawn, _Pid, _} -> ok end ||
-		_ <- lists:seq(1, NbAcc)],
+		_ <- lists:seq(1, NumAcc)],
 	%% No more traces then.
 	receive
 		{trace, EPid, spawn, _, _} when EPid == Pid; EPid == AccSupPid ->
