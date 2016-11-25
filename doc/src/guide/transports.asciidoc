@@ -13,25 +13,17 @@ The TCP transport is a thin wrapper around `gen_tcp`.
 
 === SSL transport
 
-The SSL transport is a thin wrapper around `ssl`. It requires
-the `crypto`, `asn1`, `public_key` and `ssl` applications
-to be started. When starting an SSL listener, Ranch will attempt
-to automatically start them. It will not try to stop them when
-the listener is removed, however.
+The SSL transport is a thin wrapper around `ssl`.
 
-.Starting the SSL application
+Ranch depends on `ssl` by default so any necessary
+dependencies will start when Ranch is started. It is
+possible to remove the dependency when the SSL transport
+will not be used. Refer to your release build tool's
+documentation for more information.
 
-[source,erlang]
-ssl:start().
-
-In a proper OTP setting, you will need to make your application
-depend on the `crypto`, `public_key` and `ssl` applications.
-They will be started automatically when starting your release.
-
-The SSL transport `accept/2` function performs both transport
-and SSL accepts. Errors occurring during the SSL accept phase
-are returned as `{error, {ssl_accept, atom()}}` to differentiate
-on which socket the problem occurred.
+When embedding Ranch listeners that have an SSL transport,
+your application must depend on the `ssl` application for
+proper behavior.
 
 === Sending and receiving data
 

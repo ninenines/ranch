@@ -6,13 +6,10 @@ ranch - Socket acceptor pool for TCP protocols.
 
 == Dependencies
 
-The `ranch` application has no particular dependency required
-to start.
-
-It has optional dependencies that are only required when
-listening for SSL connections. The dependencies are `crypto`,
-`asn1`, `public_key` and `ssl`. They are started automatically
-if they weren't before.
+The `ranch` application depends on the `ssl` application to
+start. It is used for handling secure connections, when the
+transport is `ranch_ssl`. It can be disabled if SSL is not
+used.
 
 == Environment
 
