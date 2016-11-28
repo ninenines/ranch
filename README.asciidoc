@@ -17,13 +17,22 @@ into **pools**, each pool having a different configurable limit.
 Ranch also allows you to **upgrade** the acceptor pool without having
 to close any of the currently opened sockets.
 
-== Getting started
+== Online documentation
 
-* link:doc/src/guide/book.asciidoc[Read the guide]
-* link:doc/src/manual/[Check the manual]
-* Look at the examples in the `examples/` directory
+* http://ninenines.eu/docs/en/ranch/1.3/guide[User guide]
+* http://ninenines.eu/docs/en/ranch/1.3/manual[Function reference]
+
+== Offline documentation
+
+* While still online, run `make docs`
+* User guide available in `doc/` in PDF and HTML formats
+* Function reference man pages available in `doc/man3/` and `doc/man7/`
+* Run `make install-docs` to install man pages on your system
+* Full documentation in Asciidoc available in `doc/src/`
+* Examples available in `examples/`
 
 == Support
 
 * Official IRC Channel: #ninenines on irc.freenode.net
+* https://github.com/ninenines/ranch/issues[Issues tracker]
 * http://ninenines.eu/services[Commercial Support]
