@@ -84,8 +84,9 @@ maybe_started({error, {{shutdown,
 maybe_started(Res) ->
 	Res.
 
-start_error(E=eaddrinuse, _) -> {error, E};
-start_error(E=no_cert, _) -> {error, E};
+start_error(E = eaddrinuse, _) -> {error, E};
+start_error(E = eacces, _) -> {error, E};
+start_error(E = no_cert, _) -> {error, E};
 start_error(_, Error) -> Error.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
