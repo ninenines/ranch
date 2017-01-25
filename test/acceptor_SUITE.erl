@@ -36,7 +36,8 @@ groups() ->
 		tcp_set_max_connections,
 		tcp_set_max_connections_clean,
 		tcp_upgrade,
-		tcp_error_eaddrinuse
+		tcp_error_eaddrinuse,
+		tcp_error_eacces
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_accept_socket,
@@ -45,7 +46,8 @@ groups() ->
 		ssl_sni_echo,
 		ssl_sni_fail,
 		ssl_error_eaddrinuse,
-		ssl_error_no_cert
+		ssl_error_no_cert,
+		ssl_error_eacces
 	]}, {misc, [
 		misc_bad_transport,
 		misc_bad_transport_options,
@@ -258,7 +260,7 @@ do_ssl_sni_fail() ->
 	ok.
 
 ssl_error_eaddrinuse(_) ->
-	doc("Check that eaddrinuse returns a simplified error."),
+	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, Opts, active_echo_protocol, []),
@@ -271,8 +273,16 @@ ssl_error_eaddrinuse(_) ->
 	ok.
 
 ssl_error_no_cert(_) ->
-	doc("Check that missing certificate returns a simplified error."),
+	doc("Ensure that failure due to missing certificate returns a compact readable error."),
 	{error, no_cert} = ranch:start_listener(name(), 1, ranch_ssl, [], active_echo_protocol, []),
+	ok.
+
+ssl_error_eacces(_) ->
+	doc("Ensure that failure due to an eacces returns a compact readable error."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{error, eacces} = ranch:start_listener(Name, 1,
+		ranch_ssl, [{port, 283}|Opts], active_echo_protocol, []),
 	ok.
 
 %% tcp.
@@ -461,7 +471,7 @@ tcp_upgrade(_) ->
 	ok = ranch:stop_listener(Name).
 
 tcp_error_eaddrinuse(_) ->
-	doc("Check that eaddrinuse returns a simplified error."),
+	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], active_echo_protocol, []),
 	Port = ranch:get_port(Name),
@@ -471,6 +481,14 @@ tcp_error_eaddrinuse(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
+
+tcp_error_eacces(_) ->
+	doc("Ensure that failure due to an eacces returns a compact readable error."),
+	Name = name(),
+	{error, eacces} = ranch:start_listener(Name, 1,
+		ranch_tcp, [{port, 283}], active_echo_protocol, []),
+	ok.
+
 
 %% Supervisor tests
 
