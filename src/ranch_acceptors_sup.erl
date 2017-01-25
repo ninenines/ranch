@@ -58,7 +58,7 @@ listen_error(Ref, Transport, TransOpts0, Reason) ->
 	exit({listen_error, Ref, Reason}).
 
 format_error(eaccess) ->
-	"permission denied; insufficient privileges to bind to the port";
+	"permission denied; insufficient privileges, cannot bind to a port";
 format_error(no_cert) ->
 	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
 format_error(Reason) ->
