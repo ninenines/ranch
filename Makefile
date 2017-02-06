@@ -2,7 +2,7 @@
 
 PROJECT = ranch
 PROJECT_DESCRIPTION = Socket acceptor pool for TCP protocols.
-PROJECT_VERSION = 1.3.0
+PROJECT_VERSION = 1.3.1
 PROJECT_REGISTERED = ranch_server
 
 # Options.
