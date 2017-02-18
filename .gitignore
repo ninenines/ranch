@@ -6,8 +6,7 @@ doc/guide.pdf
 doc/html
 doc/man3
 doc/man7
-ebin/test
-ebin/*.beam
+ebin
 examples/*/ebin
 examples/*/*.d
 examples/*/_rel
