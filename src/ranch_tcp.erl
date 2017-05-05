@@ -24,6 +24,7 @@
 -export([accept_ack/2]).
 -export([connect/3]).
 -export([connect/4]).
+-export([recv/2]).
 -export([recv/3]).
 -export([send/2]).
 -export([sendfile/2]).
@@ -116,6 +117,11 @@ connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
 	gen_tcp:connect(Host, Port,
 		Opts ++ [binary, {active, false}, {packet, raw}],
 		Timeout).
+
+-spec recv(inet:socket(), non_neg_integer())
+	-> {ok, any()} | {error, closed | atom()}.
+recv(Socket, Length) ->
+	recv(Socket, Length, timeout).
 
 -spec recv(inet:socket(), non_neg_integer(), timeout())
 	-> {ok, any()} | {error, closed | atom()}.

@@ -24,6 +24,7 @@
 -export([accept_ack/2]).
 -export([connect/3]).
 -export([connect/4]).
+-export([recv/2]).
 -export([recv/3]).
 -export([send/2]).
 -export([sendfile/2]).
@@ -157,6 +158,11 @@ connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
 	ssl:connect(Host, Port,
 		Opts ++ [binary, {active, false}, {packet, raw}],
 		Timeout).
+
+-spec recv(ssl:sslsocket(), non_neg_integer())
+	-> {ok, any()} | {error, closed | atom()}.
+recv(Socket, Length) ->
+	recv(Socket, Length, infinity).
 
 -spec recv(ssl:sslsocket(), non_neg_integer(), timeout())
 	-> {ok, any()} | {error, closed | atom()}.
