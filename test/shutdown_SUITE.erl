@@ -28,7 +28,7 @@ all() ->
 brutal_kill(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to brutal_kill."),
 	Name = name(),
-	{ok, ListenerSup} = ranch:start_listener(Name, 1,
+	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, [{port, 0}, {shutdown, brutal_kill}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
@@ -48,7 +48,7 @@ brutal_kill(_) ->
 infinity(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to infinity."),
 	Name = name(),
-	{ok, ListenerSup} = ranch:start_listener(Name, 1,
+	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, [{port, 0}, {shutdown, infinity}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
@@ -70,7 +70,7 @@ infinity_trap_exit(_) ->
 		"and protocol process trapping exits. The listener must not stop "
 		"until the protocol process terminates."),
 	Name = name(),
-	{ok, ListenerSup} = ranch:start_listener(Name, 1,
+	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, [{port, 0}, {shutdown, infinity}],
 		trap_exit_protocol, []),
 	Port = ranch:get_port(Name),
@@ -99,7 +99,7 @@ infinity_trap_exit(_) ->
 timeout(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to 500ms."),
 	Name = name(),
-	{ok, ListenerSup} = ranch:start_listener(Name, 1,
+	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, [{port, 0}, {shutdown, 500}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
@@ -121,7 +121,7 @@ timeout_trap_exit(_) ->
 		"and protocol process trapping exits. The listener will only stop "
 		"after the 500ms timeout."),
 	Name = name(),
-	{ok, ListenerSup} = ranch:start_listener(Name, 1,
+	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, [{port, 0}, {shutdown, 500}],
 		trap_exit_protocol, []),
 	Port = ranch:get_port(Name),

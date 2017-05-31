@@ -28,6 +28,7 @@ code.
 opt() = {ack_timeout, timeout()}
 	| {connection_type, worker | supervisor}
 	| {max_connections, max_conns()}
+	| {num_acceptors, pos_integer()}
 	| {shutdown, timeout() | brutal_kill}
 	| {socket, any()}
 ----
@@ -51,6 +52,8 @@ connection_type (worker)::
 	Type of process that will handle the connection.
 max_connections (1024)::
 	Maximum number of active connections. Soft limit. Using `infinity` will disable the limit entirely.
+num_acceptors (10)::
+	Number of processes that accept connections.
 shutdown (5000)::
 	Maximum allowed time for children to stop on listener shutdown.
 socket::

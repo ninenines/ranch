@@ -14,8 +14,10 @@
 
 -module(ranch).
 
+-export([start_listener/5]).
 -export([start_listener/6]).
 -export([stop_listener/1]).
+-export([child_spec/5]).
 -export([child_spec/6]).
 -export([accept_ack/1]).
 -export([remove_connection/1]).
@@ -31,18 +33,27 @@
 -export([set_option_default/3]).
 -export([require/1]).
 
+-deprecated([start_listener/6, child_spec/6]).
+
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
 
 -type opt() :: {ack_timeout, timeout()}
 	| {connection_type, worker | supervisor}
 	| {max_connections, max_conns()}
+	| {num_acceptors, pos_integer()}
 	| {shutdown, timeout() | brutal_kill}
 	| {socket, any()}.
 -export_type([opt/0]).
 
 -type ref() :: any().
 -export_type([ref/0]).
+
+-spec start_listener(ref(), module(), any(), module(), any())
+	-> supervisor:startchild_ret().
+start_listener(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
+	NumAcceptors = proplists:get_value(num_acceptors, TransOpts, 10),
+	start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts).
 
 -spec start_listener(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> supervisor:startchild_ret().
@@ -98,6 +109,12 @@ stop_listener(Ref) ->
 		{error, Reason} ->
 			{error, Reason}
 	end.
+
+-spec child_spec(ref(), module(), any(), module(), any())
+	-> supervisor:child_spec().
+child_spec(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
+	NumAcceptors = proplists:get_value(num_acceptors, TransOpts, 10),
+	child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts).
 
 -spec child_spec(ref(), non_neg_integer(), module(), any(), module(), any())
 	-> supervisor:child_spec().

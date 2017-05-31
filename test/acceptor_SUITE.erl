@@ -67,28 +67,31 @@ groups() ->
 
 misc_bad_transport(_) ->
 	doc("Reject invalid transport modules."),
-	{error, badarg} = ranch:start_listener(misc_bad_transport, 1,
+	{error, badarg} = ranch:start_listener(misc_bad_transport,
 		bad_transport, [], echo_protocol, []),
 	ok.
 
 misc_bad_transport_options(_) ->
 	doc("Ignore invalid transport options."),
-	{ok, _} = ranch:start_listener(misc_bad_transport, 1,
+	{ok, _} = ranch:start_listener(misc_bad_transport,
 		ranch_tcp, [binary, {packet, 4}, <<"garbage">>, raw, backlog], echo_protocol, []),
 	ok.
 
 misc_info(_) ->
 	doc("Information about listeners."),
 	%% Open a listener with a few connections.
-	{ok, Pid1} = ranch:start_listener({misc_info, tcp}, 1, ranch_tcp, [],
+	{ok, Pid1} = ranch:start_listener({misc_info, tcp},
+		ranch_tcp, [{num_acceptors, 1}],
 		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
 	Port1 = ranch:get_port({misc_info, tcp}),
 	%% Open a few more listeners with different arguments.
-	{ok, Pid2} = ranch:start_listener({misc_info, act}, 2, ranch_tcp, [], active_echo_protocol, {}),
+	{ok, Pid2} = ranch:start_listener({misc_info, act},
+		ranch_tcp, [{num_acceptors, 2}], active_echo_protocol, {}),
 	Port2 = ranch:get_port({misc_info, act}),
 	ranch:set_max_connections({misc_info, act}, infinity),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, Pid3} = ranch:start_listener({misc_info, ssl}, 3, ranch_ssl, Opts, echo_protocol, [{}]),
+	{ok, Pid3} = ranch:start_listener({misc_info, ssl},
+		ranch_ssl, [{num_acceptors, 3}|Opts], echo_protocol, [{}]),
 	Port3 = ranch:get_port({misc_info, ssl}),
 	%% Open 5 connections, 3 removed from the count.
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
@@ -111,7 +114,7 @@ misc_info(_) ->
 			{active_connections, 0},
 			{all_connections, 0},
 			{transport, ranch_tcp},
-			{transport_options, []},
+			{transport_options, [{num_acceptors, 2}]},
 			{protocol, active_echo_protocol},
 			{protocol_options, {}}
 		]},
@@ -124,7 +127,7 @@ misc_info(_) ->
 			{active_connections, 0},
 			{all_connections, 0},
 			{transport, ranch_ssl},
-			{transport_options, Opts},
+			{transport_options, [{num_acceptors, 3}|Opts]},
 			{protocol, echo_protocol},
 			{protocol_options, [{}]}
 		]},
@@ -137,7 +140,7 @@ misc_info(_) ->
 			{active_connections, 2},
 			{all_connections, 5},
 			{transport, ranch_tcp},
-			{transport_options, []},
+			{transport_options, [{num_acceptors, 1}]},
 			{protocol, remove_conn_and_wait_protocol},
 			{protocol_options, [{remove, false, 2500}]} %% Option was modified.
 		]}
@@ -158,7 +161,8 @@ ssl_accept_error(_) ->
 	doc("Acceptor must not crash if client disconnects in the middle of SSL handshake."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, ListenerSup} = ranch:start_listener(Name, 1, ranch_ssl, Opts, echo_protocol, []),
+	{ok, ListenerSup} = ranch:start_listener(Name,
+		ranch_ssl, [{num_acceptors, 1}|Opts], echo_protocol, []),
 	Port = ranch:get_port(Name),
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
 	{_, AcceptorsSup, _, _} = lists:keyfind(ranch_acceptors_sup, 1, ListenerSupChildren),
@@ -175,7 +179,7 @@ ssl_accept_socket(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, S} = ssl:listen(0, [binary, {active, false}, {packet, raw}, {reuseaddr, true}|Opts]),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, [{socket, S}], echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, [{socket, S}], echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = ssl:send(Socket, <<"TCP Ranch is working!">>),
@@ -190,7 +194,7 @@ ssl_active_echo(_) ->
 	doc("Ensure that active mode works with SSL transport."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, Opts, active_echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, Opts, active_echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
@@ -205,7 +209,7 @@ ssl_echo(_) ->
 	doc("Ensure that passive mode works with SSL transport."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, Opts, echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, Opts, echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
@@ -228,7 +232,7 @@ do_ssl_sni_echo() ->
 	doc("Ensure that SNI works with SSL transport."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, [{sni_hosts, [{"localhost", Opts}]}], echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, [{sni_hosts, [{"localhost", Opts}]}], echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
@@ -251,7 +255,7 @@ do_ssl_sni_fail() ->
 	doc("Ensure that connection fails when host is not in SNI list."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, [{sni_hosts, [{"pouet", Opts}]}], echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, [{sni_hosts, [{"pouet", Opts}]}], echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{error, _} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = ranch:stop_listener(Name),
@@ -263,9 +267,9 @@ ssl_error_eaddrinuse(_) ->
 	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_ssl, Opts, active_echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, Opts, active_echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{error, eaddrinuse} = ranch:start_listener({Name, fails}, 1,
+	{error, eaddrinuse} = ranch:start_listener({Name, fails},
 		ranch_ssl, [{port, Port}|Opts], active_echo_protocol, []),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
@@ -274,14 +278,14 @@ ssl_error_eaddrinuse(_) ->
 
 ssl_error_no_cert(_) ->
 	doc("Ensure that failure due to missing certificate returns a compact readable error."),
-	{error, no_cert} = ranch:start_listener(name(), 1, ranch_ssl, [], active_echo_protocol, []),
+	{error, no_cert} = ranch:start_listener(name(), ranch_ssl, [], active_echo_protocol, []),
 	ok.
 
 ssl_error_eacces(_) ->
 	doc("Ensure that failure due to an eacces returns a compact readable error."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{error, eacces} = ranch:start_listener(Name, 1,
+	{error, eacces} = ranch:start_listener(Name,
 		ranch_ssl, [{port, 283}|Opts], active_echo_protocol, []),
 	ok.
 
@@ -291,7 +295,7 @@ tcp_accept_socket(_) ->
 	doc("Ensure that listener can use an externally opened TCP listen socket."),
 	Name = name(),
 	{ok, S} = gen_tcp:listen(0, [binary, {active, false}, {packet, raw}, {reuseaddr, true}]),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [{socket, S}], echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [{socket, S}], echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
@@ -305,7 +309,7 @@ tcp_accept_socket(_) ->
 tcp_active_echo(_) ->
 	doc("Ensure that active mode works with TCP transport."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], active_echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [], active_echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
@@ -319,7 +323,7 @@ tcp_active_echo(_) ->
 tcp_echo(_) ->
 	doc("Ensure that passive mode works with TCP transport."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [], echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
@@ -334,7 +338,7 @@ tcp_inherit_options(_) ->
 	doc("Ensure TCP options are inherited in the protocol."),
 	Name = name(),
 	Opts = [{nodelay, false}, {send_timeout_close, false}],
-	{ok, _} = ranch:start_listener(Name, 4, ranch_tcp, Opts, check_tcp_options, [{pid, self()} | Opts]),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, Opts, check_tcp_options, [{pid, self()} | Opts]),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, true}, {packet, raw}]),
 	receive checked -> ok after 1000 -> error(timeout) end,
@@ -344,8 +348,8 @@ tcp_inherit_options(_) ->
 tcp_max_connections(_) ->
 	doc("Ensure the max_connections option actually limits connections."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
-		ranch_tcp, [{max_connections, 10}],
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, [{max_connections, 10}, {num_acceptors, 1}],
 		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 11, 150),
@@ -357,8 +361,8 @@ tcp_max_connections(_) ->
 tcp_max_connections_and_beyond(_) ->
 	doc("Ensure the max_connections option works when connections are removed from the count."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
-		ranch_tcp, [{max_connections, 10}],
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, [{max_connections, 10}, {num_acceptors, 1}],
 		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 10, 0),
@@ -384,8 +388,8 @@ tcp_max_connections_and_beyond(_) ->
 tcp_max_connections_infinity(_) ->
 	doc("Set the max_connections option from 10 to infinity and back to 10."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
-		ranch_tcp, [{max_connections, 10}],
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, [{max_connections, 10}, {num_acceptors, 1}],
 		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 20, 0),
@@ -405,7 +409,7 @@ tcp_max_connections_infinity(_) ->
 tcp_remove_connections(_) ->
 	doc("Ensure that removed connections are only removed once."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
+	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, [],
 		remove_conn_and_wait_protocol, [{remove, true, 0}]),
 	Port = ranch:get_port(Name),
@@ -417,8 +421,8 @@ tcp_remove_connections(_) ->
 tcp_set_max_connections(_) ->
 	doc("Ensure that changing the max_connections option to a larger value allows for more connections."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
-		ranch_tcp, [{max_connections, 10}],
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, [{max_connections, 10}, {num_acceptors, 1}],
 		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 20, 0),
@@ -433,7 +437,7 @@ tcp_set_max_connections(_) ->
 tcp_set_max_connections_clean(_) ->
 	doc("Ensure that setting max_connections does not crash any process."),
 	Name = name(),
-	{ok, ListSupPid} = ranch:start_listener(Name, 4, ranch_tcp,
+	{ok, ListSupPid} = ranch:start_listener(Name, ranch_tcp,
 			[{max_connections, 4}],
 			notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
 	Children = supervisor:which_children(ListSupPid),
@@ -459,7 +463,7 @@ tcp_set_max_connections_clean(_) ->
 tcp_upgrade(_) ->
 	doc("Ensure that protocol options can be updated."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
+	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, [],
 		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
 	Port = ranch:get_port(Name),
@@ -473,9 +477,9 @@ tcp_upgrade(_) ->
 tcp_error_eaddrinuse(_) ->
 	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], active_echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [], active_echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{error, eaddrinuse} = ranch:start_listener({Name, fails}, 1,
+	{error, eaddrinuse} = ranch:start_listener({Name, fails},
 		ranch_tcp, [{port, Port}], active_echo_protocol, []),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
@@ -485,7 +489,7 @@ tcp_error_eaddrinuse(_) ->
 tcp_error_eacces(_) ->
 	doc("Ensure that failure due to an eacces returns a compact readable error."),
 	Name = name(),
-	{error, eacces} = ranch:start_listener(Name, 1,
+	{error, eacces} = ranch:start_listener(Name,
 		ranch_tcp, [{port, 283}], active_echo_protocol, []),
 	ok.
 
@@ -495,7 +499,7 @@ tcp_error_eacces(_) ->
 connection_type_supervisor(_) ->
 	doc("The supervisor connection type must be reflected in the specifications."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
+	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, [{connection_type, supervisor}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
@@ -513,7 +517,7 @@ connection_type_supervisor(_) ->
 connection_type_supervisor_separate_from_connection(_) ->
 	doc("The supervisor connection type allows separate supervised and connection processes."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1,
+	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, [{connection_type, supervisor}],
 		supervisor_separate, []),
 	Port = ranch:get_port(Name),
@@ -537,7 +541,7 @@ supervisor_clean_child_restart(_) ->
 	1 = erlang:trace_pattern({ranch_tcp, listen, 1},
 		[{'_', [], [{return_trace}]}], [global]),
 	{ok, Pid} = ranch:start_listener(Name,
-		1, ranch_tcp, [], echo_protocol, []),
+		ranch_tcp, [{num_acceptors, 1}], echo_protocol, []),
 	%% Trace supervisor spawns.
 	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
 	ConnsSup = ranch_server:get_connections_sup(Name),
@@ -573,7 +577,7 @@ supervisor_clean_conns_sup_restart(_) ->
 		"the ranch_server process."),
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name,
-		1, ranch_tcp, [], echo_protocol, []),
+		ranch_tcp, [], echo_protocol, []),
 	Server = erlang:whereis(ranch_server),
 	ServerMonRef = erlang:monitor(process, Server),
 	%% Exit because Name already registered and is alive.
@@ -592,7 +596,8 @@ supervisor_clean_restart(_) ->
 		"and that it restarts properly."),
 	Name = name(),
 	NumAcc = 4,
-	{ok, Pid} = ranch:start_listener(Name, NumAcc, ranch_tcp, [], echo_protocol, []),
+	{ok, Pid} = ranch:start_listener(Name,
+		ranch_tcp, [{num_acceptors, NumAcc}], echo_protocol, []),
 	%% Trace supervisor spawns.
 	1 = erlang:trace(Pid, true, [procs, set_on_spawn]),
 	ConnsSup0 = ranch_server:get_connections_sup(Name),
@@ -625,7 +630,7 @@ supervisor_conns_alive(_) ->
 	_ = erlang:trace(new, true, [call]),
 	1 = erlang:trace_pattern({ranch_tcp, listen, 1},
 		[{'_', [], [{return_trace}]}], [global]),
-	{ok, _} = ranch:start_listener(Name, 1,
+	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, [],
 		remove_conn_and_wait_protocol, [{remove, false, 2500}]),
 	%% Get the listener socket
@@ -652,7 +657,7 @@ supervisor_conns_alive(_) ->
 supervisor_protocol_start_link_crash(_) ->
 	doc("Ensure a protocol start crash does not kill all connections."),
 	Name = name(),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], crash_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [], crash_protocol, []),
 	ConnsSup = ranch_server:get_connections_sup(Name),
 	Port = ranch:get_port(Name),
 	{ok, _} = gen_tcp:connect("localhost", Port, [binary, {active, true}, {packet, raw}]),
@@ -667,7 +672,7 @@ supervisor_server_recover_state(_) ->
 	_ = erlang:trace(new, true, [call]),
 	1 = erlang:trace_pattern({ranch_server, init, 1},
 		[{'_', [], [{return_trace}]}], [global]),
-	{ok, _} = ranch:start_listener(Name, 1, ranch_tcp, [], echo_protocol, []),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [], echo_protocol, []),
 	ConnsSup = ranch_server:get_connections_sup(Name),
 	ServerPid = erlang:whereis(ranch_server),
 	{monitors, Monitors} = erlang:process_info(ServerPid, monitors),

@@ -49,7 +49,7 @@ the listener to enable this behavior.
 .Configure a listener for SSL authentication
 
 [source,erlang]
-{ok, _} = ranch:start_listener(my_ssl, 100,
+{ok, _} = ranch:start_listener(my_ssl,
 	ranch_ssl, [
 		{port, SSLPort},
 		{certfile, PathToCertfile},
