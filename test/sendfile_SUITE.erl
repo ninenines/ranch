@@ -41,7 +41,7 @@ groups() ->
 
 init_per_suite(Config) ->
 	Filename = filename:join(config(priv_dir, Config), "sendfile"),
-	Binary = crypto:rand_bytes(20 * 1024 * 1024),
+	Binary = crypto:strong_rand_bytes(20 * 1024 * 1024),
 	ok = file:write_file(Filename, Binary),
 	[{filename, Filename} | Config].
 
