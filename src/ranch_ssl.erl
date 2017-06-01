@@ -38,6 +38,7 @@
 
 -type ssl_opt() :: {alpn_preferred_protocols, [binary()]}
 	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
+	| {backlog, non_neg_integer()}
 	| {cacertfile, string()}
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
@@ -49,9 +50,11 @@
 	| {depth, 0..255}
 	| {dh, public_key:der_encoded()}
 	| {dhfile, string()}
+	| {eccs, [atom()]}
 	| {fail_if_no_peer_cert, boolean()}
 	| {hibernate_after, integer() | undefined}
 	| {honor_cipher_order, boolean()}
+	| {honor_ecc_order, boolean()}
 	| {key, {'RSAPrivateKey' | 'DSAPrivateKey' | 'PrivateKeyInfo', public_key:der_encoded()}}
 	| {keyfile, string()}
 	| {log_alert, boolean()}
@@ -68,6 +71,10 @@
 	| {sni_hosts, [{string(), ssl_opt()}]}
 	| {user_lookup_fun, {fun(), any()}}
 	| {v2_hello_compatible, boolean()}
+	| {send_timeout, timeout()}
+	| {send_timeout_close, boolean()}
+	| {sni_fun, fun((ServerName :: string()) -> opts())}
+	| {sni_hosts, [{inet:hostname(), opts()}]}
 	| {verify, ssl:verify_type()}
 	| {verify_fun, {fun(), any()}}
 	| {versions, [atom()]}.
@@ -83,7 +90,7 @@ name() -> ssl.
 
 -spec secure() -> boolean().
 secure() ->
-    true.
+	true.
 
 messages() -> {ssl, ssl_closed, ssl_error}.
 
