@@ -210,6 +210,9 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{'$gen_call', {To, Tag}, _} ->
 			To ! {Tag, {error, ?MODULE}},
 			loop(State, CurConns, NbChildren, Sleepers);
+        %% TCP closed before controlling_process to Protocol process.
+        {tcp_closed, _Port} ->
+            loop(State, CurConns, NbChildren, Sleepers);
 		Msg ->
 			error_logger:error_msg(
 				"Ranch listener ~p received unexpected message ~p~n",
