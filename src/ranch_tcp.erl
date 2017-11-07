@@ -30,6 +30,9 @@
 -export([sendfile/4]).
 -export([sendfile/5]).
 -export([setopts/2]).
+-export([getopts/2]).
+-export([getstat/1]).
+-export([getstat/2]).
 -export([controlling_process/2]).
 -export([peername/1]).
 -export([sockname/1]).
@@ -173,6 +176,18 @@ sendfile(Socket, RawFile, Offset, Bytes, Opts) ->
 -spec setopts(inet:socket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
 	inet:setopts(Socket, Opts).
+
+-spec getopts(inet:socket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getopts(Socket, Opts) ->
+        inet:getopts(Socket, Opts).
+
+-spec getstat(inet:socket()) -> {ok, list()} | {error, atom()}.
+getstat(Socket) ->
+        inet:getstat(Socket).
+
+-spec getstat(inet:socket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getstat(Socket, OptionNames) ->
+        inet:getstat(Socket, OptionNames).
 
 -spec controlling_process(inet:socket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.
