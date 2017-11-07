@@ -30,6 +30,9 @@
 -export([sendfile/4]).
 -export([sendfile/5]).
 -export([setopts/2]).
+-export([getopts/2]).
+-export([getstat/1]).
+-export([getstat/2]).
 -export([controlling_process/2]).
 -export([peername/1]).
 -export([sockname/1]).
@@ -191,6 +194,18 @@ sendfile(Socket, File, Offset, Bytes, Opts) ->
 -spec setopts(ssl:sslsocket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
 	ssl:setopts(Socket, Opts).
+
+-spec getopts(ssl:sslsocket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getopts(Socket, Opts) ->
+        ssl:getopts(Socket, Opts).
+
+-spec getstat(ssl:sslsocket()) -> {ok, list()} | {error, atom()}.
+getstat(Socket) ->
+        ssl:getstat(Socket).
+
+-spec getstat(ssl:sslsocket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getstat(Socket, OptionNames) ->
+        ssl:getstat(Socket, OptionNames).
 
 -spec controlling_process(ssl:sslsocket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.

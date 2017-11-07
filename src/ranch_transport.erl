@@ -18,6 +18,7 @@
 
 -type socket() :: any().
 -type opts() :: any().
+-type stats() :: any().
 -type sendfile_opts() :: [{chunk_size, non_neg_integer()}].
 -export_type([sendfile_opts/0]).
 
@@ -43,6 +44,9 @@
 		non_neg_integer(), sendfile_opts())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 -callback setopts(socket(), opts()) -> ok | {error, atom()}.
+-callback getopts(socket(), [atom()]) -> {ok, opts()} | {error, atom()}.
+-callback getstat(socket()) -> {ok, stats()} | {error, atom()}.
+-callback getstat(socket(), [atom()]) -> {ok, stats()} | {error, atom()}.
 -callback controlling_process(socket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.
 -callback peername(socket())

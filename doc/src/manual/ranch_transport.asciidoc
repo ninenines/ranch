@@ -160,6 +160,29 @@ Change options for the given socket.
 This is mainly useful for switching to active or passive mode
 or to set protocol-specific options.
 
+=== getopts(CSocket, SockOpts) -> {ok, SockOptValues} | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+SockOpts = [atom]:: Socket option names.
+SockOptValues = list():: Socket options.
+
+Get options for the given socket.
+
+=== getstat(CSocket) -> {ok, SockStatValues} | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+SockStatValues = list():: Socket statistics.
+
+Get statistics for the given socket.
+
+=== getstat(CSocket, SockStats) -> {ok, SockStatValues} | {error, atom()}
+
+CSocket = any():: Socket for this connection.
+SockStats = [atom()]:: Socket statistic names.
+SockStatValues = list():: Socket statistics.
+
+Get statistics for the given socket.
+
 === shutdown(CSocket, How) -> ok | {error, atom()}
 
 CSocket = any():: Socket for this connection.
