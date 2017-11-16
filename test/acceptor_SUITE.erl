@@ -282,12 +282,17 @@ ssl_error_no_cert(_) ->
 	ok.
 
 ssl_error_eacces(_) ->
-	doc("Ensure that failure due to an eacces returns a compact readable error."),
-	Name = name(),
-	Opts = ct_helper:get_certs_from_ets(),
-	{error, eacces} = ranch:start_listener(Name,
-		ranch_ssl, [{port, 283}|Opts], active_echo_protocol, []),
-	ok.
+	case os:type() of
+		{win32, nt} ->
+			doc("There are no privileged ports on Windows.");
+		_ ->
+			doc("Ensure that failure due to an eacces returns a compact readable error."),
+			Name = name(),
+			Opts = ct_helper:get_certs_from_ets(),
+			{error, eacces} = ranch:start_listener(Name,
+				ranch_ssl, [{port, 283}|Opts], active_echo_protocol, []),
+			ok
+	end.
 
 %% tcp.
 
@@ -493,12 +498,16 @@ tcp_error_eaddrinuse(_) ->
 	ok.
 
 tcp_error_eacces(_) ->
-	doc("Ensure that failure due to an eacces returns a compact readable error."),
-	Name = name(),
-	{error, eacces} = ranch:start_listener(Name,
-		ranch_tcp, [{port, 283}], active_echo_protocol, []),
-	ok.
-
+	case os:type() of
+		{win32, nt} ->
+			doc("There are no privileged ports on Windows.");
+		_ ->
+			doc("Ensure that failure due to an eacces returns a compact readable error."),
+			Name = name(),
+			{error, eacces} = ranch:start_listener(Name,
+				ranch_tcp, [{port, 283}], active_echo_protocol, []),
+			ok
+	end.
 
 %% Supervisor tests
 
