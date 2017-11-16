@@ -434,7 +434,13 @@ tcp_set_max_connections(_) ->
 	20 = ranch:get_max_connections(Name),
 	ok = ranch:stop_listener(Name).
 
-tcp_set_max_connections_clean(_) ->
+tcp_set_max_connections_clean(Config) ->
+	case code:is_module_native(?MODULE) of
+		true -> doc("This test uses tracing and is not compatible with native code.");
+		false -> do_tcp_set_max_connections_clean(Config)
+	end.
+
+do_tcp_set_max_connections_clean(_) ->
 	doc("Ensure that setting max_connections does not crash any process."),
 	Name = name(),
 	{ok, ListSupPid} = ranch:start_listener(Name, ranch_tcp,
@@ -532,7 +538,13 @@ connection_type_supervisor_separate_from_connection(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-supervisor_clean_child_restart(_) ->
+supervisor_clean_child_restart(Config) ->
+	case code:is_module_native(?MODULE) of
+		true -> doc("This test uses tracing and is not compatible with native code.");
+		false -> do_supervisor_clean_child_restart(Config)
+	end.
+
+do_supervisor_clean_child_restart(_) ->
 	doc("Verify that only the relevant parts of the supervision tree restarted "
 		"when the listening socket is closed."),
 	Name = name(),
@@ -591,7 +603,13 @@ supervisor_clean_conns_sup_restart(_) ->
 	end,
 	ok = ranch:stop_listener(Name).
 
-supervisor_clean_restart(_) ->
+supervisor_clean_restart(Config) ->
+	case code:is_module_native(?MODULE) of
+		true -> doc("This test uses tracing and is not compatible with native code.");
+		false -> do_supervisor_clean_restart(Config)
+	end.
+
+do_supervisor_clean_restart(_) ->
 	doc("Verify that killing ranch_conns_sup does not crash everything "
 		"and that it restarts properly."),
 	Name = name(),
@@ -624,7 +642,13 @@ supervisor_clean_restart(_) ->
 	ok = clean_traces(),
 	ok = ranch:stop_listener(Name).
 
-supervisor_conns_alive(_) ->
+supervisor_conns_alive(Config) ->
+	case code:is_module_native(?MODULE) of
+		true -> doc("This test uses tracing and is not compatible with native code.");
+		false -> do_supervisor_conns_alive(Config)
+	end.
+
+do_supervisor_conns_alive(_) ->
 	doc("Ensure that active connections stay open when the listening socket gets closed."),
 	Name = name(),
 	_ = erlang:trace(new, true, [call]),
@@ -665,7 +689,13 @@ supervisor_protocol_start_link_crash(_) ->
 	ConnsSup = ranch_server:get_connections_sup(Name),
 	ok = ranch:stop_listener(Name).
 
-supervisor_server_recover_state(_) ->
+supervisor_server_recover_state(Config) ->
+	case code:is_module_native(?MODULE) of
+		true -> doc("This test uses tracing and is not compatible with native code.");
+		false -> do_supervisor_server_recover_state(Config)
+	end.
+
+do_supervisor_server_recover_state(_) ->
 	doc("Ensure that when ranch_server crashes and restarts, it recovers "
 		"its state and continues monitoring the same processes."),
 	Name = name(),
