@@ -16,12 +16,11 @@ LOCAL_DEPS = ssl
 
 DOC_DEPS = asciideck
 
-TEST_DEPS = ct_helper
+TEST_DEPS = ci.erlang.mk ct_helper
 dep_ct_helper = git https://github.com/ninenines/ct_helper master
 
 # CI configuration.
 
-BUILD_DEPS = ci.erlang.mk
 dep_ci.erlang.mk = git https://github.com/ninenines/ci.erlang.mk master
 DEP_EARLY_PLUGINS = ci.erlang.mk
 
