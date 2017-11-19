@@ -27,6 +27,7 @@ DEP_EARLY_PLUGINS = ci.erlang.mk
 AUTO_CI_OTP ?= OTP-18+
 AUTO_CI_HIPE ?= OTP-LATEST
 # AUTO_CI_ERLLVM ?= OTP-LATEST
+AUTO_CI_WINDOWS ?= OTP-18+
 
 # Standard targets.
 
