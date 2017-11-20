@@ -35,6 +35,8 @@ groups() ->
 		tcp_remove_connections,
 		tcp_set_max_connections,
 		tcp_set_max_connections_clean,
+		tcp_getopts_capability,
+		tcp_getstat_capability,
 		tcp_upgrade,
 		tcp_error_eaddrinuse,
 		tcp_error_eacces
@@ -45,6 +47,8 @@ groups() ->
 		ssl_echo,
 		ssl_sni_echo,
 		ssl_sni_fail,
+		ssl_getopts_capability,
+		ssl_getstat_capability,
 		ssl_error_eaddrinuse,
 		ssl_error_no_cert,
 		ssl_error_eacces
@@ -263,6 +267,44 @@ do_ssl_sni_fail() ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+ssl_getopts_capability(_) ->
+	doc("Ensure getopts/2 capability."),
+	Name=name(),
+	Opts=ct_helper:get_certs_from_ets(),
+	{ok, _}=ranch:start_listener(Name, ranch_ssl, Opts, transport_capabilities_protocol, []),
+	Port=ranch:get_port(Name),
+	{ok, Socket}=ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok=ssl:send(Socket, <<"getopts/2">>),
+	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
+	ok=ranch:stop_listener(Name),
+	{error, closed}=ssl:recv(Socket, 0, 1000),
+	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_getstat_capability(_) ->
+	case application:get_key(ssl, vsn) of
+		{ok, Vsn} when Vsn>="8.0" ->
+			do_ssl_getstat_capability();
+		_ ->
+			{skip, "No getstat/{1,2} support."}
+	end.
+
+do_ssl_getstat_capability() ->
+	doc("Ensure getstat/{1,2} capability."),
+	Name=name(),
+	Opts=ct_helper:get_certs_from_ets(),
+	{ok, _}=ranch:start_listener(Name, ranch_ssl, Opts, transport_capabilities_protocol, []),
+	Port=ranch:get_port(Name),
+	{ok, Socket}=ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok=ssl:send(Socket, <<"getstat/1">>),
+	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
+	ok=ssl:send(Socket, <<"getstat/2">>),
+	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
+	ok=ranch:stop_listener(Name),
+	{error, closed}=ssl:recv(Socket, 0, 1000),
+	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	ok.
+
 ssl_error_eaddrinuse(_) ->
 	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
 	Name = name(),
@@ -470,6 +512,34 @@ do_tcp_set_max_connections_clean(_) ->
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
 	ok = ranch:stop_listener(Name).
+
+tcp_getopts_capability(_) ->
+	doc("Ensure getopts/2 capability."),
+	Name=name(),
+	{ok, _}=ranch:start_listener(Name, ranch_tcp, [], transport_capabilities_protocol, []),
+	Port=ranch:get_port(Name),
+	{ok, Socket}=gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok=gen_tcp:send(Socket, <<"getopts/2">>),
+	{ok, <<"OK">>}=gen_tcp:recv(Socket, 0, 1000),
+	ok=ranch:stop_listener(Name),
+	{error, closed}=gen_tcp:recv(Socket, 0, 1000),
+	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	ok.
+
+tcp_getstat_capability(_) ->
+	doc("Ensure getstat/{1,2} capability."),
+	Name=name(),
+	{ok, _}=ranch:start_listener(Name, ranch_tcp, [], transport_capabilities_protocol, []),
+	Port=ranch:get_port(Name),
+	{ok, Socket}=gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok=gen_tcp:send(Socket, <<"getstat/1">>),
+	{ok, <<"OK">>}=gen_tcp:recv(Socket, 0, 1000),
+	ok=gen_tcp:send(Socket, <<"getstat/2">>),
+	{ok, <<"OK">>}=gen_tcp:recv(Socket, 0, 1000),
+	ok=ranch:stop_listener(Name),
+	{error, closed}=gen_tcp:recv(Socket, 0, 1000),
+	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	ok.
 
 tcp_upgrade(_) ->
 	doc("Ensure that protocol options can be updated."),
