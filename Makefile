@@ -16,7 +16,7 @@ LOCAL_DEPS = ssl
 
 DOC_DEPS = asciideck
 
-TEST_DEPS = ci.erlang.mk ct_helper
+TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper
 dep_ct_helper = git https://github.com/ninenines/ct_helper master
 
 # CI configuration.
