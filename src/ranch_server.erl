@@ -17,16 +17,21 @@
 
 %% API.
 -export([start_link/0]).
--export([set_new_listener_opts/3]).
+-export([set_new_listener_opts/4]).
 -export([cleanup_listener_opts/1]).
 -export([set_connections_sup/2]).
 -export([get_connections_sup/1]).
+-export([get_connections_sups/0]).
+-export([set_listener_sup/2]).
+-export([get_listener_sup/1]).
+-export([get_listener_sups/0]).
 -export([set_addr/2]).
 -export([get_addr/1]).
 -export([set_max_connections/2]).
 -export([get_max_connections/1]).
 -export([set_protocol_options/2]).
 -export([get_protocol_options/1]).
+-export([get_listener_start_args/1]).
 -export([count_connections/1]).
 
 %% gen_server.
@@ -50,15 +55,16 @@
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any()) -> ok.
-set_new_listener_opts(Ref, MaxConns, Opts) ->
-	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, Opts}).
+-spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any(), [any()]) -> ok.
+set_new_listener_opts(Ref, MaxConns, ProtoOpts, StartArgs) ->
+	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, ProtoOpts, StartArgs}).
 
 -spec cleanup_listener_opts(ranch:ref()) -> ok.
 cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {addr, Ref}),
 	_ = ets:delete(?TAB, {max_conns, Ref}),
 	_ = ets:delete(?TAB, {opts, Ref}),
+	_ = ets:delete(?TAB, {listener_start_args, Ref}),
 	%% We also remove the pid of the connections supervisor.
 	%% Depending on the timing, it might already have been deleted
 	%% when we handled the monitor DOWN message. However, in some
@@ -67,6 +73,8 @@ cleanup_listener_opts(Ref) ->
 	%% expected a crash (because the listener was stopped).
 	%% Deleting it explictly here removes any possible confusion.
 	_ = ets:delete(?TAB, {conns_sup, Ref}),
+	%% Ditto for the listener supervisor.
+	_ = ets:delete(?TAB, {listener_sup, Ref}),
 	ok.
 
 -spec set_connections_sup(ranch:ref(), pid()) -> ok.
@@ -77,6 +85,23 @@ set_connections_sup(Ref, Pid) ->
 -spec get_connections_sup(ranch:ref()) -> pid().
 get_connections_sup(Ref) ->
 	ets:lookup_element(?TAB, {conns_sup, Ref}, 2).
+
+-spec get_connections_sups() -> [{ranch:ref(), pid()}].
+get_connections_sups() ->
+	[{Ref, Pid} || [Ref, Pid] <- ets:match(?TAB, {{conns_sup, '$1'}, '$2'})].
+
+-spec set_listener_sup(ranch:ref(), pid()) -> ok.
+set_listener_sup(Ref, Pid) ->
+	true = gen_server:call(?MODULE, {set_listener_sup, Ref, Pid}),
+	ok.
+
+-spec get_listener_sup(ranch:ref()) -> pid().
+get_listener_sup(Ref) ->
+	ets:lookup_element(?TAB, {listener_sup, Ref}, 2).
+
+-spec get_listener_sups() -> [{ranch:ref(), pid()}].
+get_listener_sups() ->
+	[{Ref, Pid} || [Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})].
 
 -spec set_addr(ranch:ref(), {inet:ip_address(), inet:port_number()}) -> ok.
 set_addr(Ref, Addr) ->
@@ -102,6 +127,10 @@ set_protocol_options(Ref, ProtoOpts) ->
 get_protocol_options(Ref) ->
 	ets:lookup_element(?TAB, {opts, Ref}, 2).
 
+-spec get_listener_start_args(ranch:ref()) -> [any()].
+get_listener_start_args(Ref) ->
+	ets:lookup_element(?TAB, {listener_start_args, Ref}, 2).
+
 -spec count_connections(ranch:ref()) -> non_neg_integer().
 count_connections(Ref) ->
 	ranch_conns_sup:active_connections(get_connections_sup(Ref)).
@@ -109,13 +138,16 @@ count_connections(Ref) ->
 %% gen_server.
 
 init([]) ->
-	Monitors = [{{erlang:monitor(process, Pid), Pid}, Ref} ||
+	ConnMonitors = [{{erlang:monitor(process, Pid), Pid}, {conns_sup, Ref}} ||
 		[Ref, Pid] <- ets:match(?TAB, {{conns_sup, '$1'}, '$2'})],
-	{ok, #state{monitors=Monitors}}.
+	ListenerMonitors = [{{erlang:monitor(process, Pid), Pid}, {listener_sup, Ref}} ||
+		[Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})],
+	{ok, #state{monitors=ConnMonitors++ListenerMonitors}}.
 
-handle_call({set_new_listener_opts, Ref, MaxConns, Opts}, _, State) ->
+handle_call({set_new_listener_opts, Ref, MaxConns, ProtoOpts, StartArgs}, _, State) ->
 	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),
-	ets:insert(?TAB, {{opts, Ref}, Opts}),
+	ets:insert(?TAB, {{opts, Ref}, ProtoOpts}),
+	ets:insert(?TAB, {{listener_start_args, Ref}, StartArgs}),
 	{reply, ok, State};
 handle_call({set_connections_sup, Ref, Pid}, _,
 		State=#state{monitors=Monitors}) ->
@@ -123,7 +155,17 @@ handle_call({set_connections_sup, Ref, Pid}, _,
 		true ->
 			MonitorRef = erlang:monitor(process, Pid),
 			{reply, true,
-				State#state{monitors=[{{MonitorRef, Pid}, Ref}|Monitors]}};
+				State#state{monitors=[{{MonitorRef, Pid}, {conns_sup, Ref}}|Monitors]}};
+		false ->
+			{reply, false, State}
+	end;
+handle_call({set_listener_sup, Ref, Pid}, _,
+		State=#state{monitors=Monitors}) ->
+	case ets:insert_new(?TAB, {{listener_sup, Ref}, Pid}) of
+		true ->
+			MonitorRef = erlang:monitor(process, Pid),
+			{reply, true,
+				State#state{monitors=[{{MonitorRef, Pid}, {listener_sup, Ref}}|Monitors]}};
 		false ->
 			{reply, false, State}
 	end;
@@ -148,8 +190,8 @@ handle_cast(_Request, State) ->
 
 handle_info({'DOWN', MonitorRef, process, Pid, _},
 		State=#state{monitors=Monitors}) ->
-	{_, Ref} = lists:keyfind({MonitorRef, Pid}, 1, Monitors),
-	_ = ets:delete(?TAB, {conns_sup, Ref}),
+	{_, TypeRef} = lists:keyfind({MonitorRef, Pid}, 1, Monitors),
+	_ = ets:delete(?TAB, TypeRef),
 	Monitors2 = lists:keydelete({MonitorRef, Pid}, 1, Monitors),
 	{noreply, State#state{monitors=Monitors2}};
 handle_info(_Info, State) ->
