@@ -55,7 +55,8 @@ groups() ->
 	]}, {misc, [
 		misc_bad_transport,
 		misc_bad_transport_options,
-		misc_info
+		misc_info,
+		misc_info_embedded
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -148,7 +149,7 @@ misc_info(_) ->
 			{protocol, remove_conn_and_wait_protocol},
 			{protocol_options, [{remove, false, 2500}]} %% Option was modified.
 		]}
-	] = lists:sort([L || L={{misc_info, _}, _} <- ranch:info()]),
+	] = do_ranch_listenergroup_info(misc_info),
 	%% Get acceptors.
 	[_] = ranch:procs({misc_info, tcp}, acceptors),
 	[_, _] = ranch:procs({misc_info, act}, acceptors),
@@ -158,6 +159,102 @@ misc_info(_) ->
 	[] = ranch:procs({misc_info, act}, connections),
 	[] = ranch:procs({misc_info, ssl}, connections),
 	ok.
+
+
+misc_info_embedded(_) ->
+	doc("Information about listeners in embedded mode."),
+	{ok, SupPid}=embedded_sup:start_link(),
+	%% Open a listener with a few connections.
+	{ok, Pid1} = embedded_sup:start_listener(SupPid, {misc_info_embedded, tcp}, ranch_tcp, [{num_acceptors, 1}], remove_conn_and_wait_protocol, [{remove, true, 2500}]),
+	Port1 = ranch:get_port({misc_info_embedded, tcp}),
+	%% Open a few more listeners with different arguments.
+	{ok, Pid2} = embedded_sup:start_listener(SupPid, {misc_info_embedded, act}, ranch_tcp, [{num_acceptors, 2}], active_echo_protocol, {}),
+	Port2 = ranch:get_port({misc_info_embedded, act}),
+	ranch:set_max_connections({misc_info_embedded, act}, infinity),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, Pid3} = embedded_sup:start_listener(SupPid, {misc_info_embedded, ssl},
+		ranch_ssl, [{num_acceptors, 3}|Opts], echo_protocol, [{}]),
+	Port3 = ranch:get_port({misc_info_embedded, ssl}),
+	%% Open 5 connections, 3 removed from the count.
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	receive after 250 -> ok end,
+	ranch:set_protocol_options({misc_info_embedded, tcp}, [{remove, false, 2500}]),
+	receive after 250 -> ok end,
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
+	receive after 250 -> ok end,
+	%% Confirm the info returned by Ranch is correct.
+	[
+		{{misc_info_embedded, act}, [
+			{pid, Pid2},
+			{ip, _},
+			{port, Port2},
+			{num_acceptors, 2},
+			{max_connections, infinity}, %% Option was modified.
+			{active_connections, 0},
+			{all_connections, 0},
+			{transport, ranch_tcp},
+			{transport_options, [{num_acceptors, 2}]},
+			{protocol, active_echo_protocol},
+			{protocol_options, {}}
+		]},
+		{{misc_info_embedded, ssl}, [
+			{pid, Pid3},
+			{ip, _},
+			{port, Port3},
+			{num_acceptors, 3},
+			{max_connections, 1024},
+			{active_connections, 0},
+			{all_connections, 0},
+			{transport, ranch_ssl},
+			{transport_options, [{num_acceptors, 3}|Opts]},
+			{protocol, echo_protocol},
+			{protocol_options, [{}]}
+		]},
+		{{misc_info_embedded, tcp}, [
+			{pid, Pid1},
+			{ip, _},
+			{port, Port1},
+			{num_acceptors, 1},
+			{max_connections, 1024},
+			{active_connections, 2},
+			{all_connections, 5},
+			{transport, ranch_tcp},
+			{transport_options, [{num_acceptors, 1}]},
+			{protocol, remove_conn_and_wait_protocol},
+			{protocol_options, [{remove, false, 2500}]} %% Option was modified.
+		]}
+	] = do_ranch_listenergroup_info(misc_info_embedded),
+	%% Get acceptors.
+	[_] = ranch:procs({misc_info_embedded, tcp}, acceptors),
+	[_, _] = ranch:procs({misc_info_embedded, act}, acceptors),
+ 	[_, _, _] = ranch:procs({misc_info_embedded, ssl}, acceptors),
+	%% Get connections.
+	[_, _, _, _, _] = ranch:procs({misc_info_embedded, tcp}, connections),
+	[] = ranch:procs({misc_info_embedded, act}, connections),
+ 	[] = ranch:procs({misc_info_embedded, ssl}, connections),
+	%% Stop embedded tcp listener and ensure it is gone.
+	ok = embedded_sup:stop_listener(SupPid, {misc_info_embedded, tcp}),
+	timer:sleep(500),
+	[{{misc_info_embedded, act}, _}, {{misc_info_embedded, ssl}, _}]=
+		do_ranch_listenergroup_info(misc_info_embedded),
+	%% Stop embedded act listener and ensure it is gone.
+	ok = embedded_sup:stop_listener(SupPid, {misc_info_embedded, act}),
+	timer:sleep(500),
+	[{{misc_info_embedded, ssl}, _}]=
+		do_ranch_listenergroup_info(misc_info_embedded),
+	%% Stop embedded ssl listener and ensure it is gone.
+	ok = embedded_sup:stop_listener(SupPid, {misc_info_embedded, ssl}),
+	timer:sleep(500),
+	[]=do_ranch_listenergroup_info(misc_info_embedded),
+	%% Stop embedded supervisor.
+	embedded_sup:stop(SupPid),
+	ok.
+
+do_ranch_listenergroup_info(ListenerGroup) ->
+	lists:sort([L || L={{G, _}, _} <- ranch:info(), G=:=ListenerGroup]).
 
 %% ssl.
 
@@ -830,3 +927,4 @@ clean_traces() ->
 	after 0 ->
 		ok
 	end.
+

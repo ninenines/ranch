@@ -164,12 +164,11 @@ set_protocol_options(Ref, Opts) ->
 
 -spec info() -> [{any(), [{atom(), any()}]}].
 info() ->
-	Children = supervisor:which_children(ranch_sup),
 	[{Ref, listener_info(Ref, Pid)}
-		|| {{ranch_listener_sup, Ref}, Pid, _, [_]} <- Children].
+		|| {Ref, Pid} <- ranch_server:get_listener_sups()].
 
 listener_info(Ref, Pid) ->
-	[_, NumAcceptors, Transport, TransOpts, Protocol, _] = listener_start_args(Ref),
+	[_, NumAcceptors, Transport, TransOpts, Protocol, _] = ranch_server:get_listener_start_args(Ref),
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	{IP, Port} = get_addr(Ref),
 	MaxConns = get_max_connections(Ref),
@@ -188,24 +187,6 @@ listener_info(Ref, Pid) ->
 		{protocol_options, ProtoOpts}
 	].
 
-listener_start_args(Ref) ->
-	case erlang:function_exported(supervisor, get_childspec, 2) of
-		true ->
-			%% Can't use map syntax before R18.
-			{ok, Map} = supervisor:get_childspec(ranch_sup, {ranch_listener_sup, Ref}),
-			{ranch_listener_sup, start_link, StartArgs} = maps:get(start, Map),
-			StartArgs;
-		false ->
-			%% Awful solution for compatibility with R16 and R17.
-			{status, _, _, [_, _, _, _, [_, _,
-				{data, [{_, {state, _, _, Children, _, _, _, _, _, _}}]}]]}
-				= sys:get_status(ranch_sup),
-			[StartArgs] = [StartArgs || {child, _, {ranch_listener_sup, ChildRef},
-				{ranch_listener_sup, start_link, StartArgs}, _, _, _, _}
-				<- Children, ChildRef =:= Ref],
-			StartArgs
-	end.
-
 -spec procs(ref(), acceptors | connections) -> [pid()].
 procs(Ref, acceptors) ->
 	procs1(Ref, ranch_acceptors_sup);
@@ -213,8 +194,7 @@ procs(Ref, connections) ->
 	procs1(Ref, ranch_conns_sup).
 
 procs1(Ref, Sup) ->
-	{_, ListenerSup, _, _} = lists:keyfind({ranch_listener_sup, Ref}, 1,
-		supervisor:which_children(ranch_sup)),
+	ListenerSup = ranch_server:get_listener_sup(Ref),
 	{_, SupPid, _, _} = lists:keyfind(Sup, 1,
 		supervisor:which_children(ListenerSup)),
 	[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)].
