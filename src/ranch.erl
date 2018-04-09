@@ -17,17 +17,23 @@
 -export([start_listener/5]).
 -export([start_listener/6]).
 -export([stop_listener/1]).
+-export([suspend_listener/1]).
+-export([resume_listener/1]).
 -export([child_spec/5]).
 -export([child_spec/6]).
 -export([accept_ack/1]).
 -export([remove_connection/1]).
+-export([get_status/1]).
 -export([get_addr/1]).
 -export([get_port/1]).
 -export([get_max_connections/1]).
 -export([set_max_connections/2]).
+-export([get_transport_options/1]).
+-export([set_transport_options/2]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
 -export([info/0]).
+-export([info/1]).
 -export([procs/2]).
 -export([filter_options/3]).
 -export([set_option_default/3]).
@@ -110,6 +116,37 @@ stop_listener(Ref) ->
 			{error, Reason}
 	end.
 
+-spec suspend_listener(ref()) -> ok | {error, term()}.
+suspend_listener(Ref) ->
+	case get_status(Ref) of
+		running ->
+			ListenerSup = ranch_server:get_listener_sup(Ref),
+			ok = ranch_server:set_addr(Ref, {undefined, undefined}),
+			supervisor:terminate_child(ListenerSup, ranch_acceptors_sup);
+		suspended ->
+			ok
+	end.
+
+-spec resume_listener(ref()) -> ok | {error, term()}.
+resume_listener(Ref) ->
+	case get_status(Ref) of
+		running ->
+			ok;
+		suspended ->
+			ListenerSup = ranch_server:get_listener_sup(Ref),
+			Res = supervisor:restart_child(ListenerSup, ranch_acceptors_sup),
+			maybe_resumed(Res)
+	end.
+
+maybe_resumed(Error={error, {listen_error, _, Reason}}) ->
+	start_error(Reason, Error);
+maybe_resumed({ok, _}) ->
+	ok;
+maybe_resumed({ok, _, _}) ->
+	ok;
+maybe_resumed(Res) ->
+	Res.
+
 -spec child_spec(ref(), module(), any(), module(), any())
 	-> supervisor:child_spec().
 child_spec(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
@@ -137,11 +174,22 @@ remove_connection(Ref) ->
 	ConnsSup ! {remove_connection, Ref, self()},
 	ok.
 
--spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()}.
+-spec get_status(ref()) -> running | suspended | restarting.
+get_status(Ref) ->
+	ListenerSup = ranch_server:get_listener_sup(Ref),
+	Children = supervisor:which_children(ListenerSup),
+	case lists:keyfind(ranch_acceptors_sup, 1, Children) of
+		{_, undefined, _, _} ->
+			suspended;
+		{_, AcceptorsSup, _, _} when is_pid(AcceptorsSup) ->
+			running
+	end.
+
+-spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()} | {undefined, undefined}.
 get_addr(Ref) ->
 	ranch_server:get_addr(Ref).
 
--spec get_port(ref()) -> inet:port_number().
+-spec get_port(ref()) -> inet:port_number() | undefined.
 get_port(Ref) ->
 	{_, Port} = get_addr(Ref),
 	Port.
@@ -153,6 +201,19 @@ get_max_connections(Ref) ->
 -spec set_max_connections(ref(), max_conns()) -> ok.
 set_max_connections(Ref, MaxConnections) ->
 	ranch_server:set_max_connections(Ref, MaxConnections).
+
+-spec get_transport_options(ref()) -> any().
+get_transport_options(Ref) ->
+	ranch_server:get_transport_options(Ref).
+
+-spec set_transport_options(ref(), any()) -> ok | {error, running}.
+set_transport_options(Ref, TransOpts) ->
+	case get_status(Ref) of
+		suspended ->
+			ok = ranch_server:set_transport_options(Ref, TransOpts);
+		running ->
+			{error, running}
+	end.
 
 -spec get_protocol_options(ref()) -> any().
 get_protocol_options(Ref) ->
@@ -167,14 +228,22 @@ info() ->
 	[{Ref, listener_info(Ref, Pid)}
 		|| {Ref, Pid} <- ranch_server:get_listener_sups()].
 
+-spec info(ref()) -> [{atom(), any()}].
+info(Ref) ->
+	Pid = ranch_server:get_listener_sup(Ref),
+	listener_info(Ref, Pid).
+
 listener_info(Ref, Pid) ->
-	[_, NumAcceptors, Transport, TransOpts, Protocol, _] = ranch_server:get_listener_start_args(Ref),
+	[_, NumAcceptors, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
 	ConnsSup = ranch_server:get_connections_sup(Ref),
+	Status = get_status(Ref),
 	{IP, Port} = get_addr(Ref),
 	MaxConns = get_max_connections(Ref),
+	TransOpts = ranch_server:get_transport_options(Ref),
 	ProtoOpts = get_protocol_options(Ref),
 	[
 		{pid, Pid},
+		{status, Status},
 		{ip, IP},
 		{port, Port},
 		{num_acceptors, NumAcceptors},
@@ -197,7 +266,11 @@ procs1(Ref, Sup) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
 	{_, SupPid, _, _} = lists:keyfind(Sup, 1,
 		supervisor:which_children(ListenerSup)),
-	[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)].
+	try
+		[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)]
+	catch exit:{noproc, _} when Sup =:= ranch_acceptors_sup ->
+		[]
+	end.
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].

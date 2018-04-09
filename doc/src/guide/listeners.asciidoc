@@ -91,6 +91,34 @@ named `tcp_echo`. We can now stop it.
 [source,erlang]
 ranch:stop_listener(tcp_echo).
 
+=== Suspending and resuming a listener
+
+Listeners can be suspended and resumed by calling
+`ranch:suspend_listener/1` and `ranch:resume_listener/1`,
+respectively, with the name of the listener as argument.
+
+Suspending a listener will cause it to stop listening and not accept
+new connections, but existing connection processes will not be stopped.
+
+.Suspending a listener
+
+[source,erlang]
+ranch:suspend_listener(tcp_echo).
+
+Resuming a listener will cause it to start listening and accept new
+connections again.
+It is worth mentioning, however, that if the listener is configured
+to listen on a random port, it will listen on a different port than
+before it was suspended.
+
+.Resuming a listener
+
+[source,erlang]
+ranch:resume_listener(tcp_echo).
+
+Whether a listener is currently running or suspended can be queried
+by calling `ranch:get_status/1` with the listener name as argument.
+
 === Default transport options
 
 By default the socket will be set to return `binary` data, with the
@@ -295,6 +323,30 @@ calling `ranch:get_protocol_options/1`.
 
 [source,erlang]
 Opts = ranch:get_protocol_options(tcp_echo).
+
+=== Changing transport options
+
+Ranch allows you to change the transport options of a listener, for
+example to make it listen on a different port.
+
+To change transport options, the listener has to be suspended first.
+Then you are allowed to change the transport options by calling
+`ranch:set_transport_options/2` with the listener name and the new
+transport options as arguments.
+After that, you can resume the listener.
+
+.Changing the transport options
+
+[source,erlang]
+ranch:set_transport_options(tcp_echo, NewOpts).
+
+You can retrieve the current transport options by calling
+`ranch:get_transport_options/1`.
+
+.Retrieving the current transport options
+
+[source,erlang]
+Opts = ranch:get_transport_options(tcp_echo).
 
 === Obtaining information about listeners
 

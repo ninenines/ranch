@@ -28,6 +28,7 @@ groups() ->
 		tcp_accept_socket,
 		tcp_active_echo,
 		tcp_echo,
+		tcp_graceful,
 		tcp_inherit_options,
 		tcp_max_connections,
 		tcp_max_connections_and_beyond,
@@ -45,6 +46,7 @@ groups() ->
 		ssl_accept_socket,
 		ssl_active_echo,
 		ssl_echo,
+		ssl_graceful,
 		ssl_sni_echo,
 		ssl_sni_fail,
 		ssl_getopts_capability,
@@ -113,6 +115,7 @@ misc_info(_) ->
 	[
 		{{misc_info, act}, [
 			{pid, Pid2},
+			{status, _},
 			{ip, _},
 			{port, Port2},
 			{num_acceptors, 2},
@@ -126,6 +129,7 @@ misc_info(_) ->
 		]},
 		{{misc_info, ssl}, [
 			{pid, Pid3},
+			{status, _},
 			{ip, _},
 			{port, Port3},
 			{num_acceptors, 3},
@@ -139,6 +143,7 @@ misc_info(_) ->
 		]},
 		{{misc_info, tcp}, [
 			{pid, Pid1},
+			{status, _},
 			{ip, _},
 			{port, Port1},
 			{num_acceptors, 1},
@@ -189,6 +194,7 @@ misc_info_embedded(_) ->
 	[
 		{{misc_info_embedded, act}, [
 			{pid, Pid2},
+			{status, _},
 			{ip, _},
 			{port, Port2},
 			{num_acceptors, 2},
@@ -202,6 +208,7 @@ misc_info_embedded(_) ->
 		]},
 		{{misc_info_embedded, ssl}, [
 			{pid, Pid3},
+			{status, _},
 			{ip, _},
 			{port, Port3},
 			{num_acceptors, 3},
@@ -215,6 +222,7 @@ misc_info_embedded(_) ->
 		]},
 		{{misc_info_embedded, tcp}, [
 			{pid, Pid1},
+			{status, _},
 			{ip, _},
 			{port, Port1},
 			{num_acceptors, 1},
@@ -364,6 +372,45 @@ do_ssl_sni_fail() ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+ssl_graceful(_) ->
+	doc("Ensure suspending and resuming of listeners does not kill active connections."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, Opts, echo_protocol, []),
+	Port = ranch:get_port(Name),
+	%% Make sure connections with a fresh listener work.
+	running = ranch:get_status(Name),
+	{ok, Socket1} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = ssl:send(Socket1, <<"SSL with fresh listener">>),
+	{ok, <<"SSL with fresh listener">>} = ssl:recv(Socket1, 23, 1000),
+	%% Make sure transport options cannot be changed on a running listener.
+	{error, running} = ranch:set_transport_options(Name, [{port, Port}|Opts]),
+	%% Suspend listener, make sure established connections keep running.
+	ok = ranch:suspend_listener(Name),
+	suspended = ranch:get_status(Name),
+	ok = ssl:send(Socket1, <<"SSL with suspended listener">>),
+	{ok, <<"SSL with suspended listener">>} = ssl:recv(Socket1, 27, 1000),
+	%% Make sure new connections are refused on the suspended listener.
+	{error, econnrefused} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	%% Make sure transport options can be changed when listener is suspended.
+	ok = ranch:set_transport_options(Name, [{port, Port}|Opts]),
+	%% Resume listener, make sure connections can be established again.
+	ok = ranch:resume_listener(Name),
+	running = ranch:get_status(Name),
+	{ok, Socket2} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = ssl:send(Socket2, <<"SSL with resumed listener">>),
+	{ok, <<"SSL with resumed listener">>} = ssl:recv(Socket2, 25, 1000),
+	%% Make sure transport options cannot be changed on resumed listener.
+	{error, running} = ranch:set_transport_options(Name, [{port, Port}|Opts]),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket1, 0, 1000),
+	{error, closed} = ssl:recv(Socket2, 0, 1000),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
 ssl_getopts_capability(_) ->
 	doc("Ensure getopts/2 capability."),
 	Name=name(),
@@ -475,6 +522,44 @@ tcp_echo(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+tcp_graceful(_) ->
+	doc("Ensure suspending and resuming of listeners does not kill active connections."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [], echo_protocol, []),
+	Port = ranch:get_port(Name),
+	%% Make sure connections with a fresh listener work.
+	running = ranch:get_status(Name),
+	{ok, Socket1} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket1, <<"TCP with fresh listener">>),
+	{ok, <<"TCP with fresh listener">>} = gen_tcp:recv(Socket1, 23, 1000),
+	%% Make sure transport options cannot be changed on a running listener.
+	{error, running} = ranch:set_transport_options(Name, [{port, Port}]),
+	%% Suspend listener, make sure established connections keep running.
+	ok = ranch:suspend_listener(Name),
+	suspended = ranch:get_status(Name),
+	ok = gen_tcp:send(Socket1, <<"TCP with suspended listener">>),
+	{ok, <<"TCP with suspended listener">>} = gen_tcp:recv(Socket1, 27, 1000),
+	%% Make sure new connections are refused on the suspended listener.
+	{error, econnrefused} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	%% Make sure transport options can be changed when listener is suspended.
+	ok = ranch:set_transport_options(Name, [{port, Port}]),
+	%% Resume listener, make sure connections can be established again.
+	ok = ranch:resume_listener(Name),
+	running = ranch:get_status(Name),
+	{ok, Socket2} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket2, <<"TCP with resumed listener">>),
+	{ok, <<"TCP with resumed listener">>} = gen_tcp:recv(Socket2, 25, 1000),
+	%% Make sure transport options cannot be changed on resumed listener.
+	{error, running} = ranch:set_transport_options(Name, [{port, Port}]),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = gen_tcp:recv(Socket1, 0, 1000),
+	{error, closed} = gen_tcp:recv(Socket2, 0, 1000),
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
