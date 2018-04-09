@@ -17,7 +17,7 @@
 
 %% API.
 -export([start_link/0]).
--export([set_new_listener_opts/4]).
+-export([set_new_listener_opts/5]).
 -export([cleanup_listener_opts/1]).
 -export([set_connections_sup/2]).
 -export([get_connections_sup/1]).
@@ -29,6 +29,8 @@
 -export([get_addr/1]).
 -export([set_max_connections/2]).
 -export([get_max_connections/1]).
+-export([set_transport_options/2]).
+-export([get_transport_options/1]).
 -export([set_protocol_options/2]).
 -export([get_protocol_options/1]).
 -export([get_listener_start_args/1]).
@@ -55,15 +57,16 @@
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any(), [any()]) -> ok.
-set_new_listener_opts(Ref, MaxConns, ProtoOpts, StartArgs) ->
-	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, ProtoOpts, StartArgs}).
+-spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any(), any(), [any()]) -> ok.
+set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts, StartArgs) ->
+	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}).
 
 -spec cleanup_listener_opts(ranch:ref()) -> ok.
 cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {addr, Ref}),
 	_ = ets:delete(?TAB, {max_conns, Ref}),
-	_ = ets:delete(?TAB, {opts, Ref}),
+	_ = ets:delete(?TAB, {trans_opts, Ref}),
+	_ = ets:delete(?TAB, {proto_opts, Ref}),
 	_ = ets:delete(?TAB, {listener_start_args, Ref}),
 	%% We also remove the pid of the connections supervisor.
 	%% Depending on the timing, it might already have been deleted
@@ -119,13 +122,21 @@ set_max_connections(Ref, MaxConnections) ->
 get_max_connections(Ref) ->
 	ets:lookup_element(?TAB, {max_conns, Ref}, 2).
 
+-spec set_transport_options(ranch:ref(), any()) -> ok.
+set_transport_options(Ref, TransOpts) ->
+	gen_server:call(?MODULE, {set_trans_opts, Ref, TransOpts}).
+
+-spec get_transport_options(ranch:ref()) -> any().
+get_transport_options(Ref) ->
+	ets:lookup_element(?TAB, {trans_opts, Ref}, 2).
+
 -spec set_protocol_options(ranch:ref(), any()) -> ok.
 set_protocol_options(Ref, ProtoOpts) ->
-	gen_server:call(?MODULE, {set_opts, Ref, ProtoOpts}).
+	gen_server:call(?MODULE, {set_proto_opts, Ref, ProtoOpts}).
 
 -spec get_protocol_options(ranch:ref()) -> any().
 get_protocol_options(Ref) ->
-	ets:lookup_element(?TAB, {opts, Ref}, 2).
+	ets:lookup_element(?TAB, {proto_opts, Ref}, 2).
 
 -spec get_listener_start_args(ranch:ref()) -> [any()].
 get_listener_start_args(Ref) ->
@@ -144,9 +155,10 @@ init([]) ->
 		[Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})],
 	{ok, #state{monitors=ConnMonitors++ListenerMonitors}}.
 
-handle_call({set_new_listener_opts, Ref, MaxConns, ProtoOpts, StartArgs}, _, State) ->
+handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}, _, State) ->
 	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),
-	ets:insert(?TAB, {{opts, Ref}, ProtoOpts}),
+	ets:insert(?TAB, {{trans_opts, Ref}, TransOpts}),
+	ets:insert(?TAB, {{proto_opts, Ref}, ProtoOpts}),
 	ets:insert(?TAB, {{listener_start_args, Ref}, StartArgs}),
 	{reply, ok, State};
 handle_call({set_connections_sup, Ref, Pid}, _,
@@ -177,8 +189,11 @@ handle_call({set_max_conns, Ref, MaxConns}, _, State) ->
 	ConnsSup = get_connections_sup(Ref),
 	ConnsSup ! {set_max_conns, MaxConns},
 	{reply, ok, State};
-handle_call({set_opts, Ref, Opts}, _, State) ->
-	ets:insert(?TAB, {{opts, Ref}, Opts}),
+handle_call({set_trans_opts, Ref, Opts}, _, State) ->
+	ets:insert(?TAB, {{trans_opts, Ref}, Opts}),
+	{reply, ok, State};
+handle_call({set_proto_opts, Ref, Opts}, _, State) ->
+	ets:insert(?TAB, {{proto_opts, Ref}, Opts}),
 	ConnsSup = get_connections_sup(Ref),
 	ConnsSup ! {set_opts, Opts},
 	{reply, ok, State};

@@ -17,10 +17,14 @@
 -export([start_listener/5]).
 -export([start_listener/6]).
 -export([stop_listener/1]).
+-export([suspend_listener/1]).
+-export([resume_listener/1]).
+-export([set_listener_options/2]).
 -export([child_spec/5]).
 -export([child_spec/6]).
 -export([accept_ack/1]).
 -export([remove_connection/1]).
+-export([get_status/1]).
 -export([get_addr/1]).
 -export([get_port/1]).
 -export([get_max_connections/1]).
@@ -110,6 +114,40 @@ stop_listener(Ref) ->
 			{error, Reason}
 	end.
 
+-spec suspend_listener(ref()) -> ok | {error, term()}.
+suspend_listener(Ref) ->
+	case get_status(Ref) of
+		running ->
+			ListenerSup = ranch_server:get_listener_sup(Ref),
+			supervisor:terminate_child(ListenerSup, ranch_acceptors_sup);
+		suspended ->
+			ok
+	end.
+
+-spec resume_listener(ref()) -> ok | {error, term()}.
+resume_listener(Ref) ->
+	case get_status(Ref) of
+		running ->
+			ok;
+		suspended ->
+			ListenerSup = ranch_server:get_listener_sup(Ref),
+			case supervisor:restart_child(ListenerSup, ranch_acceptors_sup) of
+				{ok, _} ->
+					ok;
+				{error, Reason} ->
+					{error, Reason}
+			end
+	end.
+
+-spec set_listener_options(ref(), any()) -> ok | {error, running}.
+set_listener_options(Ref, TransOpts) ->
+	case get_status(Ref) of
+		suspended ->
+			ok = ranch_server:set_transport_options(Ref, TransOpts);
+		running ->
+			{error, running}
+	end.
+
 -spec child_spec(ref(), module(), any(), module(), any())
 	-> supervisor:child_spec().
 child_spec(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
@@ -136,6 +174,17 @@ remove_connection(Ref) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	ConnsSup ! {remove_connection, Ref, self()},
 	ok.
+
+-spec get_status(ref()) -> running | suspended | restarting.
+get_status(Ref) ->
+	ListenerSup = ranch_server:get_listener_sup(Ref),
+	Children = supervisor:which_children(ListenerSup),
+	case lists:keyfind(ranch_acceptors_sup, 1, Children) of
+		{_, undefined, _, _} ->
+			suspended;
+		{_, AcceptorsSup, _, _} when is_pid(AcceptorsSup) ->
+			running
+	end.
 
 -spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()}.
 get_addr(Ref) ->
@@ -168,13 +217,16 @@ info() ->
 		|| {Ref, Pid} <- ranch_server:get_listener_sups()].
 
 listener_info(Ref, Pid) ->
-	[_, NumAcceptors, Transport, TransOpts, Protocol, _] = ranch_server:get_listener_start_args(Ref),
+	[_, NumAcceptors, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
 	ConnsSup = ranch_server:get_connections_sup(Ref),
+	Status = get_status(Ref),
 	{IP, Port} = get_addr(Ref),
 	MaxConns = get_max_connections(Ref),
+	TransOpts = ranch_server:get_transport_options(Ref),
 	ProtoOpts = get_protocol_options(Ref),
 	[
 		{pid, Pid},
+		{status, Status},
 		{ip, IP},
 		{port, Port},
 		{num_acceptors, NumAcceptors},

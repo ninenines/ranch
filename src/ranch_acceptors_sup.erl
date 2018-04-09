@@ -15,16 +15,17 @@
 -module(ranch_acceptors_sup).
 -behaviour(supervisor).
 
--export([start_link/4]).
+-export([start_link/3]).
 -export([init/1]).
 
--spec start_link(ranch:ref(), non_neg_integer(), module(), any())
+-spec start_link(ranch:ref(), non_neg_integer(), module())
 	-> {ok, pid()}.
-start_link(Ref, NumAcceptors, Transport, TransOpts) ->
-	supervisor:start_link(?MODULE, [Ref, NumAcceptors, Transport, TransOpts]).
+start_link(Ref, NumAcceptors, Transport) ->
+	supervisor:start_link(?MODULE, [Ref, NumAcceptors, Transport]).
 
-init([Ref, NumAcceptors, Transport, TransOpts]) ->
+init([Ref, NumAcceptors, Transport]) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
+	TransOpts = ranch_server:get_transport_options(Ref),
 	LSocket = case proplists:get_value(socket, TransOpts) of
 		undefined ->
 			TransOpts2 = proplists:delete(ack_timeout,

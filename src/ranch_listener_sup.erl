@@ -22,7 +22,7 @@
 	-> {ok, pid()}.
 start_link(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	MaxConns = proplists:get_value(max_connections, TransOpts, 1024),
-	ranch_server:set_new_listener_opts(Ref, MaxConns, ProtoOpts,
+	ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
 		[Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts]),
 	supervisor:start_link(?MODULE, {
 		Ref, NumAcceptors, Transport, TransOpts, Protocol
@@ -38,7 +38,7 @@ init({Ref, NumAcceptors, Transport, TransOpts, Protocol}) ->
 				[Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol]},
 			permanent, infinity, supervisor, [ranch_conns_sup]},
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,
-				[Ref, NumAcceptors, Transport, TransOpts]},
+				[Ref, NumAcceptors, Transport]},
 			permanent, infinity, supervisor, [ranch_acceptors_sup]}
 	],
 	{ok, {{rest_for_one, 1, 5}, ChildSpecs}}.
