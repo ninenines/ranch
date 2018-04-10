@@ -65,7 +65,8 @@ groups() ->
 		supervisor_clean_restart,
 		supervisor_conns_alive,
 		supervisor_protocol_start_link_crash,
-		supervisor_server_recover_state
+		supervisor_server_recover_state,
+		supervisor_unexpected_message
 	]}].
 
 %% misc.
@@ -897,6 +898,28 @@ do_supervisor_server_recover_state(_) ->
 	{'EXIT', {badarg, _}} = (catch ranch_server:get_connections_sup(Name)),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces().
+
+supervisor_unexpected_message(_) ->
+	doc("Ensure the connections supervisor stays alive when it receives "
+		"an unexpected message."),
+	Name = name(),
+	{ok, ListenerPid} = ranch:start_listener(Name, ranch_tcp, [], echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	%% Send the unexpected message to ranch_conns_sup.
+	Procs = supervisor:which_children(ListenerPid),
+	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, Procs),
+	ConnsSup ! hello,
+	%% Connection is still up.
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
 
 %% Utility functions.
 
