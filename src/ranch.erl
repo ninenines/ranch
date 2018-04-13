@@ -120,6 +120,7 @@ suspend_listener(Ref) ->
 	case get_status(Ref) of
 		running ->
 			ListenerSup = ranch_server:get_listener_sup(Ref),
+			ok = ranch_server:set_addr(Ref, {undefined, undefined}),
 			supervisor:terminate_child(ListenerSup, ranch_acceptors_sup);
 		suspended ->
 			ok
