@@ -19,7 +19,6 @@
 -export([stop_listener/1]).
 -export([suspend_listener/1]).
 -export([resume_listener/1]).
--export([set_listener_options/2]).
 -export([child_spec/5]).
 -export([child_spec/6]).
 -export([accept_ack/1]).
@@ -29,6 +28,8 @@
 -export([get_port/1]).
 -export([get_max_connections/1]).
 -export([set_max_connections/2]).
+-export([get_transport_options/1]).
+-export([set_transport_options/2]).
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
 -export([info/0]).
@@ -139,15 +140,6 @@ resume_listener(Ref) ->
 			end
 	end.
 
--spec set_listener_options(ref(), any()) -> ok | {error, running}.
-set_listener_options(Ref, TransOpts) ->
-	case get_status(Ref) of
-		suspended ->
-			ok = ranch_server:set_transport_options(Ref, TransOpts);
-		running ->
-			{error, running}
-	end.
-
 -spec child_spec(ref(), module(), any(), module(), any())
 	-> supervisor:child_spec().
 child_spec(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
@@ -202,6 +194,19 @@ get_max_connections(Ref) ->
 -spec set_max_connections(ref(), max_conns()) -> ok.
 set_max_connections(Ref, MaxConnections) ->
 	ranch_server:set_max_connections(Ref, MaxConnections).
+
+-spec get_transport_options(ref()) -> any().
+get_transport_options(Ref) ->
+	ranch_server:get_transport_options(Ref).
+
+-spec set_transport_options(ref(), any()) -> ok | {error, running}.
+set_transport_options(Ref, TransOpts) ->
+	case get_status(Ref) of
+		suspended ->
+			ok = ranch_server:set_transport_options(Ref, TransOpts);
+		running ->
+			{error, running}
+	end.
 
 -spec get_protocol_options(ref()) -> any().
 get_protocol_options(Ref) ->
