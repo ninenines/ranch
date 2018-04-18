@@ -348,6 +348,10 @@ You can retrieve the current transport options by calling
 [source,erlang]
 Opts = ranch:get_transport_options(tcp_echo).
 
+If a listener crashes (this may also be due to it being unable to resume
+with the changed options), it will be restarted with the initial transport
+options given to it when it was created via `ranch:start_listener/5,6`.
+
 === Obtaining information about listeners
 
 Ranch provides two functions for retrieving information about the
