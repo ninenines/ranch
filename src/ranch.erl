@@ -133,13 +133,18 @@ resume_listener(Ref) ->
 			ok;
 		suspended ->
 			ListenerSup = ranch_server:get_listener_sup(Ref),
-			case supervisor:restart_child(ListenerSup, ranch_acceptors_sup) of
-				{ok, _} ->
-					ok;
-				{error, Reason} ->
-					{error, Reason}
-			end
+			Res=supervisor:restart_child(ListenerSup, ranch_acceptors_sup),
+			maybe_resumed(Res)
 	end.
+
+maybe_resumed(Error={error, {listen_error, _, Reason}}) ->
+	start_error(Reason, Error);
+maybe_resumed({ok, _}) ->
+	ok;
+maybe_resumed({ok, _, _}) ->
+	ok;
+maybe_resumed(Res) ->
+	Res.
 
 -spec child_spec(ref(), module(), any(), module(), any())
 	-> supervisor:child_spec().
