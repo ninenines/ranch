@@ -33,6 +33,7 @@
 -export([get_protocol_options/1]).
 -export([set_protocol_options/2]).
 -export([info/0]).
+-export([info/1]).
 -export([procs/2]).
 -export([filter_options/3]).
 -export([set_option_default/3]).
@@ -227,6 +228,11 @@ info() ->
 	[{Ref, listener_info(Ref, Pid)}
 		|| {Ref, Pid} <- ranch_server:get_listener_sups()].
 
+-spec info(ref()) -> [{atom(), any()}].
+info(Ref) ->
+	Pid = ranch_server:get_listener_sup(Ref),
+	listener_info(Ref, Pid).
+
 listener_info(Ref, Pid) ->
 	[_, NumAcceptors, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
 	ConnsSup = ranch_server:get_connections_sup(Ref),
@@ -260,7 +266,12 @@ procs1(Ref, Sup) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
 	{_, SupPid, _, _} = lists:keyfind(Sup, 1,
 		supervisor:which_children(ListenerSup)),
-	[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)].
+	try
+		[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)]
+	catch
+		exit: {noproc, _} when Sup=:=ranch_acceptors_sup ->
+			[]
+	end.
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].
