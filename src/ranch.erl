@@ -185,11 +185,11 @@ get_status(Ref) ->
 			running
 	end.
 
--spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()}.
+-spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()} | {undefined, undefined}.
 get_addr(Ref) ->
 	ranch_server:get_addr(Ref).
 
--spec get_port(ref()) -> inet:port_number().
+-spec get_port(ref()) -> inet:port_number() | undefined.
 get_port(Ref) ->
 	{_, Port} = get_addr(Ref),
 	Port.
