@@ -114,6 +114,19 @@ ProtoOpts = any():: Current protocol options.
 
 Return the protocol options set for the given listener.
 
+=== get_status(Ref) -> running | suspended
+
+Ref = ref():: Listener name.
+
+Return the status of the given listener.
+
+=== get_transport_options(Ref) -> ProtoOpts
+
+Ref = ref():: Listener name.
+TransOpts = any():: Current transport options.
+
+Return the transport options set for the given listener.
+
 === info() -> [{Ref, [{Key, Value}]}]
 
 Ref = ref():: Listener name.
@@ -155,6 +168,16 @@ without sacrificing the latency of the system.
 
 This function may only be called from a connection process.
 
+=== resume_listener(Ref) -> ok
+
+Ref = ref():: Listener name.
+
+Resume the given listener if it is suspended.
+If the listener is already running, nothing will happen.
+
+The listener will be started with the transport options
+currently set for it.
+
 === set_max_connections(Ref, MaxConns) -> ok
 
 Ref = ref():: Listener name.
@@ -175,6 +198,18 @@ Set the protocol options for the given listener.
 
 The change will be applied immediately for all new connections.
 Old connections will not receive the new options.
+
+=== set_transport_options(Ref, TransOpts) -> ok | {error, running}
+
+Ref = ref():: Listener name.
+ProtoOpts = any():: New transport options.
+
+Set the transport options for the given listener.
+
+The listener must be suspended for this call to succeed.
+If the listener is running, `{error, running}` will be returned.
+
+The change will take effect when the listener is being resumed.
 
 === start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> {ok, pid()} | {error, badarg}
 
@@ -207,3 +242,14 @@ connection processes or give them some time to stop properly.
 
 This function does not return until the listener is
 completely stopped.
+
+=== suspend_listener(Ref) -> ok
+
+Ref = ref():: Listener name.
+
+Suspend the given listener if it is running.
+If the listener is already suspended, nothing will happen.
+
+The listener will stop listening and accepting connections by
+closing the listening port, but will not stop running connection
+processes.
