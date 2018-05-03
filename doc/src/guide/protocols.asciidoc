@@ -59,30 +59,30 @@ loop(Socket, Transport) ->
 	end.
 ----
 
-=== Using gen_server
+=== Using gen_statem
 
-Special processes like the ones that use the `gen_server` or `gen_fsm`
+Special processes like the ones that use the `gen_statem` or `gen_server`
 behaviours have the particularity of having their `start_link` call not
 return until the `init` function returns. This is problematic, because
 you won't be able to call `ranch:accept_ack/1` from the `init` callback
 as this would cause a deadlock to happen.
 
-Use the `gen_server:enter_loop/3` function. It allows you to start your process
+Use the `gen_statem:enter_loop/3` function. It allows you to start your process
 normally (although it must be started with `proc_lib` like all special
 processes), then perform any needed operations before falling back into
-the normal `gen_server` execution loop.
+the normal `gen_statem` execution loop.
 
-.Use a gen_server for protocol handling
+.Use a gen_statem for protocol handling
 
 [source,erlang]
 ----
 -module(my_protocol).
--behaviour(gen_server).
+-behaviour(gen_statem).
 -behaviour(ranch_protocol).
 
 -export([start_link/4]).
 -export([init/1]).
-%% Exports of other gen_server callbacks here.
+%% Exports of other gen_statem callbacks here.
 
 start_link(Ref, Socket, Transport, Opts) ->
 	{ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Socket, Transport, Opts}])}.
@@ -91,9 +91,9 @@ init({Ref, Socket, Transport, _Opts = []}) ->
 	%% Perform any required state initialization here.
 	ok = ranch:accept_ack(Ref),
 	ok = Transport:setopts(Socket, [{active, once}]),
-	gen_server:enter_loop(?MODULE, [], {state, Socket, Transport}).
+	gen_statem:enter_loop(?MODULE, [], state_name, {state_data, Socket, Transport}).
 
-%% Other gen_server callbacks here.
+%% Other gen_statem callbacks here.
 ----
 
 Check the `tcp_reverse` example for a complete example.
