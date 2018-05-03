@@ -30,7 +30,6 @@ opt() = {ack_timeout, timeout()}
 	| {max_connections, max_conns()}
 	| {num_acceptors, pos_integer()}
 	| {shutdown, timeout() | brutal_kill}
-	| {socket, any()}
 ----
 
 Ranch-specific transport options.
@@ -56,8 +55,6 @@ num_acceptors (10)::
 	Number of processes that accept connections.
 shutdown (5000)::
 	Maximum allowed time for children to stop on listener shutdown.
-socket::
-	Listening socket opened externally to be used instead of calling `Transport:listen/1`.
 
 == Exports
 

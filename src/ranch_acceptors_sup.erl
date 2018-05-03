@@ -26,20 +26,14 @@ start_link(Ref, NumAcceptors, Transport) ->
 init([Ref, NumAcceptors, Transport]) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	TransOpts = ranch_server:get_transport_options(Ref),
-	LSocket = case proplists:get_value(socket, TransOpts) of
-		undefined ->
-			TransOpts2 = proplists:delete(ack_timeout,
-				proplists:delete(connection_type,
-				proplists:delete(max_connections,
-				proplists:delete(num_acceptors,
-				proplists:delete(shutdown,
-				proplists:delete(socket, TransOpts)))))),
-			case Transport:listen(TransOpts2) of
-				{ok, Socket} -> Socket;
-				{error, Reason} -> listen_error(Ref, Transport, TransOpts2, Reason)
-			end;
-		Socket ->
-			Socket
+	TransOpts2 = proplists:delete(ack_timeout,
+		proplists:delete(connection_type,
+		proplists:delete(max_connections,
+		proplists:delete(num_acceptors,
+		proplists:delete(shutdown, TransOpts))))),
+	LSocket = case Transport:listen(TransOpts2) of
+		{ok, Socket} -> Socket;
+		{error, Reason} -> listen_error(Ref, Transport, TransOpts2, Reason)
 	end,
 	{ok, Addr} = Transport:sockname(LSocket),
 	ranch_server:set_addr(Ref, Addr),
