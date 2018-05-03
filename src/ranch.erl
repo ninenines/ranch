@@ -56,8 +56,7 @@
 	| {connection_type, worker | supervisor}
 	| {max_connections, max_conns()}
 	| {num_acceptors, pos_integer()}
-	| {shutdown, timeout() | brutal_kill}
-	| {socket, any()}.
+	| {shutdown, timeout() | brutal_kill}.
 -export_type([opt/0]).
 
 -type opts() :: any() | #{
@@ -67,7 +66,6 @@
 	logger => module(),
 	num_acceptors => pos_integer(),
 	shutdown => timeout() | brutal_kill,
-	socket => any(),
 	socket_opts => any()
 }.
 -export_type([opts/0]).
@@ -85,24 +83,8 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 		false ->
 			{error, badarg};
 		true ->
-			Res = supervisor:start_child(ranch_sup, child_spec(Ref,
-					Transport, TransOpts, Protocol, ProtoOpts)),
-			Socket = maps:get(socket, TransOpts, undefined),
-			case Res of
-				{ok, Pid} when Socket =/= undefined ->
-					%% Give ownership of the socket to ranch_acceptors_sup
-					%% to make sure the socket stays open as long as the
-					%% listener is alive. If the socket closes however there
-					%% will be no way to recover because we don't know how
-					%% to open it again.
-					Children = supervisor:which_children(Pid),
-					{_, AcceptorsSup, _, _}
-						= lists:keyfind(ranch_acceptors_sup, 1, Children),
-					Transport:controlling_process(Socket, AcceptorsSup);
-				_ ->
-					ok
-			end,
-			maybe_started(Res)
+			maybe_started(supervisor:start_child(ranch_sup, child_spec(Ref,
+					Transport, TransOpts, Protocol, ProtoOpts)))
 	end.
 
 -spec start_listener(ref(), non_neg_integer(), module(), opts(), module(), any())
@@ -131,7 +113,7 @@ normalize_opts(List0) when is_list(List0) ->
 			false ->
 				{Map2, List2}
 		end
-	end, {Map1, List1}, [connection_type, max_connections, num_acceptors, shutdown, socket]),
+	end, {Map1, List1}, [connection_type, max_connections, num_acceptors, shutdown]),
 	if
 		Map =:= #{} ->
 			ok;

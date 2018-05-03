@@ -28,7 +28,6 @@ all() ->
 
 groups() ->
 	[{tcp, [
-		tcp_accept_socket,
 		tcp_active_echo,
 		tcp_echo,
 		tcp_graceful,
@@ -47,7 +46,6 @@ groups() ->
 		tcp_error_eacces
 	]}, {ssl, [
 		ssl_accept_error,
-		ssl_accept_socket,
 		ssl_active_echo,
 		ssl_echo,
 		ssl_graceful,
@@ -399,24 +397,6 @@ ssl_accept_error(_) ->
 	true = is_process_alive(AcceptorPid),
 	ok = ranch:stop_listener(Name).
 
-ssl_accept_socket(_) ->
-	doc("Ensure that listener can use an externally opened SSL listen socket."),
-	Name = name(),
-	Opts = ct_helper:get_certs_from_ets(),
-	{ok, S} = ssl:listen(0, [binary, {active, false}, {packet, raw}, {reuseaddr, true}|Opts]),
-	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, #{socket => S},
-		echo_protocol, []),
-	Port = ranch:get_port(Name),
-	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
-	ok = ssl:send(Socket, <<"TCP Ranch is working!">>),
-	{ok, <<"TCP Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
-	ok = ranch:stop_listener(Name),
-	{error, closed} = ssl:recv(Socket, 0, 1000),
-	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
-	ok.
-
 ssl_active_echo(_) ->
 	doc("Ensure that active mode works with SSL transport."),
 	Name = name(),
@@ -655,23 +635,6 @@ ssl_error_eacces(_) ->
 	end.
 
 %% tcp.
-
-tcp_accept_socket(_) ->
-	doc("Ensure that listener can use an externally opened TCP listen socket."),
-	Name = name(),
-	{ok, S} = gen_tcp:listen(0, [binary, {active, false}, {packet, raw}, {reuseaddr, true}]),
-	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{socket => S},
-		echo_protocol, []),
-	Port = ranch:get_port(Name),
-	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
-	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
-	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
-	ok = ranch:stop_listener(Name),
-	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
-	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
-	ok.
 
 tcp_active_echo(_) ->
 	doc("Ensure that active mode works with TCP transport."),

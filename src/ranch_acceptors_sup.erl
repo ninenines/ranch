@@ -28,23 +28,18 @@ init([Ref, Transport]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	Logger = maps:get(logger, TransOpts, error_logger),
-	LSocket = case maps:get(socket, TransOpts, undefined) of
-		undefined ->
-			SocketOpts = maps:get(socket_opts, TransOpts, []),
-			%% We temporarily put the logger in the process dictionary
-			%% so that it can be used from ranch:filter_options. The
-			%% interface as it currently is does not allow passing it
-			%% down otherwise.
-			put(logger, Logger),
-			case Transport:listen(SocketOpts) of
-				{ok, Socket} ->
-					erase(logger),
-					Socket;
-				{error, Reason} ->
-					listen_error(Ref, Transport, SocketOpts, Reason, Logger)
-			end;
-		Socket ->
-			Socket
+	SocketOpts = maps:get(socket_opts, TransOpts, []),
+	%% We temporarily put the logger in the process dictionary
+	%% so that it can be used from ranch:filter_options. The
+	%% interface as it currently is does not allow passing it
+	%% down otherwise.
+	put(logger, Logger),
+	LSocket = case Transport:listen(SocketOpts) of
+		{ok, Socket} ->
+			erase(logger),
+			Socket;
+		{error, Reason} ->
+			listen_error(Ref, Transport, SocketOpts, Reason, Logger)
 	end,
 	{ok, Addr} = Transport:sockname(LSocket),
 	ranch_server:set_addr(Ref, Addr),
