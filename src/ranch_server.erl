@@ -156,10 +156,10 @@ init([]) ->
 	{ok, #state{monitors=ConnMonitors++ListenerMonitors}}.
 
 handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}, _, State) ->
-	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),
-	ets:insert(?TAB, {{trans_opts, Ref}, TransOpts}),
-	ets:insert(?TAB, {{proto_opts, Ref}, ProtoOpts}),
-	ets:insert(?TAB, {{listener_start_args, Ref}, StartArgs}),
+	ets:insert_new(?TAB, {{max_conns, Ref}, MaxConns}),
+	ets:insert_new(?TAB, {{trans_opts, Ref}, TransOpts}),
+	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
+	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
 	{reply, ok, State};
 handle_call({set_connections_sup, Ref, Pid}, _,
 		State=#state{monitors=Monitors}) ->

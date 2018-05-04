@@ -18,7 +18,7 @@
 -module(ranch_conns_sup).
 
 %% API.
--export([start_link/6]).
+-export([start_link/3]).
 -export([start_protocol/2]).
 -export([active_connections/1]).
 
@@ -45,9 +45,12 @@
 
 %% API.
 
--spec start_link(ranch:ref(), conn_type(), shutdown(), module(),
-	timeout(), module()) -> {ok, pid()}.
-start_link(Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol) ->
+-spec start_link(ranch:ref(), module(), module()) -> {ok, pid()}.
+start_link(Ref, Transport, Protocol) ->
+	TransOpts = ranch_server:get_transport_options(Ref),
+	ConnType = proplists:get_value(connection_type, TransOpts, worker),
+	Shutdown = proplists:get_value(shutdown, TransOpts, 5000),
+	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
 	proc_lib:start_link(?MODULE, init,
 		[self(), Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol]).
 
