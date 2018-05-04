@@ -25,17 +25,14 @@ start_link(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
 	ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
 		[Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts]),
 	supervisor:start_link(?MODULE, {
-		Ref, NumAcceptors, Transport, TransOpts, Protocol
+		Ref, NumAcceptors, Transport, Protocol
 	}).
 
-init({Ref, NumAcceptors, Transport, TransOpts, Protocol}) ->
+init({Ref, NumAcceptors, Transport, Protocol}) ->
 	ok = ranch_server:set_listener_sup(Ref, self()),
-	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
-	ConnType = proplists:get_value(connection_type, TransOpts, worker),
-	Shutdown = proplists:get_value(shutdown, TransOpts, 5000),
 	ChildSpecs = [
 		{ranch_conns_sup, {ranch_conns_sup, start_link,
-				[Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol]},
+				[Ref, Transport, Protocol]},
 			permanent, infinity, supervisor, [ranch_conns_sup]},
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,
 				[Ref, NumAcceptors, Transport]},

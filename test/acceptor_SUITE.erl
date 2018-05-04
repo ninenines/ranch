@@ -62,6 +62,7 @@ groups() ->
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
+		supervisor_changed_options_restart,
 		supervisor_clean_child_restart,
 		supervisor_clean_conns_sup_restart,
 		supervisor_clean_restart,
@@ -799,6 +800,36 @@ connection_type_supervisor_separate_from_connection(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+supervisor_changed_options_restart(_) ->
+	doc("Ensure that a listener is restarted with changed transport options."),
+	Name = name(),
+	%% Start a listener using send_timeout as option change marker.
+	{ok, ListenerSupPid1} = ranch:start_listener(Name,
+		ranch_tcp, [{send_timeout, 300000}],
+		echo_protocol, []),
+	%% Ensure send_timeout is really set to initial value.
+	{ok, [{send_timeout, 300000}]}
+		= inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
+	%% Change send_timeout option.
+	ok = ranch:suspend_listener(Name),
+	ok = ranch:set_transport_options(Name, [{send_timeout, 300001}]),
+	ok = ranch:resume_listener(Name),
+	%% Ensure send_timeout is really set to the changed value.
+	{ok, [{send_timeout, 300001}]}
+		= inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
+	%% Crash the listener_sup process, allow a short time for restart to succeed.
+	exit(ListenerSupPid1, kill),
+	timer:sleep(1000),
+	%% Obtain pid of restarted listener_sup process.
+	[ListenerSupPid2] = [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _}
+		<- supervisor:which_children(ranch_sup), Ref =:= Name],
+	%% Ensure send_timeout is still set to the changed value.
+	{ok, [{send_timeout, 300001}]}
+		= inet:getopts(do_get_listener_socket(ListenerSupPid2), [send_timeout]),
+	ok = ranch:stop_listener(Name),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
 supervisor_clean_child_restart(Config) ->
 	case code:is_module_native(?MODULE) of
 		true -> doc("This test uses tracing and is not compatible with native code.");
@@ -1034,3 +1065,10 @@ clean_traces() ->
 	after 0 ->
 		ok
 	end.
+
+do_get_listener_socket(ListenerSupPid) ->
+	[AcceptorsSupPid] = [Pid || {ranch_acceptors_sup, Pid, supervisor, _}
+		<- supervisor:which_children(ListenerSupPid)],
+	{links, Links} = erlang:process_info(AcceptorsSupPid, links),
+	[LSocket] = [P || P <- Links, is_port(P)],
+	LSocket.
