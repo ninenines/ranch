@@ -162,20 +162,22 @@ solutions is however out of the scope of this guide.
 
 === Accepting connections on an existing socket
 
-If you want to accept connections on an existing socket, you can use the
-`socket` transport option, which should just be the relevant data returned
-from the connect function for the transport or the underlying socket library
-(`gen_tcp:connect`, `ssl:connect`). The accept function will then be
-called on the passed in socket. You should connect the socket in
-`{active, false}` mode, as well.
+If you want to accept connections on an existing socket, you can write
+a custom `ranch_transport` implementation that fetches or otherwise
+acquires a listening socket in the `listen/1` callback and returns it
+in the form of `{ok, ListenSocket}`.
 
-Note, however, that because of a bug in SSL, you cannot change ownership of an
-SSL listen socket prior to R16. Ranch will catch the error thrown, but the
-owner of the SSL socket will remain as whatever process created the socket.
-However, this will not affect accept behaviour unless the owner process dies,
-in which case the socket is closed. Therefore, to use this feature with SSL
-with an erlang release prior to R16, ensure that the SSL socket is opened in a
-persistant process.
+The custom `listen/1` function must ensure that the listener process
+(usually the process calling it) is also made the controlling process
+of the socket it returns. Failing to do so will result in stop/start
+and suspend/resume not working properly for that listener.
+
+While it might be tempting to pass in an existing socket to your
+custom transport by way of the transport options, thereby mimicking
+a deprecated ranch behavior, this is considered dangerous and was removed
+for that very reason. In general, it should be ensured that the socket
+to be returned from a custom `listen/1` function really is a listening
+socket and that it is operational.
 
 === Limiting the number of concurrent connections
 
