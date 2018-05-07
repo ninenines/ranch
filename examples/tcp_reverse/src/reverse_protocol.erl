@@ -1,19 +1,18 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 -module(reverse_protocol).
--behaviour(gen_server).
+-behaviour(gen_statem).
 -behaviour(ranch_protocol).
 
 %% API.
 -export([start_link/4]).
 
-%% gen_server.
+%% gen_statem.
+-export([callback_mode/0]).
 -export([init/1]).
--export([handle_call/3]).
--export([handle_cast/2]).
--export([handle_info/2]).
--export([terminate/2]).
--export([code_change/3]).
+-export([connected/3]).
+-export([terminate/3]).
+-export([code_change/4]).
 
 -define(TIMEOUT, 5000).
 
@@ -24,45 +23,49 @@
 start_link(Ref, Socket, Transport, Opts) ->
 	{ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Socket, Transport, Opts}])}.
 
-%% gen_server.
+%% gen_statem.
 
-%% This function is never called. We only define it so that
-%% we can use the -behaviour(gen_server) attribute.
-%init([]) -> {ok, undefined}.
+callback_mode() ->
+	state_functions.
 
 init({Ref, Socket, Transport, _Opts = []}) ->
 	ok = ranch:accept_ack(Ref),
-	ok = Transport:setopts(Socket, [{active, once}]),
-	gen_server:enter_loop(?MODULE, [],
+	ok = Transport:setopts(Socket, [{active, once}, {packet, line}]),
+	gen_statem:enter_loop(?MODULE, [], connected,
 		#state{socket=Socket, transport=Transport},
-		?TIMEOUT).
+		[?TIMEOUT]).
 
-handle_info({tcp, Socket, Data}, State=#state{
+connected(info, {tcp, Socket, Data}, _StateData=#state{
 		socket=Socket, transport=Transport})
-		when byte_size(Data) > 1 ->
+  		when byte_size(Data) > 1 ->
 	Transport:setopts(Socket, [{active, once}]),
 	Transport:send(Socket, reverse_binary(Data)),
-	{noreply, State, ?TIMEOUT};
-handle_info({tcp_closed, _Socket}, State) ->
-	{stop, normal, State};
-handle_info({tcp_error, _, Reason}, State) ->
-	{stop, Reason, State};
-handle_info(timeout, State) ->
-	{stop, normal, State};
-handle_info(_Info, State) ->
-	{stop, normal, State}.
+	{keep_state_and_data, ?TIMEOUT};
+connected(info, {tcp_closed, _Socket}, _StateData) ->
+	{stop, normal};
+connected(info, {tcp_error, _, Reason}, _StateData) ->
+	{stop, Reason};
+connected({call, From}, _Request, _StateData) ->
+	gen_statem:reply(From, ok),
+	keep_state_and_data;
+connected(cast, _Msg, _StateData) ->
+	keep_state_and_data;
+connected(timeout, _Msg, _StateData) ->
+	{stop, normal};
+connected(_EventType, _Msg, _StateData) ->
+	{stop, normal}.
 
-handle_call(_Request, _From, State) ->
-	{reply, ok, State}.
-
-handle_cast(_Msg, State) ->
-	{noreply, State}.
-
-terminate(_Reason, _State) ->
+terminate(Reason, StateName, StateData=#state{
+		socket=Socket, transport=Transport})
+  		when Socket=/=undefined andalso Transport=/=undefined ->
+	catch Transport:close(Socket),
+	terminate(Reason, StateName,
+		StateData#state{socket=undefined, transport=undefined});
+terminate(_Reason, _StateName, _StateData) ->
 	ok.
 
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
+code_change(_OldVsn, StateName, StateData, _Extra) ->
+	{ok, StateName, StateData}.
 
 %% Internal.
 
