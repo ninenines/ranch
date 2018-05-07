@@ -45,15 +45,15 @@ connected(info, {tcp_closed, _Socket}, _StateData) ->
 	{stop, normal};
 connected(info, {tcp_error, _, Reason}, _StateData) ->
 	{stop, Reason};
-connected(info, timeout, _StateData) ->
-	{stop, normal};
-connected(info, _Info, _StateData) ->
-	{stop, normal};
 connected({call, From}, _Request, _StateData) ->
 	gen_statem:reply(From, ok),
 	keep_state_and_data;
 connected(cast, _Msg, _StateData) ->
-	keep_state_and_data.
+	keep_state_and_data;
+connected(timeout, _Msg, _StateData) ->
+	{stop, normal};
+connected(_EventType, _Msg, _StateData) ->
+	{stop, normal}.
 
 terminate(Reason, StateName, StateData=#state{
 		socket=Socket, transport=Transport})
