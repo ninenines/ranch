@@ -34,7 +34,6 @@ groups() ->
 		tcp_max_connections_and_beyond,
 		tcp_max_connections_infinity,
 		tcp_remove_connections,
-		tcp_restart_listener_with_changed_options,
 		tcp_set_max_connections,
 		tcp_set_max_connections_clean,
 		tcp_getopts_capability,
@@ -68,6 +67,7 @@ groups() ->
 		supervisor_clean_restart,
 		supervisor_conns_alive,
 		supervisor_protocol_start_link_crash,
+		supervisor_changed_options_restart,
 		supervisor_server_recover_state,
 		supervisor_unexpected_message
 	]}].
@@ -564,30 +564,6 @@ tcp_graceful(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_restart_listener_with_changed_options(_) ->
-	doc("Ensure that a listener is restarted with changed transport options."),
-	Name = name(),
-	%% Start a listener using send_timeout as option change marker.
-	{ok, ListenerSupPid1} = ranch:start_listener(Name, ranch_tcp, [{send_timeout, 300000}], echo_protocol, []),
-	%% Ensure send_timeout is really set to initial value.
-	{ok, [{send_timeout, 300000}]} = inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
-	%% Change send_timeout option.
-	ranch:suspend_listener(Name),
-	ranch:set_transport_options(Name, [{send_timeout, 300001}]),
-	ranch:resume_listener(Name),
-	%% Ensure send_timeout is really set to the changed value.
-	{ok, [{send_timeout, 300001}]} = inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
-	%% Crash the listener_sup process, allow a short time for restart to succeed.
-	exit(ListenerSupPid1, kill),
-	timer:sleep(1000),
-	%% Obtain pid of restarted listener_sup process.
-	[ListenerSupPid2] = [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _} <- supervisor:which_children(ranch_sup), Ref=:=Name],
-	%% Ensure send_timeout is still set to the changed value.
-	{ok, [{send_timeout, 300001}]} = inet:getopts(do_get_listener_socket(ListenerSupPid2), [send_timeout]),
-	ok = ranch:stop_listener(Name),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
-	ok.
-
 do_get_listener_socket(ListenerSupPid) ->
 	[AcceptorsSupPid] = [Pid || {ranch_acceptors_sup, Pid, supervisor, _} <- supervisor:which_children(ListenerSupPid)],
 	{links, Links} = erlang:process_info(AcceptorsSupPid, links),
@@ -980,6 +956,30 @@ supervisor_protocol_start_link_crash(_) ->
 	receive after 500 -> ok end,
 	ConnsSup = ranch_server:get_connections_sup(Name),
 	ok = ranch:stop_listener(Name).
+
+supervisor_changed_options_restart(_) ->
+	doc("Ensure that a listener is restarted with changed transport options."),
+	Name = name(),
+	%% Start a listener using send_timeout as option change marker.
+	{ok, ListenerSupPid1} = ranch:start_listener(Name, ranch_tcp, [{send_timeout, 300000}], echo_protocol, []),
+	%% Ensure send_timeout is really set to initial value.
+	{ok, [{send_timeout, 300000}]} = inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
+	%% Change send_timeout option.
+	ranch:suspend_listener(Name),
+	ranch:set_transport_options(Name, [{send_timeout, 300001}]),
+	ranch:resume_listener(Name),
+	%% Ensure send_timeout is really set to the changed value.
+	{ok, [{send_timeout, 300001}]} = inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
+	%% Crash the listener_sup process, allow a short time for restart to succeed.
+	exit(ListenerSupPid1, kill),
+	timer:sleep(1000),
+	%% Obtain pid of restarted listener_sup process.
+	[ListenerSupPid2] = [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _} <- supervisor:which_children(ranch_sup), Ref=:=Name],
+	%% Ensure send_timeout is still set to the changed value.
+	{ok, [{send_timeout, 300001}]} = inet:getopts(do_get_listener_socket(ListenerSupPid2), [send_timeout]),
+	ok = ranch:stop_listener(Name),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
 
 supervisor_server_recover_state(Config) ->
 	case code:is_module_native(?MODULE) of
