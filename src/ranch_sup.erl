@@ -23,10 +23,18 @@ start_link() ->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
+	Intensity = case application:get_env(ranch_sup_intensity) of
+		{ok, Value1} -> Value1;
+		undefined -> 1
+	end,
+	Period = case application:get_env(ranch_sup_period) of
+		{ok, Value2} -> Value2;
+		undefined -> 5
+	end,
 	ranch_server = ets:new(ranch_server, [
 		ordered_set, public, named_table]),
 	Procs = [
 		{ranch_server, {ranch_server, start_link, []},
 			permanent, 5000, worker, [ranch_server]}
 	],
-	{ok, {{one_for_one, 1, 5}, Procs}}.
+	{ok, {{one_for_one, Intensity, Period}, Procs}}.
