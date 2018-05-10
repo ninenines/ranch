@@ -120,7 +120,7 @@ Ref = ref():: Listener name.
 
 Return the status of the given listener.
 
-=== get_transport_options(Ref) -> ProtoOpts
+=== get_transport_options(Ref) -> TransOpts
 
 Ref = ref():: Listener name.
 TransOpts = any():: Current transport options.
@@ -138,6 +138,7 @@ Return detailed information about all Ranch listeners.
 The following keys are defined:
 
 pid:: Pid of the listener's top-level supervisor.
+status:: Listener status, either running or suspended.
 ip:: Interface Ranch listens on.
 port:: Port number Ranch listens on.
 num_acceptors:: Number of acceptor processes.
@@ -148,6 +149,16 @@ transport:: Transport module.
 transport_options:: Transport options.
 protocol:: Protocol module.
 protocol_options:: Protocol options.
+
+=== info(Ref) -> [{Key, Value}]
+
+Ref = ref():: Listener name.
+Key = atom():: Information key.
+Value = any():: Information value.
+
+Return detailed information about a specific Ranch listener.
+
+See `info/0` for a description of the defined keys.
 
 === procs(Ref, acceptors | connections) -> [pid()]
 
@@ -253,3 +264,12 @@ If the listener is already suspended, nothing will happen.
 The listener will stop listening and accepting connections by
 closing the listening port, but will not stop running connection
 processes.
+
+=== wait_for_connections(Ref, Operator, NumConnections) -> ok
+
+Ref = ref():: Listener name.
+Operator = '>' | '>=' | '==' | '=<' | '<':: Comparison operator.
+NumConnections = non_neg_integer():: Number of connections to wait for.
+
+Wait until the number of connections on the given listener matches
+the given operator and number of connections.

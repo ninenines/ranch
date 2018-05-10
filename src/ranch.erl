@@ -35,6 +35,8 @@
 -export([info/0]).
 -export([info/1]).
 -export([procs/2]).
+-export([wait_for_connections/3]).
+-export([wait_for_connections/4]).
 -export([filter_options/3]).
 -export([set_option_default/3]).
 -export([require/1]).
@@ -270,6 +272,51 @@ procs1(Ref, Sup) ->
 		[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)]
 	catch exit:{noproc, _} when Sup =:= ranch_acceptors_sup ->
 		[]
+	end.
+
+-spec wait_for_connections
+	(ref(), '>' | '>=' | '==' | '=<', non_neg_integer()) -> ok;
+	(ref(), '<', pos_integer()) -> ok.
+wait_for_connections(Ref, Op, NumConns) ->
+	wait_for_connections(Ref, Op, NumConns, 1000).
+
+-spec wait_for_connections
+	(ref(), '>' | '>=' | '==' | '=<', non_neg_integer(), non_neg_integer()) -> ok;
+	(ref(), '<', pos_integer(), non_neg_integer()) -> ok.
+wait_for_connections(Ref, Op, NumConns, Interval) ->
+	validate_op(Op, NumConns),
+	validate_num_conns(NumConns),
+	validate_interval(Interval),
+	wait_for_connections_loop(Ref, Op, NumConns, Interval).
+
+validate_op('>', _) -> ok;
+validate_op('>=', _) -> ok;
+validate_op('==', _) -> ok;
+validate_op('=<', _) -> ok;
+validate_op('<', NumConns) when NumConns > 0 -> ok;
+validate_op(_, _) -> error(badarg).
+
+validate_num_conns(NumConns) when is_integer(NumConns), NumConns >= 0 -> ok;
+validate_num_conns(_) -> error(badarg).
+
+validate_interval(Interval) when is_integer(Interval), Interval >= 0 -> ok;
+validate_interval(_) -> error(badarg).
+
+wait_for_connections_loop(Ref, Op, NumConns, Interval) ->
+	CurConns = try
+		ConnsSup = ranch_server:get_connections_sup(Ref),
+		proplists:get_value(active, supervisor:count_children(ConnsSup))
+	catch _:_ ->
+		0
+	end,
+	case erlang:Op(CurConns, NumConns) of
+		true ->
+			ok;
+		false when Interval > 0 ->
+			wait_for_connections_loop(Ref, Op, NumConns, Interval);
+		false ->
+			timer:sleep(Interval),
+			wait_for_connections_loop(Ref, Op, NumConns, Interval)
 	end.
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
