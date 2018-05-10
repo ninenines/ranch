@@ -35,6 +35,8 @@
 -export([info/0]).
 -export([info/1]).
 -export([procs/2]).
+-export([wait_for_connections/3]).
+-export([wait_for_connections/4]).
 -export([filter_options/3]).
 -export([set_option_default/3]).
 -export([require/1]).
@@ -271,6 +273,37 @@ procs1(Ref, Sup) ->
 	catch exit:{noproc, _} when Sup =:= ranch_acceptors_sup ->
 		[]
 	end.
+
+-spec wait_for_connections(ref(), '>' | '>=' | '==' | '=<' | '<', non_neg_integer()) -> ok.
+wait_for_connections(Ref, Op, NumConns) ->
+	wait_for_connections(Ref, Op, NumConns, 1000).
+
+-spec wait_for_connections(ref(), '>' | '>=' | '==' | '=<' | '<', non_neg_integer(),
+	non_neg_integer()) -> ok.
+wait_for_connections(Ref, Op, NumConns, Interval) ->
+	CurConns = try
+		ConnsSup = ranch_server:get_connections_sup(Ref),
+		proplists:get_value(active, supervisor:count_children(ConnsSup))
+	catch
+		error:badarg ->
+			0;
+		exit:{noproc, _} ->
+			0
+	end,
+	wait_for_connections1(Ref, Op, CurConns, NumConns, Interval).
+
+wait_for_connections1(_Ref, Op, CurConns, NumConns, _Interval)
+	when Op=:='>' andalso CurConns>NumConns
+	orelse Op=:='>=' andalso CurConns>=NumConns
+	orelse Op=:='==' andalso CurConns==NumConns
+	orelse Op=:='=<' andalso CurConns=<NumConns
+	orelse Op=:='<' andalso CurConns<NumConns ->
+	ok;
+wait_for_connections1(Ref, Op, _CurConns, NumConns, 0) ->
+	wait_for_connections(Ref, Op, NumConns, 0);
+wait_for_connections1(Ref, Op, _CurConns, NumConns, Interval) ->
+	timer:sleep(Interval),
+	wait_for_connections(Ref, Op, NumConns, Interval).
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].
