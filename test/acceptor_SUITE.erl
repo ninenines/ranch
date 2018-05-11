@@ -58,7 +58,8 @@ groups() ->
 		misc_bad_transport,
 		misc_bad_transport_options,
 		misc_info,
-		misc_info_embedded
+		misc_info_embedded,
+		misc_wait_for_connections
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -263,6 +264,79 @@ misc_info_embedded(_) ->
 
 do_get_listener_info(ListenerGroup) ->
 	lists:sort([L || L={{G, _}, _} <- ranch:info(), G=:=ListenerGroup]).
+
+misc_wait_for_connections(_) ->
+	doc("Ensure wait for connections works."),
+	Name = name(),
+	Self = self(),
+	%% Ensure invalid arguments are rejected.
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, 'foo', 0) end,
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '==', -1) end,
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '==', 0, -1) end,
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '<', 0) end,
+	%% Create waiters for increasing number of connections.
+	Pid1GT = do_create_waiter(Self, Name, '>', 0),
+	Pid1GE = do_create_waiter(Self, Name, '>=', 1),
+	Pid1EQ = do_create_waiter(Self, Name, '==', 1),
+	Pid2GT = do_create_waiter(Self, Name, '>', 1),
+	Pid2GE = do_create_waiter(Self, Name, '>=', 2),
+	Pid2EQ = do_create_waiter(Self, Name, '==', 2),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, [{num_acceptors, 1}],
+		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
+	Port = ranch:get_port(Name),
+	%% Create some connections, ensure that waiters respond.
+	{ok, Sock1} = gen_tcp:connect("localhost", Port, []),
+	ok = do_expect_waiter(Pid1GT),
+	ok = do_expect_waiter(Pid1GE),
+	ok = do_expect_waiter(Pid1EQ),
+	ok = do_expect_waiter(undefined),
+	{ok, Sock2} = gen_tcp:connect("localhost", Port, []),
+	ok = do_expect_waiter(Pid2GT),
+	ok = do_expect_waiter(Pid2GE),
+	ok = do_expect_waiter(Pid2EQ),
+	ok = do_expect_waiter(undefined),
+	%% Create waiters for decreasing number of connections.
+	Pid3LT = do_create_waiter(Self, Name, '<', 2),
+	Pid3LE = do_create_waiter(Self, Name, '=<', 1),
+	Pid3EQ = do_create_waiter(Self, Name, '==', 1),
+	Pid4LT = do_create_waiter(Self, Name, '<', 1),
+	Pid4LE = do_create_waiter(Self, Name, '=<', 0),
+	Pid4EQ = do_create_waiter(Self, Name, '==', 0),
+	%% Close connections, ensure that waiters respond.
+	ok = gen_tcp:close(Sock1),
+	ok = do_expect_waiter(Pid3LT),
+	ok = do_expect_waiter(Pid3LE),
+	ok = do_expect_waiter(Pid3EQ),
+	ok = do_expect_waiter(undefined),
+	ok = gen_tcp:close(Sock2),
+	ok = do_expect_waiter(Pid4LT),
+	ok = do_expect_waiter(Pid4LE),
+	ok = do_expect_waiter(Pid4EQ),
+	ok = do_expect_waiter(undefined),
+	ok = ranch:stop_listener(Name),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+do_create_waiter(ReplyTo, Ref, Op, NumConns) ->
+	spawn(fun () -> ok = ranch:wait_for_connections(Ref, Op, NumConns, 100),
+		ReplyTo ! {wait_connections, self()} end).
+
+do_expect_waiter(WaiterPid) ->
+	receive
+		{wait_connections, _} when WaiterPid=:=undefined ->
+			error;
+		{wait_connections, Pid} when Pid=:=WaiterPid ->
+			ok
+	after 1000 ->
+			case WaiterPid of
+				undefined ->
+					ok;
+				_ ->
+					timeout
+			end
+	end.
 
 %% ssl.
 
