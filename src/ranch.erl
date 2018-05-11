@@ -283,6 +283,35 @@ wait_for_connections(Ref, Op, NumConns) ->
 	non_neg_integer()) -> ok;
 	(ref(), '<', pos_integer(), non_neg_integer()) -> ok.
 wait_for_connections(Ref, Op, NumConns, Interval) ->
+	if
+		is_integer(Interval) andalso Interval>=0 ->
+			ok;
+		true ->
+			error(badarg)
+	end,
+	if
+		is_integer(NumConns) andalso NumConns>=0 ->
+			ok;
+		true ->
+			error(badarg)
+	end,
+	case Op of
+		'>' ->
+			ok;
+		'>=' ->
+			ok;
+		'==' ->
+			ok;
+		'=<' ->
+			ok;
+		'<' when NumConns>=1 ->
+			ok;
+		_ ->
+			error(badarg)
+	end,
+	wait_for_connections1(Ref, Op, NumConns, Interval).
+
+wait_for_connections1(Ref, Op, NumConns, Interval) ->
 	CurConns = try
 		ConnsSup = ranch_server:get_connections_sup(Ref),
 		proplists:get_value(active, supervisor:count_children(ConnsSup))
@@ -292,28 +321,15 @@ wait_for_connections(Ref, Op, NumConns, Interval) ->
 		exit:{noproc, _} ->
 			0
 	end,
-	wait_for_connections1(Ref, Op, CurConns, NumConns, Interval).
-
-wait_for_connections1(_Ref, '>', CurConns, NumConns, _Interval)
-		when CurConns>NumConns ->
-	ok;
-wait_for_connections1(_Ref, '>=', CurConns, NumConns, _Interval)
-		when CurConns>=NumConns ->
-	ok;
-wait_for_connections1(_Ref, '==', CurConns, NumConns, _Interval)
-		when CurConns==NumConns ->
-	ok;
-wait_for_connections1(_Ref, '=<', CurConns, NumConns, _Interval)
-		when CurConns=<NumConns ->
-	ok;
-wait_for_connections1(_Ref, '<', CurConns, NumConns, _Interval)
-		when CurConns<NumConns ->
-	ok;
-wait_for_connections1(Ref, Op, _CurConns, NumConns, 0) ->
-	wait_for_connections(Ref, Op, NumConns, 0);
-wait_for_connections1(Ref, Op, _CurConns, NumConns, Interval) ->
-	timer:sleep(Interval),
-	wait_for_connections(Ref, Op, NumConns, Interval).
+	case erlang:Op(CurConns, NumConns) of
+		true ->
+			ok;
+		false when Interval>0 ->
+			wait_for_connections1(Ref, Op, NumConns, Interval);
+		false ->
+			timer:sleep(Interval),
+			wait_for_connections1(Ref, Op, NumConns, Interval)
+	end.
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
 	[atom()], Acc) -> Acc when Acc :: [any()].

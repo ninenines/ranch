@@ -269,6 +269,11 @@ misc_wait_for_connections(_) ->
 	doc("Ensure wait for connections works."),
 	Name = name(),
 	Self = self(),
+	%% Ensure invalid arguments are rejected.
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, 'foo', 0) end,
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '==', -1) end,
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '==', 0, -1) end,
+	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '<', 0) end,
 	%% Create waiters for increasing number of connections.
 	Pid1GT = do_create_waiter(Self, Name, '>', 0),
 	Pid1GE = do_create_waiter(Self, Name, '>=', 1),
