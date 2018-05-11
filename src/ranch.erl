@@ -274,12 +274,14 @@ procs1(Ref, Sup) ->
 		[]
 	end.
 
--spec wait_for_connections(ref(), '>' | '>=' | '==' | '=<' | '<', non_neg_integer()) -> ok.
+-spec wait_for_connections(ref(), '>' | '>=' | '==' | '=<', non_neg_integer()) -> ok;
+	(ref(), '<', pos_integer()) -> ok.
 wait_for_connections(Ref, Op, NumConns) ->
 	wait_for_connections(Ref, Op, NumConns, 1000).
 
--spec wait_for_connections(ref(), '>' | '>=' | '==' | '=<' | '<', non_neg_integer(),
-	non_neg_integer()) -> ok.
+-spec wait_for_connections(ref(), '>' | '>=' | '==' | '=<', non_neg_integer(),
+	non_neg_integer()) -> ok;
+	(ref(), '<', pos_integer(), non_neg_integer()) -> ok.
 wait_for_connections(Ref, Op, NumConns, Interval) ->
 	CurConns = try
 		ConnsSup = ranch_server:get_connections_sup(Ref),
@@ -292,12 +294,20 @@ wait_for_connections(Ref, Op, NumConns, Interval) ->
 	end,
 	wait_for_connections1(Ref, Op, CurConns, NumConns, Interval).
 
-wait_for_connections1(_Ref, Op, CurConns, NumConns, _Interval)
-	when Op=:='>' andalso CurConns>NumConns
-	orelse Op=:='>=' andalso CurConns>=NumConns
-	orelse Op=:='==' andalso CurConns==NumConns
-	orelse Op=:='=<' andalso CurConns=<NumConns
-	orelse Op=:='<' andalso CurConns<NumConns ->
+wait_for_connections1(_Ref, '>', CurConns, NumConns, _Interval)
+		when CurConns>NumConns ->
+	ok;
+wait_for_connections1(_Ref, '>=', CurConns, NumConns, _Interval)
+		when CurConns>=NumConns ->
+	ok;
+wait_for_connections1(_Ref, '==', CurConns, NumConns, _Interval)
+		when CurConns==NumConns ->
+	ok;
+wait_for_connections1(_Ref, '=<', CurConns, NumConns, _Interval)
+		when CurConns=<NumConns ->
+	ok;
+wait_for_connections1(_Ref, '<', CurConns, NumConns, _Interval)
+		when CurConns<NumConns ->
 	ok;
 wait_for_connections1(Ref, Op, _CurConns, NumConns, 0) ->
 	wait_for_connections(Ref, Op, NumConns, 0);
