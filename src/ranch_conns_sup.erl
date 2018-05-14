@@ -23,7 +23,7 @@
 -export([active_connections/1]).
 
 %% Supervisor internals.
--export([init/7]).
+-export([init/4]).
 -export([system_continue/3]).
 -export([system_terminate/4]).
 -export([system_code_change/4]).
@@ -47,12 +47,8 @@
 
 -spec start_link(ranch:ref(), module(), module()) -> {ok, pid()}.
 start_link(Ref, Transport, Protocol) ->
-	TransOpts = ranch_server:get_transport_options(Ref),
-	ConnType = proplists:get_value(connection_type, TransOpts, worker),
-	Shutdown = proplists:get_value(shutdown, TransOpts, 5000),
-	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
 	proc_lib:start_link(?MODULE, init,
-		[self(), Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol]).
+		[self(), Ref, Transport, Protocol]).
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
@@ -97,17 +93,21 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), ranch:ref(), conn_type(), shutdown(),
-	module(), timeout(), module()) -> no_return().
-init(Parent, Ref, ConnType, Shutdown, Transport, AckTimeout, Protocol) ->
+-spec init(pid(), ranch:ref(),
+	module(), module()) -> no_return().
+init(Parent, Ref, Transport, Protocol) ->
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
-	Opts = ranch_server:get_protocol_options(Ref),
+	TransOpts = ranch_server:get_transport_options(Ref),
+	ConnType = proplists:get_value(connection_type, TransOpts, worker),
+	Shutdown = proplists:get_value(shutdown, TransOpts, 5000),
+	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
+	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		shutdown=Shutdown, transport=Transport, protocol=Protocol,
-		opts=Opts, ack_timeout=AckTimeout, max_conns=MaxConns}, 0, 0, []).
+		opts=ProtoOpts, ack_timeout=AckTimeout, max_conns=MaxConns}, 0, 0, []).
 
 loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
