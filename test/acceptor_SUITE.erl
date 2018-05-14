@@ -965,9 +965,9 @@ supervisor_changed_options_restart(_) ->
 	%% Ensure send_timeout is really set to initial value.
 	{ok, [{send_timeout, 300000}]} = inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
 	%% Change send_timeout option.
-	ranch:suspend_listener(Name),
-	ranch:set_transport_options(Name, [{send_timeout, 300001}]),
-	ranch:resume_listener(Name),
+	ok = ranch:suspend_listener(Name),
+	ok = ranch:set_transport_options(Name, [{send_timeout, 300001}]),
+	ok = ranch:resume_listener(Name),
 	%% Ensure send_timeout is really set to the changed value.
 	{ok, [{send_timeout, 300001}]} = inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
 	%% Crash the listener_sup process, allow a short time for restart to succeed.
