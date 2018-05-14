@@ -17,6 +17,11 @@
 -export([init/2]).
 
 init(_, _) ->
+	%% Allow a more relaxed restart intensity because
+	%% some tests will cause quick restarts of several
+	%% ranch_sup children.
+	application:set_env(ranch, ranch_sup_intensity, 10),
+	application:set_env(ranch, ranch_sup_period, 1),
 	ct_helper:start([ranch]),
 	ct_helper:make_certs_in_ets(),
 	error_logger:add_report_handler(ct_helper_error_h),
