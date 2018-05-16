@@ -14,6 +14,7 @@
 
 -module(shutdown_SUITE).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -import(ct_helper, [doc/1]).
 -import(ct_helper, [name/0]).
