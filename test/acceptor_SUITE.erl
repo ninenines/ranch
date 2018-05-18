@@ -287,7 +287,7 @@ misc_wait_for_connections(_) ->
 	Pid2EQ = do_create_waiter(Self, Name, '==', 2),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, [{num_acceptors, 1}],
-		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
+		echo_protocol, []),
 	Port = ranch:get_port(Name),
 	%% Create some connections, ensure that waiters respond.
 	{ok, Sock1} = gen_tcp:connect("localhost", Port, []),
