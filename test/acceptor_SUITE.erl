@@ -52,6 +52,7 @@ groups() ->
 		ssl_graceful,
 		ssl_sni_echo,
 		ssl_sni_fail,
+		ssl_upgrade_from_tcp,
 		ssl_getopts_capability,
 		ssl_getstat_capability,
 		ssl_error_eaddrinuse,
@@ -448,6 +449,24 @@ do_ssl_sni_fail() ->
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_upgrade_from_tcp(_) ->
+	doc("Ensure a TCP socket can be upgraded to SSL"),
+	Name=name(),
+	{ok, _}=ranch:start_listener(Name, ranch_tcp, [], ssl_upgrade_protocol, []),
+	Port=ranch:get_port(Name),
+	{ok, Socket}=gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok=gen_tcp:send(Socket, <<"ECHO Before upgrading to SSL">>),
+	{ok, <<"Before upgrading to SSL">>}=gen_tcp:recv(Socket, 23, 1000),
+	ok=gen_tcp:send(Socket, <<"UPGRADE">>),
+	{ok, <<"READY">>}=gen_tcp:recv(Socket, 5, 1000),
+	{ok, SslSocket}=ssl:connect(Socket, [{verify, verify_none}], 5000),
+	ok=ssl:send(SslSocket, <<"ECHO After upgrading to SSL">>),
+	{ok, <<"After upgrading to SSL">>}=ssl:recv(SslSocket, 22, 1000),
+	ok=ranch:stop_listener(Name),
+	{error, closed}=ssl:recv(SslSocket, 0, 1000),
+	{'EXIT', _}=begin catch ranch:get_port(Name) end,
 	ok.
 
 ssl_graceful(_) ->
@@ -962,7 +981,7 @@ supervisor_clean_conns_sup_restart(_) ->
 	Server = erlang:whereis(ranch_server),
 	ServerMonRef = erlang:monitor(process, Server),
 	%% Exit because Name already registered and is alive.
-	{'EXIT', _}  = (catch ranch_server:set_connections_sup(Name, self())),
+	{'EXIT', _} = (catch ranch_server:set_connections_sup(Name, self())),
 	receive
 		{'DOWN', ServerMonRef, process, Server, _} ->
 			error(ranch_server_down)

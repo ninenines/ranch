@@ -53,6 +53,10 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
 
 SSL-specific listen options.
 
+=== ssl_opts() = [ssl_opt()]
+
+List of SSL-specific listen options.
+
 === opt() = ranch_tcp:opt() | ssl_opt()
 
 Listen options.
@@ -151,4 +155,21 @@ The options `sni_fun` and `sni_hosts` are mutually exclusive.
 
 == Exports
 
-None.
+=== upgrade(CSocket, Transport, Opts) -> upgrade(CSocket, Transport, Opts, infinity)
+
+Alias of `ranch_ssl:upgrade/4`.
+
+=== upgrade(CSocket, Transport, Opts, Timeout) -> {ok, {SslSocket, SslTransport}} | {error, term()}
+
+CSocket = any():: Socket to upgrade from. Only `inet:socket()` is currently supported.
+Transport = any():: Transport to upgrade from. Only `ranch_tcp` is currently supported.
+Opts = [ssl_opt()]:: SSL Options for the Socket upgrade.
+Timeout = timeout():: Timeout for socket upgrade.
+SslSocket = ssl:ssl_socket():: The upgraded Socket.
+SslTransport = ranch_ssl:: The transport callback module for the upgraded Socket.
+
+Upgrades the given socket to a SSL socket.
+
+Note that the socket must be in `{active, false}` mode before telling the client
+that the server is ready to upgrade by calling this function, else the upgrade may
+succeed or fail depending on timing.

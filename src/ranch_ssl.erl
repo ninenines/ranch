@@ -38,6 +38,8 @@
 -export([sockname/1]).
 -export([shutdown/2]).
 -export([close/1]).
+-export([upgrade/3]).
+-export([upgrade/4]).
 
 -type ssl_opt() :: {alpn_preferred_protocols, [binary()]}
 	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
@@ -76,6 +78,9 @@
 	| {versions, [atom()]}.
 -export_type([ssl_opt/0]).
 
+-type ssl_opts() :: [ssl_opt()].
+-export_type([ssl_opts/0]).
+
 -type opt() :: ranch_tcp:opt() | ssl_opt().
 -export_type([opt/0]).
 
@@ -92,10 +97,7 @@ messages() -> {ssl, ssl_closed, ssl_error}.
 
 -spec listen(opts()) -> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
-	case lists:keymember(cert, 1, Opts)
-			orelse lists:keymember(certfile, 1, Opts)
-			orelse lists:keymember(sni_fun, 1, Opts)
-			orelse lists:keymember(sni_hosts, 1, Opts) of
+	case has_cert(Opts) of
 		true ->
 			do_listen(Opts);
 		false ->
@@ -197,15 +199,15 @@ setopts(Socket, Opts) ->
 
 -spec getopts(ssl:sslsocket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getopts(Socket, Opts) ->
-        ssl:getopts(Socket, Opts).
+	ssl:getopts(Socket, Opts).
 
 -spec getstat(ssl:sslsocket()) -> {ok, list()} | {error, atom()}.
 getstat(Socket) ->
-        ssl:getstat(Socket).
+	ssl:getstat(Socket).
 
 -spec getstat(ssl:sslsocket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getstat(Socket, OptionNames) ->
-        ssl:getstat(Socket, OptionNames).
+	ssl:getstat(Socket, OptionNames).
 
 -spec controlling_process(ssl:sslsocket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.
@@ -231,7 +233,42 @@ shutdown(Socket, How) ->
 close(Socket) ->
 	ssl:close(Socket).
 
+-spec upgrade(any(), any(), ssl_opts()) -> {ok, {ssl:ssl_socket(), ranch_ssl}} | {error, term()}.
+upgrade(Socket, Transport, Opts) ->
+	upgrade(Socket, Transport, Opts, infinity).
+
+-spec upgrade(any(), any(), ssl_opts(), timeout()) -> {ok, {ssl:ssl_socket(), ranch_ssl}} | {error, term()}.
+upgrade(Socket, ranch_tcp, Opts, Timeout) ->
+	case has_cert(Opts) of
+		true ->
+			do_upgrade(Socket, Opts, Timeout);
+		false ->
+			{error, no_cert}
+	end;
+upgrade(_, _, _, _) ->
+	{error, not_supported}.
+
+-spec do_upgrade(any(), any(), timeout()) -> {ok, {ssl:ssl_socket(), ranch_ssl}} | {error, term()}.
+do_upgrade(Socket, Opts, Timeout) ->
+	Opts2 = ranch:set_option_default(Opts, ciphers, unbroken_cipher_suites()),
+	Opts3 = ranch:filter_options(Opts2, disallowed_listen_options(), []),
+	case ssl:ssl_accept(Socket, Opts3, Timeout) of
+		{ok, SslSocket} ->
+			{ok, {SslSocket, ?MODULE}};
+		Error={error, _} ->
+			Error
+	end.
+
+
 %% Internal.
+
+-spec has_cert(opts()) -> boolean().
+has_cert(Opts) ->
+	lists:keymember(cert, 1, Opts)
+	orelse lists:keymember(certfile, 1, Opts)
+	orelse lists:keymember(sni_fun, 1, Opts)
+	orelse lists:keymember(sni_hosts, 1, Opts).
+
 
 %% Unfortunately the implementation of elliptic-curve ciphers that has
 %% been introduced in R16B01 is incomplete.  Depending on the particular

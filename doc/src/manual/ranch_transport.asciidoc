@@ -163,7 +163,7 @@ or to set protocol-specific options.
 === getopts(CSocket, SockOpts) -> {ok, SockOptValues} | {error, atom()}
 
 CSocket = any():: Socket for this connection.
-SockOpts = [atom]:: Socket option names.
+SockOpts = [atom()]:: Socket option names.
 SockOptValues = list():: Socket options.
 
 Get options for the given socket.
