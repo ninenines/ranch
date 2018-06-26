@@ -20,16 +20,16 @@
 
 %% API.
 
-start_link(Ref, Socket, Transport, Opts) ->
-	{ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Socket, Transport, Opts}])}.
+start_link(Ref, _Socket, Transport, Opts) ->
+	{ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Transport, Opts}])}.
 
 %% gen_statem.
 
 callback_mode() ->
 	state_functions.
 
-init({Ref, Socket, Transport, _Opts = []}) ->
-	ok = ranch:accept_ack(Ref),
+init({Ref, Transport, _Opts = []}) ->
+	{ok, Socket} = ranch:handshake(Ref),
 	ok = Transport:setopts(Socket, [{active, once}, {packet, line}]),
 	gen_statem:enter_loop(?MODULE, [], connected,
 		#state{socket=Socket, transport=Transport},

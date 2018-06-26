@@ -2,15 +2,15 @@
 -behaviour(ranch_protocol).
 
 -export([start_link/4]).
--export([init/4]).
+-export([init/3]).
 
-start_link(Ref, Socket, Transport, Opts) ->
-	Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
+start_link(Ref, _Socket, Transport, Opts) ->
+	Pid = spawn_link(?MODULE, init, [Ref, Transport, Opts]),
 	{ok, Pid}.
 
-init(Ref, Socket, Transport, _Opts = []) ->
+init(Ref, Transport, _Opts = []) ->
 	process_flag(trap_exit, true),
-	ok = ranch:accept_ack(Ref),
+	{ok, Socket} = ranch:handshake(Ref),
 	loop(Socket, Transport).
 
 loop(Socket, Transport) ->

@@ -22,6 +22,8 @@
 -export([child_spec/5]).
 -export([child_spec/6]).
 -export([accept_ack/1]).
+-export([handshake/1]).
+-export([handshake/2]).
 -export([remove_connection/1]).
 -export([get_status/1]).
 -export([get_addr/1]).
@@ -166,8 +168,18 @@ child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 
 -spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
-	receive {shoot, Ref, Transport, Socket, AckTimeout} ->
+	receive {handshake, Ref, Transport, Socket, AckTimeout} ->
 		Transport:accept_ack(Socket, AckTimeout)
+	end.
+
+-spec handshake(ref()) -> {ok, ranch_transport:socket()}.
+handshake(Ref) ->
+	handshake(Ref, []).
+
+-spec handshake(ref(), any()) -> {ok, ranch_transport:socket()}.
+handshake(Ref, Opts) ->
+	receive {handshake, Ref, Transport, Socket, AckTimeout} ->
+		Transport:handshake(Socket, Opts, AckTimeout)
 	end.
 
 -spec remove_connection(ref()) -> ok.
