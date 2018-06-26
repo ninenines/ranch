@@ -22,6 +22,7 @@
 -export([disallowed_listen_options/0]).
 -export([accept/2]).
 -export([accept_ack/2]).
+-export([handshake/3]).
 -export([connect/3]).
 -export([connect/4]).
 -export([recv/3]).
@@ -128,9 +129,14 @@ accept(LSocket, Timeout) ->
 
 -spec accept_ack(ssl:sslsocket(), timeout()) -> ok.
 accept_ack(CSocket, Timeout) ->
-	case ssl:ssl_accept(CSocket, Timeout) of
+	{ok, _}=handshake(CSocket, [], Timeout),
+	ok.
+
+-spec handshake(ssl:sslsocket(), opts(), timeout()) -> {ok, ssl:sslsocket()}.
+handshake(CSocket, Opts, Timeout) ->
+	case ssl:ssl_accept(CSocket, Opts, Timeout) of
 		ok ->
-			ok;
+			{ok, CSocket};
 		%% Garbage was most likely sent to the socket, don't error out.
 		{error, {tls_alert, _}} ->
 			ok = close(CSocket),

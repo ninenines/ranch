@@ -29,6 +29,7 @@
 -callback accept(socket(), timeout())
 	-> {ok, socket()} | {error, closed | timeout | atom()}.
 -callback accept_ack(socket(), timeout()) -> ok.
+-callback handshake(socket(), opts(), timeout()) -> {ok, socket()}.
 -callback connect(string(), inet:port_number(), opts())
 	-> {ok, socket()} | {error, atom()}.
 -callback connect(string(), inet:port_number(), opts(), timeout())
