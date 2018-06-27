@@ -47,7 +47,7 @@ Unique name used to refer to a listener.
 None of the options are required.
 
 ack_timeout (5000)::
-	Maximum allowed time for the `ranch:handshake({1,2}` or `ranch:accept_ack/1` call to finish.
+	Maximum allowed time for the `ranch:handshake({1,2}` call to finish.
 connection_type (worker)::
 	Type of process that will handle the connection.
 max_connections (1024)::
@@ -60,17 +60,6 @@ socket::
 	Listening socket opened externally to be used instead of calling `Transport:listen/1`.
 
 == Exports
-
-=== accept_ack(Ref) -> ok
-
-Ref = ref():: Listener name.
-
-Acknowledge that the connection is accepted.
-
-Either this or one of the `ranch:handshake/{1,2}`
-functions MUST be used by a connection process to inform
-Ranch that it initialized properly and let it perform any
-additional operations before the socket can be safely used.
 
 === child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> supervisor:child_spec()
 
@@ -136,10 +125,10 @@ Socket = any():: Initialized socket.
 Acknowledge that the connection is accepted.
 Returns a socket that is ready to use.
 
-Either one of the `ranch:handshake/{1,2}` or `ranch:accept_ack/1`
-functions MUST be used by a connection process to inform
-Ranch that it initialized properly and let it perform any
-additional operations before the socket can be safely used.
+One of the `ranch:handshake/{1,2}` functions MUST be used
+by a connection process to inform Ranch that it initialized
+properly and let it perform any additional operations before
+the socket can be safely used.
 
 === handshake(Ref, Opts) -> {ok, Socket}
 
@@ -151,10 +140,10 @@ Acknowledge that the connection is accepted.
 Additional options can be provided for socket initialization.
 Returns a socket that is ready to use.
 
-Either one of the `ranch:handshake/{1,2}` or `ranch:accept_ack/1`
-functions MUST be used by a connection process to inform
-Ranch that it initialized properly and let it perform any
-additional operations before the socket can be safely used.
+One of the `ranch:handshake/{1,2}` functions MUST be used
+by a connection process to inform Ranch that it initialized
+properly and let it perform any additional operations before
+the socket can be safely used.
 
 === info() -> [{Ref, [{Key, Value}]}]
 

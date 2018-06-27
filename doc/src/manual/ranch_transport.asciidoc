@@ -26,22 +26,9 @@ Timeout = timeout():: Accept timeout.
 
 Accept a connection on the given listening socket.
 
-One of the `handshake` or `accept_ack` callbacks will be
-used to initialize the socket after accepting the connection.
-This is most useful when the transport is not raw TCP, like
-with SSL for example.
-
-=== accept_ack(CSocket, Timeout) -> ok
-
-CSocket = any():: Socket for this connection.
-Timeout = timeout():: Ack timeout.
-
-Perform post-accept initialization of the connection.
-
-This function will be called by connection processes
-before performing any socket operation. It allows
-transports that require extra initialization to perform
-their task and make the socket ready to use.
+The `handshake` callback will be used to initialize the socket
+after accepting the connection. This is most useful when the
+transport is not raw TCP, like with SSL for example.
 
 === close(Socket) -> ok
 
