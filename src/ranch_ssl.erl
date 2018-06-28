@@ -15,6 +15,10 @@
 -module(ranch_ssl).
 -behaviour(ranch_transport).
 
+-ifdef(OTP_RELEASE).
+-compile({nowarn_deprecated_function, [{ssl, ssl_accept, 3}]}).
+-endif.
+
 -export([name/0]).
 -export([secure/0]).
 -export([messages/0]).
