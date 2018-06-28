@@ -1,15 +1,15 @@
--module(echo_protocol).
+-module(accept_ack_protocol).
 -behaviour(ranch_protocol).
 
 -export([start_link/4]).
--export([init/3]).
+-export([init/4]).
 
-start_link(Ref, _Socket, Transport, Opts) ->
-	Pid = spawn_link(?MODULE, init, [Ref, Transport, Opts]),
+start_link(Ref, Socket, Transport, Opts) ->
+	Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
 	{ok, Pid}.
 
-init(Ref, Transport, _Opts = []) ->
-	{ok, Socket} = ranch:handshake(Ref),
+init(Ref, Socket, Transport, _Opts = []) ->
+	ok = ranch:accept_ack(Ref),
 	loop(Socket, Transport).
 
 loop(Socket, Transport) ->

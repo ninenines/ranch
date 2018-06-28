@@ -32,6 +32,7 @@ groups() ->
 		tcp_active_echo,
 		tcp_echo,
 		tcp_graceful,
+		tcp_accept_ack,
 		tcp_inherit_options,
 		tcp_max_connections,
 		tcp_max_connections_and_beyond,
@@ -50,6 +51,7 @@ groups() ->
 		ssl_active_echo,
 		ssl_echo,
 		ssl_graceful,
+		ssl_accept_ack,
 		ssl_sni_echo,
 		ssl_sni_fail,
 		ssl_getopts_capability,
@@ -489,6 +491,20 @@ ssl_graceful(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+ssl_accept_ack(_) ->
+	doc("Ensure accept_ack works with SSL transport."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, _} = ranch:start_listener(Name, ranch_ssl, Opts, accept_ack_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = ssl:send(Socket, <<"SSL transport accept_ack is working!">>),
+	{ok, <<"SSL transport accept_ack is working!">>} = ssl:recv(Socket, 36, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
 ssl_getopts_capability(_) ->
 	doc("Ensure getopts/2 capability."),
 	Name=name(),
@@ -638,6 +654,19 @@ tcp_graceful(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket1, 0, 1000),
 	{error, closed} = gen_tcp:recv(Socket2, 0, 1000),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+tcp_accept_ack(_) ->
+	doc("Ensure accept_ack works with TCP transport."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, [], accept_ack_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP transport accept_ack is working!">>),
+	{ok, <<"TCP transport accept_ack is working!">>} = gen_tcp:recv(Socket, 36, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 

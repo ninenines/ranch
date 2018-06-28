@@ -115,9 +115,9 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{?MODULE, start_protocol, To, Socket} ->
 			try Protocol:start_link(Ref, Socket, Transport, Opts) of
 				{ok, Pid} ->
-					shoot(State, CurConns, NbChildren, Sleepers, To, Socket, Pid, Pid);
+					handshake(State, CurConns, NbChildren, Sleepers, To, Socket, Pid, Pid);
 				{ok, SupPid, ProtocolPid} when ConnType =:= supervisor ->
-					shoot(State, CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid);
+					handshake(State, CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid);
 				Ret ->
 					To ! self(),
 					error_logger:error_msg(
@@ -219,11 +219,11 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			loop(State, CurConns, NbChildren, Sleepers)
 	end.
 
-shoot(State=#state{ref=Ref, transport=Transport, ack_timeout=AckTimeout, max_conns=MaxConns},
+handshake(State=#state{ref=Ref, transport=Transport, ack_timeout=AckTimeout, max_conns=MaxConns},
 		CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid) ->
 	case Transport:controlling_process(Socket, ProtocolPid) of
 		ok ->
-			ProtocolPid ! {shoot, Ref, Transport, Socket, AckTimeout},
+			ProtocolPid ! {handshake, Ref, Transport, Socket, AckTimeout},
 			put(SupPid, active),
 			CurConns2 = CurConns + 1,
 			if CurConns2 < MaxConns ->
