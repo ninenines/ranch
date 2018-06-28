@@ -47,7 +47,7 @@ Unique name used to refer to a listener.
 None of the options are required.
 
 ack_timeout (5000)::
-	Maximum allowed time for the `ranch:handshake({1,2}` call to finish.
+	Maximum allowed time for the `ranch:handshake/{1,2}` call to finish.
 connection_type (worker)::
 	Type of process that will handle the connection.
 max_connections (1024)::

@@ -102,7 +102,7 @@ accept(LSocket, Timeout) ->
 
 -spec accept_ack(inet:socket(), timeout()) -> ok.
 accept_ack(CSocket, Timeout) ->
-	{ok, _}=handshake(CSocket, [], Timeout),
+	{ok, _} = handshake(CSocket, [], Timeout),
 	ok.
 
 -spec handshake(inet:socket(), opts(), timeout()) -> {ok, inet:socket()}.

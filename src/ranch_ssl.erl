@@ -133,7 +133,7 @@ accept(LSocket, Timeout) ->
 
 -spec accept_ack(ssl:sslsocket(), timeout()) -> ok.
 accept_ack(CSocket, Timeout) ->
-	{ok, _}=handshake(CSocket, [], Timeout),
+	{ok, _} = handshake(CSocket, [], Timeout),
 	ok.
 
 -spec handshake(ssl:sslsocket(), opts(), timeout()) -> {ok, ssl:sslsocket()}.
