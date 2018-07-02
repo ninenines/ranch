@@ -43,7 +43,7 @@
 -export([set_option_default/3]).
 -export([require/1]).
 
--deprecated([start_listener/6, child_spec/6]).
+-deprecated([start_listener/6, child_spec/6, accept_ack/1]).
 
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
