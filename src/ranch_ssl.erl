@@ -50,7 +50,7 @@
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
 	| {certfile, string()}
-	| {ciphers, [ssl:erl_cipher_suite()] | string()}
+	| {ciphers, [ssl_cipher:erl_cipher_suite()]}
 	| {client_renegotiation, boolean()}
 	| {crl_cache, {module(), {internal | any(), list()}}}
 	| {crl_check, boolean() | peer | best_effort}
@@ -76,7 +76,7 @@
 	| {sni_hosts, [{string(), ssl_opt()}]}
 	| {user_lookup_fun, {fun(), any()}}
 	| {v2_hello_compatible, boolean()}
-	| {verify, ssl:verify_type()}
+	| {verify, verify_none | verify_peer}
 	| {verify_fun, {fun(), any()}}
 	| {versions, [atom()]}.
 -export_type([ssl_opt/0]).
@@ -107,16 +107,15 @@ listen(Opts) ->
 			{error, no_cert}
 	end.
 
-do_listen(Opts) ->
-	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, ciphers, unbroken_cipher_suites()),
-	Opts4 = ranch:set_option_default(Opts3, nodelay, true),
-	Opts5 = ranch:set_option_default(Opts4, send_timeout, 30000),
-	Opts6 = ranch:set_option_default(Opts5, send_timeout_close, true),
+do_listen(Opts0) ->
+	Opts1 = ranch:set_option_default(Opts0, backlog, 1024),
+	Opts2 = ranch:set_option_default(Opts1, nodelay, true),
+	Opts3 = ranch:set_option_default(Opts2, send_timeout, 30000),
+	Opts = ranch:set_option_default(Opts3, send_timeout_close, true),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(Opts6, disallowed_listen_options(),
+	ssl:listen(0, ranch:filter_options(Opts, disallowed_listen_options(),
 		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
 
 %% 'binary' and 'list' are disallowed but they are handled
@@ -240,22 +239,3 @@ shutdown(Socket, How) ->
 -spec close(ssl:sslsocket()) -> ok.
 close(Socket) ->
 	ssl:close(Socket).
-
-%% Internal.
-
-%% Unfortunately the implementation of elliptic-curve ciphers that has
-%% been introduced in R16B01 is incomplete.  Depending on the particular
-%% client, this can cause the TLS handshake to break during key
-%% agreement.  Depending on the ssl application version, this function
-%% returns a list of all cipher suites that are supported by default,
-%% minus the elliptic-curve ones.
--spec unbroken_cipher_suites() -> [ssl:erl_cipher_suite()].
-unbroken_cipher_suites() ->
-	case proplists:get_value(ssl_app, ssl:versions()) of
-		Version when Version =:= "5.3"; Version =:= "5.3.1" ->
-			lists:filter(fun(Suite) ->
-				string:left(atom_to_list(element(1, Suite)), 4) =/= "ecdh"
-			end, ssl:cipher_suites());
-		_ ->
-			ssl:cipher_suites()
-	end.

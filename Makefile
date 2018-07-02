@@ -8,7 +8,7 @@ PROJECT_REGISTERED = ranch_server
 # Options.
 
 CT_OPTS += -pa test -ct_hooks ranch_ct_hook []
-PLT_APPS = crypto public_key ssl
+PLT_APPS = crypto public_key tools
 
 # Dependencies.
 
