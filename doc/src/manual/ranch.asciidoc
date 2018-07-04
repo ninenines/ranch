@@ -26,17 +26,43 @@ code.
 [source,erlang]
 ----
 opt() = {ack_timeout, timeout()}
-	| {connection_type, worker | supervisor}
-	| {max_connections, max_conns()}
-	| {num_acceptors, pos_integer()}
-	| {shutdown, timeout() | brutal_kill}
-	| {socket, any()}
+      | {connection_type, worker | supervisor}
+      | {max_connections, max_conns()}
+      | {num_acceptors, pos_integer()}
+      | {shutdown, timeout() | brutal_kill}
+      | {socket, any()}
 ----
 
-Ranch-specific transport options.
+Deprecated form for Ranch-specific options.
 
-These options are not passed on to the transports.
-They are used by Ranch while setting up the listeners.
+Please use the `opts()` type when you need to provide
+Ranch-specific transport options. Socket options will
+remain separate from the Ranch-specific options.
+
+=== opts()
+
+[source,erlang]
+----
+opts() = any() | #{
+    connection_type   => worker | supervisor,
+    handshake_timeout => timeout(),
+    max_connections   => max_conns(),
+    num_acceptors     => pos_integer(),
+    shutdown          => timeout() | brutal_kill,
+    socket            => any(),
+    socket_opts       => any()
+}
+----
+
+Transport options.
+
+The transport options are a combination of Ranch-specific
+options and socket options. Socket options may be given
+directly (assuming they are not a map and no Ranch-specific
+option needs to be given) or as part of `socket_opts`.
+
+The different options are described further down in this
+document.
 
 === ref() = any()
 
@@ -46,18 +72,41 @@ Unique name used to refer to a listener.
 
 None of the options are required.
 
-ack_timeout (5000)::
-	Maximum allowed time for the `ranch:handshake/{1,2}` call to finish.
+ack_timeout::
+
+When `ack_timeout` is found in a transport options proplist,
+it is converted to the `handshake_timeout` option from the
+map. They are equivalent. The `ack_timeout` option will be
+removed in Ranch 2.0.
+
 connection_type (worker)::
-	Type of process that will handle the connection.
+
+Type of process that will handle the connection.
+
+handshake_timeout (5000)::
+
+Maximum allowed time for the `ranch:handshake/1,2` call to finish.
+
 max_connections (1024)::
-	Maximum number of active connections. Soft limit. Using `infinity` will disable the limit entirely.
+
+Maximum number of active connections. Soft limit. Using `infinity` will disable the limit entirely.
+
 num_acceptors (10)::
-	Number of processes that accept connections.
+
+Number of processes that accept connections.
+
 shutdown (5000)::
-	Maximum allowed time for children to stop on listener shutdown.
+
+Maximum allowed time for children to stop on listener shutdown.
+
 socket::
-	Listening socket opened externally to be used instead of calling `Transport:listen/1`.
+
+Listening socket opened externally to be used instead of calling `Transport:listen/1`.
+
+socket_opts::
+
+Socket options given to the `Transport:listen/1`. Please refer to the
+documentation of the transport module you are using for more details.
 
 == Exports
 

@@ -48,6 +48,7 @@
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
 
+%% This type is deprecated and will be removed in Ranch 2.0.
 -type opt() :: {ack_timeout, timeout()}
 	| {connection_type, worker | supervisor}
 	| {max_connections, max_conns()}
@@ -56,28 +57,33 @@
 	| {socket, any()}.
 -export_type([opt/0]).
 
+-type opts() :: any() | #{
+	connection_type => worker | supervisor,
+	handshake_timeout => timeout(),
+	max_connections => max_conns(),
+	num_acceptors => pos_integer(),
+	shutdown => timeout() | brutal_kill,
+	socket => any(),
+	socket_opts => any()
+}.
+-export_type([opts/0]).
+
 -type ref() :: any().
 -export_type([ref/0]).
 
--spec start_listener(ref(), module(), any(), module(), any())
+-spec start_listener(ref(), module(), opts(), module(), any())
 	-> supervisor:startchild_ret().
-start_listener(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
-	NumAcceptors = proplists:get_value(num_acceptors, TransOpts, 10),
-	start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts).
-
--spec start_listener(ref(), non_neg_integer(), module(), any(), module(), any())
-	-> supervisor:startchild_ret().
-start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
-		when is_integer(NumAcceptors) andalso is_atom(Transport)
-		andalso is_atom(Protocol) ->
+start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
+		when is_atom(Transport), is_atom(Protocol) ->
+	TransOpts = normalize_opts(TransOpts0),
 	_ = code:ensure_loaded(Transport),
 	case erlang:function_exported(Transport, name, 0) of
 		false ->
 			{error, badarg};
 		true ->
-			Res = supervisor:start_child(ranch_sup, child_spec(Ref, NumAcceptors,
+			Res = supervisor:start_child(ranch_sup, child_spec(Ref,
 					Transport, TransOpts, Protocol, ProtoOpts)),
-			Socket = proplists:get_value(socket, TransOpts),
+			Socket = maps:get(socket, TransOpts, undefined),
 			case Res of
 				{ok, Pid} when Socket =/= undefined ->
 					%% Give ownership of the socket to ranch_acceptors_sup
@@ -97,6 +103,59 @@ start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
 			end,
 			maybe_started(Res)
 	end.
+
+-spec start_listener(ref(), non_neg_integer(), module(), opts(), module(), any())
+	-> supervisor:startchild_ret().
+start_listener(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
+		when is_integer(NumAcceptors), is_atom(Transport), is_atom(Protocol) ->
+	TransOpts = normalize_opts(TransOpts0),
+	start_listener(Ref, Transport, TransOpts#{num_acceptors => NumAcceptors},
+		Protocol, ProtoOpts).
+
+normalize_opts(Map) when is_map(Map) ->
+	Map;
+normalize_opts(List0) when is_list(List0) ->
+	Map0 = #{},
+	{Map1, List1} = case take(ack_timeout, List0) of
+		{value, HandshakeTimeout, Tail0} ->
+			{Map0#{handshake_timeout => HandshakeTimeout}, Tail0};
+		false ->
+			{Map0, List0}
+	end,
+	{Map, List} = lists:foldl(fun(Key, {Map2, List2}) ->
+		case take(Key, List2) of
+			{value, ConnectionType, Tail2} ->
+				{Map2#{Key => ConnectionType}, Tail2};
+			false ->
+				{Map2, List2}
+		end
+	end, {Map1, List1}, [connection_type, max_connections, num_acceptors, shutdown, socket]),
+	if
+		Map =:= #{} ->
+			ok;
+		true ->
+			%% @todo This needs a test.
+			error_logger:warning_msg(
+				"Setting Ranch options together with socket options "
+				"is deprecated. Please use the new map syntax that allows "
+				"specifying socket options separately from other options.~n")
+	end,
+	case List of
+		[] -> Map;
+		_ -> Map#{socket_opts => List}
+	end;
+normalize_opts(Any) ->
+	#{socket_opts => Any}.
+
+take(Key, List) ->
+	take(Key, List, []).
+
+take(_, [], _) ->
+	false;
+take(Key, [{Key, Value}|Tail], Acc) ->
+	{value, Value, lists:reverse(Acc, Tail)};
+take(Key, [Value|Tail], Acc) ->
+	take(Key, Tail, [Value|Acc]).
 
 maybe_started({error, {{shutdown,
 		{failed_to_start_child, ranch_acceptors_sup,
@@ -151,25 +210,26 @@ maybe_resumed({ok, _, _}) ->
 maybe_resumed(Res) ->
 	Res.
 
--spec child_spec(ref(), module(), any(), module(), any())
+-spec child_spec(ref(), module(), opts(), module(), any())
 	-> supervisor:child_spec().
-child_spec(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
-	NumAcceptors = proplists:get_value(num_acceptors, TransOpts, 10),
-	child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts).
-
--spec child_spec(ref(), non_neg_integer(), module(), any(), module(), any())
-	-> supervisor:child_spec().
-child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts)
-		when is_integer(NumAcceptors) andalso is_atom(Transport)
-		andalso is_atom(Protocol) ->
+child_spec(Ref, Transport, TransOpts0, Protocol, ProtoOpts) ->
+	TransOpts = normalize_opts(TransOpts0),
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
-		Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts
+		Ref, Transport, TransOpts, Protocol, ProtoOpts
 	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
+
+-spec child_spec(ref(), non_neg_integer(), module(), opts(), module(), any())
+	-> supervisor:child_spec().
+child_spec(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
+		when is_integer(NumAcceptors), is_atom(Transport), is_atom(Protocol) ->
+	TransOpts = normalize_opts(TransOpts0),
+	child_spec(Ref, Transport, TransOpts#{num_acceptors => NumAcceptors},
+		Protocol, ProtoOpts).
 
 -spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
-	receive {handshake, Ref, Transport, Socket, AckTimeout} ->
-		Transport:accept_ack(Socket, AckTimeout)
+	receive {handshake, Ref, Transport, Socket, HandshakeTimeout} ->
+		Transport:accept_ack(Socket, HandshakeTimeout)
 	end.
 
 -spec handshake(ref()) -> {ok, ranch_transport:socket()}.
@@ -178,8 +238,8 @@ handshake(Ref) ->
 
 -spec handshake(ref(), any()) -> {ok, ranch_transport:socket()}.
 handshake(Ref, Opts) ->
-	receive {handshake, Ref, Transport, Socket, AckTimeout} ->
-		Transport:handshake(Socket, Opts, AckTimeout)
+	receive {handshake, Ref, Transport, Socket, HandshakeTimeout} ->
+		Transport:handshake(Socket, Opts, HandshakeTimeout)
 	end.
 
 -spec remove_connection(ref()) -> ok.
@@ -220,8 +280,9 @@ set_max_connections(Ref, MaxConnections) ->
 get_transport_options(Ref) ->
 	ranch_server:get_transport_options(Ref).
 
--spec set_transport_options(ref(), any()) -> ok | {error, running}.
-set_transport_options(Ref, TransOpts) ->
+-spec set_transport_options(ref(), opts()) -> ok | {error, running}.
+set_transport_options(Ref, TransOpts0) ->
+	TransOpts = normalize_opts(TransOpts0),
 	case get_status(Ref) of
 		suspended ->
 			ok = ranch_server:set_transport_options(Ref, TransOpts);
@@ -229,7 +290,7 @@ set_transport_options(Ref, TransOpts) ->
 			{error, running}
 	end.
 
--spec get_protocol_options(ref()) -> any().
+-spec get_protocol_options(ref()) -> opts().
 get_protocol_options(Ref) ->
 	ranch_server:get_protocol_options(Ref).
 
@@ -248,7 +309,7 @@ info(Ref) ->
 	listener_info(Ref, Pid).
 
 listener_info(Ref, Pid) ->
-	[_, NumAcceptors, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
+	[_, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
 	ConnsSup = ranch_server:get_connections_sup(Ref),
 	Status = get_status(Ref),
 	{IP, Port} = get_addr(Ref),
@@ -260,7 +321,6 @@ listener_info(Ref, Pid) ->
 		{status, Status},
 		{ip, IP},
 		{port, Port},
-		{num_acceptors, NumAcceptors},
 		{max_connections, MaxConns},
 		{active_connections, ranch_conns_sup:active_connections(ConnsSup)},
 		{all_connections, proplists:get_value(active, supervisor:count_children(ConnsSup))},

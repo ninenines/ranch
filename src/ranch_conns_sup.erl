@@ -39,7 +39,7 @@
 	transport = undefined :: module(),
 	protocol = undefined :: module(),
 	opts :: any(),
-	ack_timeout :: timeout(),
+	handshake_timeout :: timeout(),
 	max_conns = undefined :: ranch:max_conns()
 }).
 
@@ -99,14 +99,14 @@ init(Parent, Ref, Transport, Protocol) ->
 	ok = ranch_server:set_connections_sup(Ref, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
 	TransOpts = ranch_server:get_transport_options(Ref),
-	ConnType = proplists:get_value(connection_type, TransOpts, worker),
-	Shutdown = proplists:get_value(shutdown, TransOpts, 5000),
-	AckTimeout = proplists:get_value(ack_timeout, TransOpts, 5000),
+	ConnType = maps:get(connection_type, TransOpts, worker),
+	Shutdown = maps:get(shutdown, TransOpts, 5000),
+	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		shutdown=Shutdown, transport=Transport, protocol=Protocol,
-		opts=ProtoOpts, ack_timeout=AckTimeout, max_conns=MaxConns}, 0, 0, []).
+		opts=ProtoOpts, handshake_timeout=HandshakeTimeout, max_conns=MaxConns}, 0, 0, []).
 
 loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
@@ -219,11 +219,11 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			loop(State, CurConns, NbChildren, Sleepers)
 	end.
 
-handshake(State=#state{ref=Ref, transport=Transport, ack_timeout=AckTimeout, max_conns=MaxConns},
-		CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid) ->
+handshake(State=#state{ref=Ref, transport=Transport, handshake_timeout=HandshakeTimeout,
+		max_conns=MaxConns}, CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid) ->
 	case Transport:controlling_process(Socket, ProtocolPid) of
 		ok ->
-			ProtocolPid ! {handshake, Ref, Transport, Socket, AckTimeout},
+			ProtocolPid ! {handshake, Ref, Transport, Socket, HandshakeTimeout},
 			put(SupPid, active),
 			CurConns2 = CurConns + 1,
 			if CurConns2 < MaxConns ->

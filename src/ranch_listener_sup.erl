@@ -15,27 +15,27 @@
 -module(ranch_listener_sup).
 -behaviour(supervisor).
 
--export([start_link/6]).
+-export([start_link/5]).
 -export([init/1]).
 
--spec start_link(ranch:ref(), non_neg_integer(), module(), any(), module(), any())
+-spec start_link(ranch:ref(), module(), any(), module(), any())
 	-> {ok, pid()}.
-start_link(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) ->
-	MaxConns = proplists:get_value(max_connections, TransOpts, 1024),
+start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
+	MaxConns = maps:get(max_connections, TransOpts, 1024),
 	ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
-		[Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts]),
+		[Ref, Transport, TransOpts, Protocol, ProtoOpts]),
 	supervisor:start_link(?MODULE, {
-		Ref, NumAcceptors, Transport, Protocol
+		Ref, Transport, Protocol
 	}).
 
-init({Ref, NumAcceptors, Transport, Protocol}) ->
+init({Ref, Transport, Protocol}) ->
 	ok = ranch_server:set_listener_sup(Ref, self()),
 	ChildSpecs = [
 		{ranch_conns_sup, {ranch_conns_sup, start_link,
 				[Ref, Transport, Protocol]},
 			permanent, infinity, supervisor, [ranch_conns_sup]},
 		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,
-				[Ref, NumAcceptors, Transport]},
+				[Ref, Transport]},
 			permanent, infinity, supervisor, [ranch_acceptors_sup]}
 	],
 	{ok, {{rest_for_one, 1, 5}, ChildSpecs}}.
