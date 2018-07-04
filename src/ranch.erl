@@ -228,9 +228,8 @@ child_spec(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
 
 -spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
-	receive {handshake, Ref, Transport, Socket, HandshakeTimeout} ->
-		Transport:accept_ack(Socket, HandshakeTimeout)
-	end.
+	{ok, _} = handshake(Ref),
+	ok.
 
 -spec handshake(ref()) -> {ok, ranch_transport:socket()}.
 handshake(Ref) ->
@@ -238,8 +237,22 @@ handshake(Ref) ->
 
 -spec handshake(ref(), any()) -> {ok, ranch_transport:socket()}.
 handshake(Ref, Opts) ->
-	receive {handshake, Ref, Transport, Socket, HandshakeTimeout} ->
-		Transport:handshake(Socket, Opts, HandshakeTimeout)
+	receive {handshake, Ref, Transport, CSocket, HandshakeTimeout} ->
+		case Transport:handshake(CSocket, Opts, HandshakeTimeout) of
+			OK = {ok, _} ->
+				OK;
+			%% Garbage was most likely sent to the socket, don't error out.
+			{error, {tls_alert, _}} ->
+				ok = Transport:close(CSocket),
+				exit(normal);
+			%% Socket most likely stopped responding, don't error out.
+			{error, Reason} when Reason =:= timeout; Reason =:= closed ->
+				ok = Transport:close(CSocket),
+				exit(normal);
+			{error, Reason} ->
+				ok = Transport:close(CSocket),
+				error(Reason)
+		end
 	end.
 
 -spec remove_connection(ref()) -> ok.

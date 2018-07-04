@@ -136,24 +136,15 @@ accept_ack(CSocket, Timeout) ->
 	ok.
 
 -spec handshake(inet:socket() | ssl:sslsocket(), opts(), timeout())
-	-> {ok, ssl:sslsocket()}.
+	-> {ok, ssl:sslsocket()} | {error, any()}.
 handshake(CSocket, Opts, Timeout) ->
 	case ssl:ssl_accept(CSocket, Opts, Timeout) of
 		ok ->
 			{ok, CSocket};
 		{ok, NewSocket} ->
 			{ok, NewSocket};
-		%% Garbage was most likely sent to the socket, don't error out.
-		{error, {tls_alert, _}} ->
-			ok = close(CSocket),
-			exit(normal);
-		%% Socket most likely stopped responding, don't error out.
-		{error, Reason} when Reason =:= timeout; Reason =:= closed ->
-			ok = close(CSocket),
-			exit(normal);
-		{error, Reason} ->
-			ok = close(CSocket),
-			error(Reason)
+		Error = {error, _} ->
+			Error
 	end.
 
 %% @todo Probably filter Opts?

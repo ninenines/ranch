@@ -30,7 +30,7 @@
 -callback listen(opts()) -> {ok, socket()} | {error, atom()}.
 -callback accept(socket(), timeout())
 	-> {ok, socket()} | {error, closed | timeout | atom()}.
--callback handshake(socket(), opts(), timeout()) -> {ok, socket()}.
+-callback handshake(socket(), opts(), timeout()) -> {ok, socket()} | {error, any()}.
 -callback connect(string(), inet:port_number(), opts())
 	-> {ok, socket()} | {error, atom()}.
 -callback connect(string(), inet:port_number(), opts(), timeout())
