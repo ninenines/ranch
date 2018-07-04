@@ -55,12 +55,17 @@ Options = any():: Options for initialization.
 Timeout = timeout():: Handshake timeout.
 CSocket1 = any():: Initialized socket for this connection.
 
-Perform post-accept initialization of the connection.
+Perform any necessary handshake for this transport.
 
 This function will be called by connection processes
 before performing any socket operation. It allows
 transports that require extra initialization to perform
 their task and return a socket that is ready to use.
+
+This function may also be used to upgrade a connection
+from a transport to another depending on the capabilities
+of the transports. For example a `ranch_tcp` socket may
+be upgraded to a `ranch_ssl` one using this function.
 
 === listen(TransOpts) -> {ok, LSocket} | {error, atom()}
 

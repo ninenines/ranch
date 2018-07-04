@@ -135,11 +135,14 @@ accept_ack(CSocket, Timeout) ->
 	{ok, _} = handshake(CSocket, [], Timeout),
 	ok.
 
--spec handshake(ssl:sslsocket(), opts(), timeout()) -> {ok, ssl:sslsocket()}.
+-spec handshake(inet:socket() | ssl:sslsocket(), opts(), timeout())
+	-> {ok, ssl:sslsocket()}.
 handshake(CSocket, Opts, Timeout) ->
 	case ssl:ssl_accept(CSocket, Opts, Timeout) of
 		ok ->
 			{ok, CSocket};
+		{ok, NewSocket} ->
+			{ok, NewSocket};
 		%% Garbage was most likely sent to the socket, don't error out.
 		{error, {tls_alert, _}} ->
 			ok = close(CSocket),

@@ -144,6 +144,17 @@ possible to use a file descriptor opened in raw mode:
 {ok, RawFile} = file:open(Filename, [raw, read, binary]),
 {ok, SentBytes} = Transport:sendfile(Socket, RawFile, Offset, Bytes, Opts).
 
+=== Upgrading a TCP socket to SSL
+
+A connected TCP socket can be upgraded to a SSL socket via the function
+`ranch_ssl:handshake/3`. The socket *must* be in `{active, false}` mode
+before telling the client that the server is ready to upgrade in order
+to avoid race conditions.
+
+.Performing a TLS handshake on a TCP socket
+[source,erlang]
+{ok, NewSocket} = ranch_ssl:handshake(Socket, SslOpts, 5000).
+
 === Writing a transport handler
 
 A transport handler is a module implementing the `ranch_transport` behavior.
