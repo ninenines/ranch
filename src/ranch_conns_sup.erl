@@ -40,7 +40,8 @@
 	protocol = undefined :: module(),
 	opts :: any(),
 	handshake_timeout :: timeout(),
-	max_conns = undefined :: ranch:max_conns()
+	max_conns = undefined :: ranch:max_conns(),
+	logger = undefined :: module()
 }).
 
 %% API.
@@ -102,15 +103,17 @@ init(Parent, Ref, Transport, Protocol) ->
 	ConnType = maps:get(connection_type, TransOpts, worker),
 	Shutdown = maps:get(shutdown, TransOpts, 5000),
 	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
+	Logger = maps:get(logger, TransOpts, error_logger),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		shutdown=Shutdown, transport=Transport, protocol=Protocol,
-		opts=ProtoOpts, handshake_timeout=HandshakeTimeout, max_conns=MaxConns}, 0, 0, []).
+		opts=ProtoOpts, handshake_timeout=HandshakeTimeout,
+		max_conns=MaxConns, logger=Logger}, 0, 0, []).
 
 loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		transport=Transport, protocol=Protocol, opts=Opts,
-		max_conns=MaxConns}, CurConns, NbChildren, Sleepers) ->
+		max_conns=MaxConns, logger=Logger}, CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
 			try Protocol:start_link(Ref, Socket, Transport, Opts) of
@@ -120,18 +123,18 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 					handshake(State, CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid);
 				Ret ->
 					To ! self(),
-					error_logger:error_msg(
+					ranch:log(error,
 						"Ranch listener ~p connection process start failure; "
 						"~p:start_link/4 returned: ~999999p~n",
-						[Ref, Protocol, Ret]),
+						[Ref, Protocol, Ret], Logger),
 					Transport:close(Socket),
 					loop(State, CurConns, NbChildren, Sleepers)
 			catch Class:Reason ->
 				To ! self(),
-				error_logger:error_msg(
+				ranch:log(error,
 					"Ranch listener ~p connection process start failure; "
 					"~p:start_link/4 crashed with reason: ~p:~999999p~n",
-					[Ref, Protocol, Class, Reason]),
+					[Ref, Protocol, Class, Reason], Logger),
 				loop(State, CurConns, NbChildren, Sleepers)
 			end;
 		{?MODULE, active_connections, To, Tag} ->
@@ -166,10 +169,10 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{'EXIT', Pid, Reason} when Sleepers =:= [] ->
 			case erase(Pid) of
 				active ->
-					report_error(Ref, Protocol, Pid, Reason),
+					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns - 1, NbChildren - 1, Sleepers);
 				removed ->
-					report_error(Ref, Protocol, Pid, Reason),
+					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns, NbChildren - 1, Sleepers);
 				undefined ->
 					loop(State, CurConns, NbChildren, Sleepers)
@@ -178,15 +181,15 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{'EXIT', Pid, Reason} ->
 			case erase(Pid) of
 				active when CurConns > MaxConns ->
-					report_error(Ref, Protocol, Pid, Reason),
+					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns - 1, NbChildren - 1, Sleepers);
 				active ->
-					report_error(Ref, Protocol, Pid, Reason),
+					report_error(Logger, Ref, Protocol, Pid, Reason),
 					[To|Sleepers2] = Sleepers,
 					To ! self(),
 					loop(State, CurConns - 1, NbChildren - 1, Sleepers2);
 				removed ->
-					report_error(Ref, Protocol, Pid, Reason),
+					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns, NbChildren - 1, Sleepers);
 				undefined ->
 					loop(State, CurConns, NbChildren, Sleepers)
@@ -213,9 +216,9 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			To ! {Tag, {error, ?MODULE}},
 			loop(State, CurConns, NbChildren, Sleepers);
 		Msg ->
-			error_logger:error_msg(
+			ranch:log(error,
 				"Ranch listener ~p received unexpected message ~p~n",
-				[Ref, Msg]),
+				[Ref, Msg], Logger),
 			loop(State, CurConns, NbChildren, Sleepers)
 	end.
 
@@ -309,14 +312,14 @@ system_code_change(Misc, _, _, _) ->
 
 %% We use ~999999p here instead of ~w because the latter doesn't
 %% support printable strings.
-report_error(_, _, _, normal) ->
+report_error(_, _, _, _, normal) ->
 	ok;
-report_error(_, _, _, shutdown) ->
+report_error(_, _, _, _, shutdown) ->
 	ok;
-report_error(_, _, _, {shutdown, _}) ->
+report_error(_, _, _, _, {shutdown, _}) ->
 	ok;
-report_error(Ref, Protocol, Pid, Reason) ->
-	error_logger:error_msg(
+report_error(Logger, Ref, Protocol, Pid, Reason) ->
+	ranch:log(error,
 		"Ranch listener ~p had connection process started with "
 		"~p:start_link/4 at ~p exit with reason: ~999999p~n",
-		[Ref, Protocol, Pid, Reason]).
+		[Ref, Protocol, Pid, Reason], Logger).

@@ -42,6 +42,7 @@
 -export([filter_options/3]).
 -export([set_option_default/3]).
 -export([require/1]).
+-export([log/4]).
 
 -deprecated([start_listener/6, child_spec/6, accept_ack/1]).
 
@@ -61,6 +62,7 @@
 	connection_type => worker | supervisor,
 	handshake_timeout => timeout(),
 	max_connections => max_conns(),
+	logger => module(),
 	num_acceptors => pos_integer(),
 	shutdown => timeout() | brutal_kill,
 	socket => any(),
@@ -134,11 +136,11 @@ normalize_opts(List0) when is_list(List0) ->
 		Map =:= #{} ->
 			ok;
 		true ->
-			%% @todo This needs a test.
-			error_logger:warning_msg(
+			log(warning,
 				"Setting Ranch options together with socket options "
 				"is deprecated. Please use the new map syntax that allows "
-				"specifying socket options separately from other options.~n")
+				"specifying socket options separately from other options.~n",
+				[], Map)
 	end,
 	case List of
 		[] -> Map;
@@ -433,7 +435,13 @@ filter_user_options([], _) ->
 	[].
 
 filter_options_warning(Opt) ->
-	error_logger:warning_msg("Transport option ~p unknown or invalid.~n", [Opt]).
+	Logger = case get(logger) of
+		undefined -> error_logger;
+		Logger0 -> Logger0
+	end,
+	log(warning,
+		"Transport option ~p unknown or invalid.~n",
+		[Opt], Logger).
 
 merge_options({Key, _} = Option, OptionList) ->
 	lists:keystore(Key, 1, OptionList, Option);
@@ -457,3 +465,26 @@ require([App|Tail]) ->
 		{error, {already_started, App}} -> ok
 	end,
 	require(Tail).
+
+-spec log(logger:level(), io:format(), list(), module() | #{logger => module()}) -> ok.
+log(Level, Format, Args, Logger) when is_atom(Logger) ->
+	log(Level, Format, Args, #{logger => Logger});
+log(Level, Format, Args, #{logger := Logger})
+		when Logger =/= error_logger ->
+	_ = Logger:Level(Format, Args),
+	ok;
+%% We use error_logger by default. Because error_logger does
+%% not have all the levels we accept we have to do some
+%% mapping to error_logger functions.
+log(Level, Format, Args, _) ->
+	Function = case Level of
+		emergency -> error_msg;
+		alert -> error_msg;
+		critical -> error_msg;
+		error -> error_msg;
+		warning -> warning_msg;
+		notice -> warning_msg;
+		info -> info_msg;
+		debug -> info_msg
+	end,
+	error_logger:Function(Format, Args).

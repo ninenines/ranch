@@ -65,6 +65,7 @@ groups() ->
 		misc_bad_transport_options,
 		misc_info,
 		misc_info_embedded,
+		misc_opts_logger,
 		misc_wait_for_connections
 	]}, {supervisor, [
 		connection_type_supervisor,
@@ -274,6 +275,22 @@ misc_info_embedded(_) ->
 
 do_get_listener_info(ListenerGroup) ->
 	lists:sort([L || L={{G, _}, _} <- ranch:info(), G=:=ListenerGroup]).
+
+misc_opts_logger(_) ->
+	doc("Confirm that messages are sent via the configured logger module."),
+	register(name(), self()),
+	{ok, _} = ranch:start_listener(name(),
+		ranch_tcp, #{logger => ?MODULE, socket_opts => [<<"garbage">>]},
+		echo_protocol, []),
+	receive
+		{warning, "Transport option " ++ _, [<<"garbage">>]} ->
+			ok
+	after 1000 ->
+		error(timeout)
+	end.
+
+warning(Format, Args) ->
+	misc_opts_logger ! {warning, Format, Args}.
 
 misc_wait_for_connections(_) ->
 	doc("Ensure wait for connections works."),
