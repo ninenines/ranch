@@ -58,7 +58,8 @@ init([Ref, Transport]) ->
 -spec listen_error(any(), module(), any(), atom(), module()) -> no_return().
 listen_error(Ref, Transport, SocketOpts0, Reason, Logger) ->
 	SocketOpts1 = [{cert, '...'}|proplists:delete(cert, SocketOpts0)],
-	SocketOpts = [{key, '...'}|proplists:delete(key, SocketOpts1)],
+	SocketOpts2 = [{key, '...'}|proplists:delete(key, SocketOpts1)],
+	SocketOpts = [{cacerts, '...'}|proplists:delete(cacerts, SocketOpts2)],
 	ranch:log(error,
 		"Failed to start Ranch listener ~p in ~p:listen(~999999p) for reason ~p (~s)~n",
 		[Ref, Transport, SocketOpts, Reason, format_error(Reason)], Logger),
