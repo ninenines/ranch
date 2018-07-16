@@ -21,7 +21,6 @@
 -export([listen/1]).
 -export([disallowed_listen_options/0]).
 -export([accept/2]).
--export([accept_ack/2]).
 -export([handshake/3]).
 -export([connect/3]).
 -export([connect/4]).
@@ -99,11 +98,6 @@ disallowed_listen_options() ->
 	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.
 accept(LSocket, Timeout) ->
 	gen_tcp:accept(LSocket, Timeout).
-
--spec accept_ack(inet:socket(), timeout()) -> ok.
-accept_ack(CSocket, Timeout) ->
-	{ok, _} = handshake(CSocket, [], Timeout),
-	ok.
 
 -spec handshake(inet:socket(), opts(), timeout()) -> {ok, inet:socket()}.
 handshake(CSocket, _, _) ->

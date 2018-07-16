@@ -15,17 +15,12 @@
 -module(ranch_ssl).
 -behaviour(ranch_transport).
 
--ifdef(OTP_RELEASE).
--compile({nowarn_deprecated_function, [{ssl, ssl_accept, 3}]}).
--endif.
-
 -export([name/0]).
 -export([secure/0]).
 -export([messages/0]).
 -export([listen/1]).
 -export([disallowed_listen_options/0]).
 -export([accept/2]).
--export([accept_ack/2]).
 -export([handshake/3]).
 -export([connect/3]).
 -export([connect/4]).
@@ -130,17 +125,10 @@ disallowed_listen_options() ->
 accept(LSocket, Timeout) ->
 	ssl:transport_accept(LSocket, Timeout).
 
--spec accept_ack(ssl:sslsocket(), timeout()) -> ok.
-accept_ack(CSocket, Timeout) ->
-	{ok, _} = handshake(CSocket, [], Timeout),
-	ok.
-
 -spec handshake(inet:socket() | ssl:sslsocket(), opts(), timeout())
 	-> {ok, ssl:sslsocket()} | {error, any()}.
 handshake(CSocket, Opts, Timeout) ->
-	case ssl:ssl_accept(CSocket, Opts, Timeout) of
-		ok ->
-			{ok, CSocket};
+	case new_ssl_accept(CSocket, Opts, Timeout) of
 		{ok, NewSocket} ->
 			{ok, NewSocket};
 		Error = {error, _} ->
@@ -233,3 +221,25 @@ shutdown(Socket, How) ->
 -spec close(ssl:sslsocket()) -> ok.
 close(Socket) ->
 	ssl:close(Socket).
+
+-spec new_ssl_accept(inet:socket() | ssl:sslsocket(), opts(), timeout())
+	-> {ok, ssl:sslsocket()} | {error, any()}.
+-ifdef(OTP_RELEASE).
+new_ssl_accept(ClientSocket, SSLOptions, Timeout) ->
+    case ssl:handshake(ClientSocket, SSLOptions, Timeout) of
+        {ok, SslClientSocket} ->
+            {ok, SslClientSocket};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+-else.
+new_ssl_accept(ClientSocket, SSLOptions, Timeout) ->
+    case ssl:ssl_accept(ClientSocket, SSLOptions, Timeout) of
+        ok ->
+            {ok, ClientSocket};
+        {ok, ClientSocket} ->
+            {ok, ClientSocket};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+-endif.
