@@ -21,7 +21,6 @@
 -export([resume_listener/1]).
 -export([child_spec/5]).
 -export([child_spec/6]).
--export([accept_ack/1]).
 -export([handshake/1]).
 -export([handshake/2]).
 -export([remove_connection/1]).
@@ -44,7 +43,7 @@
 -export([require/1]).
 -export([log/4]).
 
--deprecated([start_listener/6, child_spec/6, accept_ack/1]).
+-deprecated([start_listener/6, child_spec/6]).
 
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
@@ -227,11 +226,6 @@ child_spec(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
 	TransOpts = normalize_opts(TransOpts0),
 	child_spec(Ref, Transport, TransOpts#{num_acceptors => NumAcceptors},
 		Protocol, ProtoOpts).
-
--spec accept_ack(ref()) -> ok.
-accept_ack(Ref) ->
-	{ok, _} = handshake(Ref),
-	ok.
 
 -spec handshake(ref()) -> {ok, ranch_transport:socket()}.
 handshake(Ref) ->

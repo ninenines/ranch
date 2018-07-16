@@ -5861,8 +5861,8 @@ start_link(Ref, Socket, Transport, Opts) ->
 
 -spec init(ranch:ref(), inet:socket(), module(), opts()) -> ok.
 init(Ref, Socket, Transport, _Opts) ->
-	ok = ranch:accept_ack(Ref),
-	loop(#state{socket=Socket, transport=Transport}).
+	{ok, NewSocket} = ranch:handshake(Ref),
+	loop(#state{socket=NewSocket, transport=Transport}).
 
 loop(State) ->
 	loop(State).
