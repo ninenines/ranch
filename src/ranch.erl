@@ -36,6 +36,7 @@
 -export([set_protocol_options/2]).
 -export([info/0]).
 -export([info/1]).
+-export([info/2]).
 -export([procs/2]).
 -export([wait_for_connections/3]).
 -export([wait_for_connections/4]).
@@ -259,8 +260,10 @@ handshake(Ref, Opts) ->
 
 -spec remove_connection(ref()) -> ok.
 remove_connection(Ref) ->
-	ConnsSup = ranch_server:get_connections_sup(Ref),
-	ConnsSup ! {remove_connection, Ref, self()},
+	ListenerSup = ranch_server:get_listener_sup(Ref),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
+		supervisor:which_children(ListenerSup)),
+	_ = [ConnsSup ! {remove_connection, Ref, self()} || {_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
 	ok.
 
 -spec get_status(ref()) -> running | suspended | restarting.
@@ -282,6 +285,14 @@ get_addr(Ref) ->
 get_port(Ref) ->
 	{_, Port} = get_addr(Ref),
 	Port.
+
+-spec get_connections(ref(), active|all) -> non_neg_integer().
+get_connections(Ref, active) ->
+	SupCounts = [ranch_conns_sup:active_connections(ConnsSup) || {_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
+	lists:sum(SupCounts);
+get_connections(Ref, all) ->
+	SupCounts = [proplists:get_value(active, supervisor:count_children(ConnsSup)) || {_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
+	lists:sum(SupCounts).
 
 -spec get_max_connections(ref()) -> max_conns().
 get_max_connections(Ref) ->
@@ -315,51 +326,77 @@ set_protocol_options(Ref, Opts) ->
 
 -spec info() -> [{any(), [{atom(), any()}]}].
 info() ->
-	[{Ref, listener_info(Ref, Pid)}
-		|| {Ref, Pid} <- ranch_server:get_listener_sups()].
+	[{Ref, info(Ref)}
+		|| {Ref, _} <- ranch_server:get_listener_sups()].
 
 -spec info(ref()) -> [{atom(), any()}].
 info(Ref) ->
-	Pid = ranch_server:get_listener_sup(Ref),
-	listener_info(Ref, Pid).
+	[{Key, info(Ref, Key)}
+		|| Key <- [pid, status, ip, port, max_connections,
+			active_connections, all_connections, transport,
+			transport_options, protocol, protocol_options]].
 
-listener_info(Ref, Pid) ->
-	[_, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
-	ConnsSup = ranch_server:get_connections_sup(Ref),
-	Status = get_status(Ref),
-	{IP, Port} = get_addr(Ref),
-	MaxConns = get_max_connections(Ref),
-	TransOpts = ranch_server:get_transport_options(Ref),
-	ProtoOpts = get_protocol_options(Ref),
-	[
-		{pid, Pid},
-		{status, Status},
-		{ip, IP},
-		{port, Port},
-		{max_connections, MaxConns},
-		{active_connections, ranch_conns_sup:active_connections(ConnsSup)},
-		{all_connections, proplists:get_value(active, supervisor:count_children(ConnsSup))},
-		{transport, Transport},
-		{transport_options, TransOpts},
-		{protocol, Protocol},
-		{protocol_options, ProtoOpts}
-	].
+-spec info(ref(), pid) -> pid;
+	(ref(), status) -> running | suspended;
+	(ref(), ip) -> inet:ip_address();
+	(ref(), port) -> inet:port_number();
+	(ref(), max_connections) -> max_conns();
+	(ref(), active_connections) -> non_neg_integer();
+	(ref(), all_connections) -> non_neg_integer();
+	(ref(), transport) -> module();
+	(ref(), transport_options) -> opts();
+	(ref(), protocol) -> module();
+	(ref(), protocol_options) -> any().
+info(Ref, pid) ->
+	ranch_server:get_listener_sup(Ref);
+info(Ref, status) ->
+	get_status(Ref);
+info(Ref, ip) ->
+	{IP, _} = get_addr(Ref),
+	IP;
+info(Ref, port) ->
+	{_, Port} = get_addr(Ref),
+	Port;
+info(Ref, max_connections) ->
+	get_max_connections(Ref);
+info(Ref, active_connections) ->
+	get_connections(Ref, active);
+info(Ref, all_connections) ->
+	get_connections(Ref, all);
+info(Ref, transport) ->
+	[_, Transport, _, _, _] = ranch_server:get_listener_start_args(Ref),
+	Transport;
+info(Ref, transport_options) ->
+	ranch_server:get_transport_options(Ref);
+info(Ref, protocol) ->
+	[_, _, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
+	Protocol;
+info(Ref, protocol_options) ->
+	get_protocol_options(Ref).
 
 -spec procs(ref(), acceptors | connections) -> [pid()].
-procs(Ref, acceptors) ->
-	procs1(Ref, ranch_acceptors_sup);
-procs(Ref, connections) ->
-	procs1(Ref, ranch_conns_sup).
-
-procs1(Ref, Sup) ->
+procs(Ref, Type) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
-	{_, SupPid, _, _} = lists:keyfind(Sup, 1,
+	procs1(ListenerSup, Type).
+
+procs1(ListenerSup, acceptors) ->
+	{_, SupPid, _, _} = lists:keyfind(ranch_acceptors_sup, 1,
 		supervisor:which_children(ListenerSup)),
 	try
 		[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)]
-	catch exit:{noproc, _} when Sup =:= ranch_acceptors_sup ->
+	catch exit:{noproc, _} ->
 		[]
-	end.
+	end;
+procs1(ListenerSup, connections) ->
+	{_, SupSupPid, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
+		supervisor:which_children(ListenerSup)),
+	Conns=
+	lists:map(fun ({_, SupPid, _, _}) ->
+			[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)]
+		end,
+		supervisor:which_children(SupSupPid)
+	),
+	lists:flatten(Conns).
 
 -spec wait_for_connections
 	(ref(), '>' | '>=' | '==' | '=<', non_neg_integer()) -> ok;
@@ -391,8 +428,7 @@ validate_interval(_) -> error(badarg).
 
 wait_for_connections_loop(Ref, Op, NumConns, Interval) ->
 	CurConns = try
-		ConnsSup = ranch_server:get_connections_sup(Ref),
-		proplists:get_value(active, supervisor:count_children(ConnsSup))
+		get_connections(Ref, all)
 	catch _:_ ->
 		0
 	end,
