@@ -399,7 +399,7 @@ wait_for_connections_loop(Ref, Op, NumConns, Interval) ->
 	case erlang:Op(CurConns, NumConns) of
 		true ->
 			ok;
-		false when Interval > 0 ->
+		false when Interval == 0 ->
 			wait_for_connections_loop(Ref, Op, NumConns, Interval);
 		false ->
 			timer:sleep(Interval),
