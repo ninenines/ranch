@@ -181,7 +181,7 @@ stop_listener(Ref) ->
 			{error, Reason}
 	end.
 
--spec suspend_listener(ref()) -> ok | {error, term()}.
+-spec suspend_listener(ref()) -> ok | {error, any()}.
 suspend_listener(Ref) ->
 	case get_status(Ref) of
 		running ->
@@ -192,7 +192,7 @@ suspend_listener(Ref) ->
 			ok
 	end.
 
--spec resume_listener(ref()) -> ok | {error, term()}.
+-spec resume_listener(ref()) -> ok | {error, any()}.
 resume_listener(Ref) ->
 	case get_status(Ref) of
 		running ->
@@ -263,7 +263,7 @@ remove_connection(Ref) ->
 	ConnsSup ! {remove_connection, Ref, self()},
 	ok.
 
--spec get_status(ref()) -> running | suspended | restarting.
+-spec get_status(ref()) -> running | suspended.
 get_status(Ref) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
 	Children = supervisor:which_children(ListenerSup),

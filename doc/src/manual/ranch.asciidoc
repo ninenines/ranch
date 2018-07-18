@@ -2,16 +2,58 @@
 
 == Name
 
-ranch - socket acceptor pool
+ranch - Socket acceptor pool
 
 == Description
 
-The `ranch` module provides functions for starting and
+The module `ranch` provides functions for starting and
 manipulating Ranch listeners.
+
+== Exports
+
+Start/stop:
+
+* link:man:ranch:start_listener(3)[ranch:start_listener(3)] - Start a listener
+* link:man:ranch:stop_listener(3)[ranch:stop_listener(3)] - Stop a listener
+* link:man:ranch:child_spec(3)[ranch:child_spec(3)] - Build child specifications for a new listener
+
+Suspend/resume:
+
+* link:man:ranch:suspend_listener(3)[ranch:suspend_listener(3)] - Suspend a running listener
+* link:man:ranch:resume_listener(3)[ranch:resume_listener(3)] - Resume a suspended listener
+* link:man:ranch:get_status(3)[ranch:get_status(3)] - Get a listener's running state
+
+Connections:
+
+* ranch:accept_ack(3) - Deprecated in favor of link:man:ranch:handshake(3)[ranch:handshake(3)]
+* link:man:ranch:handshake(3)[ranch:handshake(3)] - Perform the transport handshake
+* link:man:ranch:remove_connection(3)[ranch:remove_connection(3)] - Remove connection from the count
+
+Options:
+
+* link:man:ranch:get_max_connections(3)[ranch:get_max_connections(3)] - Get the max number of connections
+* link:man:ranch:get_protocol_options(3)[ranch:get_protocol_options(3)] - Get the current protocol options
+* link:man:ranch:get_transport_options(3)[ranch:get_transport_options(3)] - Get the current transport options
+* link:man:ranch:set_max_connections(3)[ranch:set_max_connections(3)] - Set the max number of connections
+* link:man:ranch:set_protocol_options(3)[ranch:set_protocol_options(3)] - Set the protocol options
+* link:man:ranch:set_transport_options(3)[ranch:set_transport_options(3)] - Set the transport options
+
+Introspection:
+
+* link:man:ranch:get_addr(3)[ranch:get_addr(3)] - Get the listening port and IP
+* link:man:ranch:get_port(3)[ranch:get_port(3)] - Get the listening port
+* link:man:ranch:info(3)[ranch:info(3)] - Overview of Ranch listeners
+* link:man:ranch:procs(3)[ranch:procs(3)] - Retrieve pids from a listener
+* link:man:ranch:wait_for_connections(3)[ranch:wait_for_connections(3)] - Wait for a specific number of connections
 
 == Types
 
-=== max_conns() = non_neg_integer() | infinity
+=== max_conns()
+
+[source,erlang]
+----
+max_conns() = non_neg_integer() | infinity
+----
 
 Maximum number of connections allowed on this listener.
 
@@ -47,6 +89,7 @@ opts() = any() | #{
     connection_type   => worker | supervisor,
     handshake_timeout => timeout(),
     max_connections   => max_conns(),
+    logger            => module(),
     num_acceptors     => pos_integer(),
     shutdown          => timeout() | brutal_kill,
     socket            => any(),
@@ -64,7 +107,12 @@ option needs to be given) or as part of `socket_opts`.
 The different options are described further down in this
 document.
 
-=== ref() = any()
+=== ref()
+
+[source,erlang]
+----
+ref() = any()
+----
 
 Unique name used to refer to a listener.
 
@@ -89,7 +137,8 @@ Maximum allowed time for the `ranch:handshake/1,2` call to finish.
 
 max_connections (1024)::
 
-Maximum number of active connections. Soft limit. Using `infinity` will disable the limit entirely.
+Maximum number of active connections. Soft limit.
+Use `infinity` to disable the limit entirely.
 
 num_acceptors (10)::
 
@@ -101,246 +150,21 @@ Maximum allowed time for children to stop on listener shutdown.
 
 socket::
 
-Listening socket opened externally to be used instead of calling `Transport:listen/1`.
+Listening socket opened externally to be used instead of
+calling `Transport:listen/1`. This option will be removed
+in Ranch 2.0. Use a custom transport module acting as a
+wrapper for `ranch_tcp` or `ranch_ssl` instead.
 
 socket_opts::
 
-Socket options given to the `Transport:listen/1`. Please refer to the
+Socket options given to `Transport:listen/1`. Please refer to the
 documentation of the transport module you are using for more details.
 
-== Exports
+== Changelog
 
-=== accept_ack(Ref) -> ok
+* *1.6*: The `logger` option was added.
+* *1.6*: The `opt()` type was deprecated in favor of the new `opts()` type.
 
-This function is deprecated in favor of `ranch:handshake/1,2`.
+== See also
 
-=== child_spec(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> supervisor:child_spec()
-
-Ref = ref():: Listener name.
-NumAcceptors = non_neg_integer():: Number of acceptor processes.
-Transport = module():: Transport module.
-TransOpts = any():: Transport options.
-Protocol = module():: Protocol module.
-ProtoOpts = any():: Protocol options.
-
-Return child specifications for a new listener.
-
-This function can be used to embed a listener directly
-in an application instead of letting Ranch handle it.
-
-=== get_addr(Ref) -> {IP, Port}
-
-Ref = ref():: Listener name.
-IP = inet:ip_address():: IP of the interface used by this listener.
-Port = inet:port_number():: Port number used by this listener.
-
-Return the IP address and port for the given listener.
-
-=== get_max_connections(Ref) -> MaxConns
-
-Ref = ref():: Listener name.
-MaxConns = max_conns():: Current maximum number of connections.
-
-Return the max number of connections allowed for the given listener.
-
-=== get_port(Ref) -> Port
-
-Ref = ref():: Listener name.
-Port = inet:port_number():: Port number used by this listener.
-
-Return the port for the given listener.
-
-=== get_protocol_options(Ref) -> ProtoOpts
-
-Ref = ref():: Listener name.
-ProtoOpts = any():: Current protocol options.
-
-Return the protocol options set for the given listener.
-
-=== get_status(Ref) -> running | suspended
-
-Ref = ref():: Listener name.
-
-Return the status of the given listener.
-
-=== get_transport_options(Ref) -> TransOpts
-
-Ref = ref():: Listener name.
-TransOpts = any():: Current transport options.
-
-Return the transport options set for the given listener.
-
-=== handshake(Ref) -> {ok, Socket}
-
-Ref = ref():: Listener name.
-Socket = any():: Initialized socket.
-
-Acknowledge that the connection is accepted.
-Returns a socket that is ready to use.
-
-One of the `ranch:handshake/{1,2}` functions MUST be used
-by a connection process to inform Ranch that it initialized
-properly and let it perform any additional operations before
-the socket can be safely used.
-
-=== handshake(Ref, Opts) -> {ok, Socket}
-
-Ref = ref():: Listener name.
-Opts = any():: Initialization options.
-Socket = any():: Initialized socket.
-
-Acknowledge that the connection is accepted.
-Additional options can be provided for socket initialization.
-Returns a socket that is ready to use.
-
-One of the `ranch:handshake/{1,2}` functions MUST be used
-by a connection process to inform Ranch that it initialized
-properly and let it perform any additional operations before
-the socket can be safely used.
-
-=== info() -> [{Ref, [{Key, Value}]}]
-
-Ref = ref():: Listener name.
-Key = atom():: Information key.
-Value = any():: Information value.
-
-Return detailed information about all Ranch listeners.
-
-The following keys are defined:
-
-pid:: Pid of the listener's top-level supervisor.
-status:: Listener status, either running or suspended.
-ip:: Interface Ranch listens on.
-port:: Port number Ranch listens on.
-num_acceptors:: Number of acceptor processes.
-max_connections:: Maximum number of connections.
-active_connections:: Number of active connections.
-all_connections:: Number of connections, including those removed from the count.
-transport:: Transport module.
-transport_options:: Transport options.
-protocol:: Protocol module.
-protocol_options:: Protocol options.
-
-=== info(Ref) -> [{Key, Value}]
-
-Ref = ref():: Listener name.
-Key = atom():: Information key.
-Value = any():: Information value.
-
-Return detailed information about a specific Ranch listener.
-
-See `info/0` for a description of the defined keys.
-
-=== procs(Ref, acceptors | connections) -> [pid()]
-
-Ref = ref():: Listener name.
-
-Return all acceptor or connection processes for one listener.
-
-=== remove_connection(Ref) -> ok
-
-Ref = ref():: Listener name.
-
-Do not count this connection when limiting the number of connections.
-
-You can use this function for long-running connection processes
-which spend most of their time idling rather than consuming
-resources. This allows Ranch to accept a lot more connections
-without sacrificing the latency of the system.
-
-This function may only be called from a connection process.
-
-=== resume_listener(Ref) -> ok
-
-Ref = ref():: Listener name.
-
-Resume the given listener if it is suspended.
-If the listener is already running, nothing will happen.
-
-The listener will be started with the transport options
-currently set for it.
-
-=== set_max_connections(Ref, MaxConns) -> ok
-
-Ref = ref():: Listener name.
-MaxConns = max_conns():: New maximum number of connections.
-
-Set the max number of connections for the given listener.
-
-The change will be applied immediately. If the new value is
-smaller than the previous one, Ranch will not kill the extra
-connections, but will wait for them to terminate properly.
-
-=== set_protocol_options(Ref, ProtoOpts) -> ok
-
-Ref = ref():: Listener name.
-ProtoOpts = any():: New protocol options.
-
-Set the protocol options for the given listener.
-
-The change will be applied immediately for all new connections.
-Old connections will not receive the new options.
-
-=== set_transport_options(Ref, TransOpts) -> ok | {error, running}
-
-Ref = ref():: Listener name.
-ProtoOpts = any():: New transport options.
-
-Set the transport options for the given listener.
-
-The listener must be suspended for this call to succeed.
-If the listener is running, `{error, running}` will be returned.
-
-The change will take effect when the listener is being resumed.
-
-=== start_listener(Ref, NumAcceptors, Transport, TransOpts, Protocol, ProtoOpts) -> {ok, pid()} | {error, badarg}
-
-Ref = ref():: Listener name.
-NumAcceptors = non_neg_integer():: Number of acceptor processes.
-Transport = module():: Transport module.
-TransOpts = any():: Transport options.
-Protocol = module():: Protocol module.
-ProtoOpts = any():: Protocol options.
-
-Start listening for connections using the given transport
-and protocol. Returns the pid for this listener's supervisor.
-
-There are additional transport options that apply
-regardless of transport. They allow configuring how the
-connections are supervised, rate limited and more. Please
-consult the previous section for more details.
-
-=== stop_listener(Ref) -> ok | {error, not_found}
-
-Ref = ref():: Listener name.
-
-Stop the given listener.
-
-The listener is stopped gracefully, first by closing the
-listening port, then by stopping the connection processes.
-These processes are stopped according to the `shutdown`
-transport option, which may be set to brutally kill all
-connection processes or give them some time to stop properly.
-
-This function does not return until the listener is
-completely stopped.
-
-=== suspend_listener(Ref) -> ok
-
-Ref = ref():: Listener name.
-
-Suspend the given listener if it is running.
-If the listener is already suspended, nothing will happen.
-
-The listener will stop listening and accepting connections by
-closing the listening port, but will not stop running connection
-processes.
-
-=== wait_for_connections(Ref, Operator, NumConnections) -> ok
-
-Ref = ref():: Listener name.
-Operator = '>' | '>=' | '==' | '=<' | '<':: Comparison operator.
-NumConnections = non_neg_integer():: Number of connections to wait for.
-
-Wait until the number of connections on the given listener matches
-the given operator and number of connections.
+link:man:ranch(7)[ranch(7)]

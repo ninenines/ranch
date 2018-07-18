@@ -14,6 +14,10 @@ recent Ranch version.
 * The function `ranch:accept_ack/1` has been deprecated in
   favor of `ranch:handshake/1,2`.
 
+* The function `ranch:info/1,2` will return a map containing
+  each listener's information rather than a list of key/values.
+  The `num_acceptors` key will be removed.
+
 * The socket will no longer be passed to the protocol when
   starting it. It will be available as a return value from
   `ranch:handshake/1,2` only.
