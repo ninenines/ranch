@@ -270,7 +270,7 @@ get_status(Ref) ->
 	case lists:keyfind(ranch_acceptors_sup, 1, Children) of
 		{_, undefined, _, _} ->
 			suspended;
-		{_, AcceptorsSup, _, _} when is_pid(AcceptorsSup) ->
+		{_, _, _, _} ->
 			running
 	end.
 
