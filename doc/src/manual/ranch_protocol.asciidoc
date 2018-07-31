@@ -2,27 +2,28 @@
 
 == Name
 
-ranch_protocol - behaviour for protocol modules
+ranch_protocol - Protocol modules
 
 == Description
 
-The `ranch_protocol` behaviour defines the interface used
+The module `ranch_protocol` defines the interface used
 by Ranch protocols.
-
-== Types
-
-None.
 
 == Callbacks
 
-=== start_link(Ref, Socket, Transport, ProtoOpts) -> {ok, pid()} | {ok, pid(), pid()}
+Ranch protocols implement the following interface:
 
-Ref = ranch:ref():: Listener name.
-Socket = any():: Socket for this connection.
-Transport = module():: Transport module for this socket.
-ProtoOpts = any():: Protocol options.
+[source,erlang]
+----
+start_link(Ref       :: ranch:ref(),
+           _,
+           Transport :: module(),
+           ProtoOpts :: any())
+    -> {ok, ConnPid :: pid()}
+     | {ok, SupPid :: pid(), ConnPid :: pid()}
+----
 
-Start a new connection process for the given socket.
+Start a new connection process.
 
 The only purpose of this callback is to start a process that
 will handle the socket. It must spawn the process, link and
@@ -42,3 +43,14 @@ socket and assume no process has been started.
 Do not perform any operations in this callback, as this would
 block the supervisor responsible for starting connection
 processes and degrade performance severely.
+
+== Changelog
+
+* *1.6*: The second argument `Socket` was deprecated and will
+         be removed in Ranch 2.0. The socket should be obtained
+         by calling link:man:ranch:handshake(3)[ranch:handshake(3)].
+
+== See also
+
+link:man:ranch:handshake(3)[ranch:handshake(3)],
+link:man:ranch(7)[ranch(7)]

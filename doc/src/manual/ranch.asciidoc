@@ -104,20 +104,6 @@ options and socket options. Socket options may be given
 directly (assuming they are not a map and no Ranch-specific
 option needs to be given) or as part of `socket_opts`.
 
-The different options are described further down in this
-document.
-
-=== ref()
-
-[source,erlang]
-----
-ref() = any()
-----
-
-Unique name used to refer to a listener.
-
-== Option descriptions
-
 None of the options are required.
 
 ack_timeout::
@@ -159,6 +145,15 @@ socket_opts::
 
 Socket options given to `Transport:listen/1`. Please refer to the
 documentation of the transport module you are using for more details.
+
+=== ref()
+
+[source,erlang]
+----
+ref() = any()
+----
+
+Unique name used to refer to a listener.
 
 == Changelog
 

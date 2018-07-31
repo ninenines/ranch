@@ -19,6 +19,9 @@ service.
 Functions:
 
 * link:man:ranch(3)[ranch(3)] - Socket acceptor pool
+
+Transports:
+
 * link:man:ranch_ssl(3)[ranch_ssl(3)] - SSL transport
 * link:man:ranch_tcp(3)[ranch_tcp(3)] - TLS transport
 

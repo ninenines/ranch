@@ -2,60 +2,90 @@
 
 == Name
 
-ranch_transport - behaviour for transport modules
+ranch_transport - Transport modules
 
 == Description
 
-The `ranch_transport` behaviour defines the interface used
+The module `ranch_transport` defines the interface used
 by Ranch transports.
-
-== Types
-
-=== sendfile_opts() = [{chunk_size, non_neg_integer()}]
-
-Options used by the sendfile function and callbacks.
-
-Allows configuring the chunk size, in bytes. Defaults to 8191 bytes.
 
 == Callbacks
 
-=== accept(LSocket, Timeout) -> {ok, CSocket} | {error, closed | timeout | atom()}
+Ranch transports implement the following interface:
 
-LSocket = CSocket = any():: Listening socket.
-Timeout = timeout():: Accept timeout.
+=== accept
 
-Accept a connection on the given listening socket.
+[source,erlang]
+----
+accept(LSocket :: socket(), Timeout :: timeout())
+    -> {ok, Socket :: socket()}
+     | {error, closed | timeout | atom()}
+----
 
-The `handshake` callback will be used to initialize the socket
-after accepting the connection. This is most useful when the
-transport is not raw TCP, like with SSL for example.
+Use the listening socket returned by `listen/1`
+to accept a new connection. The timeout is specified
+in milliseconds.
 
-=== close(Socket) -> ok
+=== close
 
-Socket = any():: Socket opened with listen/1 or accept/2.
+[source,erlang]
+----
+close(Socket :: socket()) -> ok
+----
 
-Close the given socket.
+Close the socket.
 
-=== controlling_process(Socket, Pid) -> ok | {error, closed | not_owner | atom()}
+=== controlling_process
 
-Socket = any():: Socket opened with listen/1 or accept/2.
-Pid = pid():: Pid of the new owner of the socket.
+[source,erlang]
+----
+controlling_process(Socket :: socket(), Pid :: pid())
+    -> ok | {error, closed | not_owner | atom()}
+----
 
-Change the controlling process for the given socket.
+Assign a new controlling process to the socket. The
+controlling process is the process that is linked to
+and receives messages from the socket.
 
-The controlling process is the process that is allowed to
-perform operations on the socket, and that will receive
-messages from the socket when active mode is used. When
-the controlling process dies, the socket is closed.
+=== getopts
 
-=== handshake(CSocket0, Options, Timeout) -> {ok, CSocket1}
+[source,erlang]
+----
+getopts(Socket :: socket(), SockOpts :: [atom()])
+    -> {ok, any()} | {error, atom()}
+----
 
-CSocket0 = any():: Uninitialized socket for this connection.
-Options = any():: Options for initialization.
-Timeout = timeout():: Handshake timeout.
-CSocket1 = any():: Initialized socket for this connection.
+Get one or more options for the socket.
 
-Perform any necessary handshake for this transport.
+=== getstat
+
+[source,erlang]
+----
+getstat(Socket :: socket())
+    -> {ok, SockStatValues :: any()} | {error, atom()}
+----
+
+Get all statistics for the socket.
+
+[source,erlang]
+----
+getstat(Socket :: socket(), SockStats :: [atom()])
+    -> {ok, SockStatValues :: any()} | {error, atom()}
+----
+
+Get one or more statistic options for the socket.
+
+=== handshake
+
+[source,erlang]
+----
+handshake(Socket0  :: socket(),
+          SockOpts :: any(),
+          Timeout  :: timeout())
+    -> {ok, Socket}
+----
+
+Perform the transport-level handshake.
 
 This function will be called by connection processes
 before performing any socket operation. It allows
@@ -67,158 +97,198 @@ from a transport to another depending on the capabilities
 of the transports. For example a `ranch_tcp` socket may
 be upgraded to a `ranch_ssl` one using this function.
 
-=== listen(TransOpts) -> {ok, LSocket} | {error, atom()}
+=== listen
 
-TransOpts = any():: Transport options.
-LSocket = any():: Listening socket.
+[source,erlang]
+----
+listen(SockOpts :: any())
+    -> {ok, LSocket :: socket()} | {error, atom()}
+----
 
-Listen for connections on the given port.
+Create a socket that listens on the given port.
 
-The port is given as part of the transport options under
-the key `port`. Any other option is transport dependent.
+The port may not be specified or may be set to 0, which
+means a random available port number will be chosen.
 
-The socket returned by this call can then be used to
-accept connections. It is not possible to send or receive
-data from the listening socket.
+=== messages
 
-=== messages() -> {OK, Closed, Error}
+[source,erlang]
+----
+messages()
+    -> {OK     :: atom(),
+        Closed :: atom(),
+        Error  :: atom()}
+----
 
-OK = Closed = Error = atom():: Tuple names.
+Return the tuple keys for the messages sent by the socket.
 
-Return the atoms used to identify messages sent in active mode.
+=== name
 
-=== name() -> Name
-
-Name = atom():: Transport module name.
+[source,erlang]
+----
+name() -> Name :: atom()
+----
 
 Return the name of the transport.
 
-=== peername(CSocket) -> {ok, {IP, Port}} | {error, atom()}
+=== peername
 
-CSocket = any():: Socket for this connection.
-IP = inet:ip_address():: IP of the remote endpoint.
-Port = inet:port_number():: Port of the remote endpoint.
+[source,erlang]
+----
+peername(Socket :: socket())
+    -> {ok, {inet:ip_address(), inet:port_number()}}
+     | {error, atom()}.
+----
 
-Return the IP and port of the remote endpoint.
+Return the address and port number for the other end of
+the connection.
 
-=== recv(CSocket, Length, Timeout) -> {ok, Packet} | {error, closed | timeout | atom()}
+=== recv
 
-CSocket = any():: Socket for this connection.
-Length = non_neg_integer():: Requested length.
-Timeout = timeout():: Receive timeout.
-Packet = iodata() | any():: Data received.
+[source,erlang]
+----
+recv(Socket :: socket(),
+     Length :: non_neg_integer(),
+     Timeout :: timeout())
+    -> {ok, Packet :: any()}
+     | {error, closed | timeout | atom()}
+----
 
-Receive data from the given socket when in passive mode.
+Receive a packet from the socket in passive mode.
 
-Trying to receive data from a socket that is in active mode
-will return an error.
+Attempting to receive data from a socket that is
+in active mode will return an error.
 
-A length of 0 will return any data available on the socket.
+A length of 0 will return the data available on
+the socket as soon as possible, regardless of length.
 
 While it is possible to use the timeout value `infinity`,
-this is highly discouraged as this could cause your process
+it is highly discouraged as it could cause your process
 to get stuck waiting for data that will never come. This may
 happen when a socket becomes half-open due to a crash of the
-remote endpoint. Wi-Fi going down is another common culprit
-of this issue.
+remote endpoint. Wi-Fi going down is another common culprit.
 
-=== send(CSocket, Packet) -> ok | {error, atom()}
+=== secure
 
-CSocket = any():: Socket for this connection.
-Packet = iodata():: Data to be sent.
+[source,erlang]
+----
+secure() -> boolean()
+----
 
-Send data to the given socket.
+Return whether the transport can be used for secure connections.
 
-=== sendfile(CSocket, File) -> sendfile(CSocket, File, 0, 0, [])
+=== send
 
-Alias of `ranch_transport:sendfile/5`.
+[source,erlang]
+----
+send(Socket :: socket(), Packet :: iodata())
+    -> ok | {error, atom()}
+----
 
-=== sendfile(CSocket, File, Offset, Bytes) -> sendfile(CSocket, File, Offset, Bytes, [])
+Send a packet on the socket.
 
-Alias of `ranch_transport:sendfile/5`.
+=== sendfile
 
-=== sendfile(CSocket, File, Offset, Bytes, SfOpts) -> {ok, SentBytes} | {error, atom()}
+[source,erlang]
+----
+sendfile(Socket, File)
+    -> sendfile(Socket, File, 0, 0, [])
 
-CSocket = any():: Socket for this connection.
-File = file:filename_all() | file:fd():: Filename or file descriptor for the file to be sent.
-Offset = non_neg_integer():: Begin sending at this position in the file.
-Bytes = non_neg_integer():: Send this many bytes.
-SentBytes = non_neg_integer():: This many bytes were sent.
-SfOpts = sendfile_opts():: Sendfile options.
+sendfile(Socket, File, Offset, Bytes)
+    -> sendfile(Socket, File, Offset, Bytes, [])
 
-Send data from a file to the given socket.
+sendfile(Socket :: socket(),
+         File   :: file:name_all() | file:fd(),
+         Offset :: non_neg_integer(),
+         Bytes  :: non_neg_integer(),
+         Opts   :: sendfile_opts())
+    -> {ok, SentBytes :: non_neg_integer()} | {error, atom()}
+----
+
+Send a file on the socket.
 
 The file may be sent full or in parts, and may be specified
 by its filename or by an already open file descriptor.
 
 Transports that manipulate TCP directly may use the
-`file:sendfile/{2,4,5}` function, which calls the sendfile
+`file:sendfile/2,4,5` function, which calls the `sendfile`
 syscall where applicable (on Linux, for example). Other
 transports can use the `sendfile/6` function exported from
 this module.
 
-=== setopts(CSocket, SockOpts) -> ok | {error, atom()}
+=== setopts
 
-CSocket = any():: Socket for this connection.
-SockOpts = any():: Socket options.
+[source,erlang]
+----
+setopts(Socket :: socket(), SockOpts :: any())
+    -> ok | {error, atom()}
+----
 
-Change options for the given socket.
+Set one or more options for the socket.
 
-This is mainly useful for switching to active or passive mode
-or to set protocol-specific options.
+=== shutdown
 
-=== getopts(CSocket, SockOpts) -> {ok, SockOptValues} | {error, atom()}
+[source,erlang]
+----
+shutdown(Socket :: socket(),
+         How    :: read | write | read_write)
+    -> ok | {error, atom()}
+----
 
-CSocket = any():: Socket for this connection.
-SockOpts = [atom()]:: Socket option names.
-SockOptValues = list():: Socket options.
+Close the socket for reading and/or writing.
 
-Get options for the given socket.
+=== sockname
 
-=== getstat(CSocket) -> {ok, SockStatValues} | {error, atom()}
+[source,erlang]
+----
+sockname(Socket :: socket())
+    -> {ok, {inet:ip_address(), inet:port_number()}}
+     | {error, atom()}.
+----
 
-CSocket = any():: Socket for this connection.
-SockStatValues = list():: Socket statistics.
-
-Get statistics for the given socket.
-
-=== getstat(CSocket, SockStats) -> {ok, SockStatValues} | {error, atom()}
-
-CSocket = any():: Socket for this connection.
-SockStats = [atom()]:: Socket statistic names.
-SockStatValues = list():: Socket statistics.
-
-Get statistics for the given socket.
-
-=== shutdown(CSocket, How) -> ok | {error, atom()}
-
-CSocket = any():: Socket for this connection.
-How = read | write | read_write:: Which side(s) of the socket to close.
-
-Immediately close the socket in one or two directions.
-
-=== sockname(Socket) -> {ok, {IP, Port}} | {error, atom()}
-
-Socket = any():: Socket opened with listen/1 or accept/2.
-IP = inet:ip_address():: IP of the local endpoint.
-Port = inet:port_number():: Port of the local endpoint.
-
-Return the IP and port of the local endpoint.
+Return the address and port number for the local end
+of the connection.
 
 == Exports
 
-=== sendfile(Transport, CSocket, File, Offset, Bytes, SfOpts) -> {ok, SentBytes} | {error, atom()}
+The following function can be used when implementing
+transport modules:
 
-Transport = module():: Transport module for this socket.
-CSocket = any():: Socket for this connection.
-File = file:filename_all() | file:fd():: Filename or file descriptor for the file to be sent.
-Offset = non_neg_integer():: Begin sending at this position in the file.
-Bytes = non_neg_integer():: Send this many bytes.
-SentBytes = non_neg_integer():: This many bytes were sent.
-SfOpts = sendfile_opts():: Sendfile options.
+* link:man:ranch_transport:sendfile(3)[ranch_transport:sendfile(3)] - Send a file on the socket
 
-Send data from a file to the given socket.
+== Types
 
-This function emulates the function `file:sendfile/{2,4,5}`
-and may be used when transports are not manipulating TCP
-directly.
+=== sendfile_opts()
+
+[source,erlang]
+----
+sendfile_opts() :: [{chunk_size, non_neg_integer()}]
+----
+
+Options accepted by the sendfile function and callbacks:
+
+chunk_size (8191)::
+
+The chunk size, in bytes.
+
+=== socket()
+
+[source,erlang]
+----
+socket() :: any()
+----
+
+The socket.
+
+The exact type will vary depending on the transport module.
+
+== Changelog
+
+* *1.6*: The `socket()` type was added for documentation purposes.
+* *1.6*: The type of the sendfile filename was extended.
+
+== See also
+
+link:man:ranch(7)[ranch(7)],
+link:man:ranch_tcp(3)[ranch_tcp(3)],
+link:man:ranch_ssl(3)[ranch_ssl(3)]
