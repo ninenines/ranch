@@ -38,11 +38,11 @@
 -callback recv(socket(), non_neg_integer(), timeout())
 	-> {ok, any()} | {error, closed | timeout | atom()}.
 -callback send(socket(), iodata()) -> ok | {error, atom()}.
--callback sendfile(socket(), file:name() | file:fd())
+-callback sendfile(socket(), file:name_all() | file:fd())
 	-> {ok, non_neg_integer()} | {error, atom()}.
--callback sendfile(socket(), file:name() | file:fd(), non_neg_integer(),
+-callback sendfile(socket(), file:name_all() | file:fd(), non_neg_integer(),
 		non_neg_integer()) -> {ok, non_neg_integer()} | {error, atom()}.
--callback sendfile(socket(), file:name() | file:fd(), non_neg_integer(),
+-callback sendfile(socket(), file:name_all() | file:fd(), non_neg_integer(),
 		non_neg_integer(), sendfile_opts())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 -callback setopts(socket(), opts()) -> ok | {error, atom()}.
@@ -62,7 +62,7 @@
 %% A fallback for transports that don't have a native sendfile implementation.
 %% Note that the ordering of arguments is different from file:sendfile/5 and
 %% that this function accepts either a raw file or a file name.
--spec sendfile(module(), socket(), file:filename_all() | file:fd(),
+-spec sendfile(module(), socket(), file:name_all() | file:fd(),
 		non_neg_integer(), non_neg_integer(), sendfile_opts())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Transport, Socket, Filename, Offset, Bytes, Opts)
