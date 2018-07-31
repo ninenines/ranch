@@ -200,15 +200,15 @@ setopts(Socket, Opts) ->
 
 -spec getopts(ssl:sslsocket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getopts(Socket, Opts) ->
-        ssl:getopts(Socket, Opts).
+	ssl:getopts(Socket, Opts).
 
 -spec getstat(ssl:sslsocket()) -> {ok, list()} | {error, atom()}.
 getstat(Socket) ->
-        ssl:getstat(Socket).
+	ssl:getstat(Socket).
 
 -spec getstat(ssl:sslsocket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getstat(Socket, OptionNames) ->
-        ssl:getstat(Socket, OptionNames).
+	ssl:getstat(Socket, OptionNames).
 
 -spec controlling_process(ssl:sslsocket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.

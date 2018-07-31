@@ -185,15 +185,15 @@ setopts(Socket, Opts) ->
 
 -spec getopts(inet:socket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getopts(Socket, Opts) ->
-        inet:getopts(Socket, Opts).
+	inet:getopts(Socket, Opts).
 
 -spec getstat(inet:socket()) -> {ok, list()} | {error, atom()}.
 getstat(Socket) ->
-        inet:getstat(Socket).
+	inet:getstat(Socket).
 
 -spec getstat(inet:socket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getstat(Socket, OptionNames) ->
-        inet:getstat(Socket, OptionNames).
+	inet:getstat(Socket, OptionNames).
 
 -spec controlling_process(inet:socket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.
