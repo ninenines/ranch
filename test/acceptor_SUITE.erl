@@ -278,7 +278,7 @@ do_get_listener_info(ListenerGroup) ->
 
 misc_opts_logger(_) ->
 	doc("Confirm that messages are sent via the configured logger module."),
-	register(name(), self()),
+	register(misc_opts_logger, self()),
 	{ok, _} = ranch:start_listener(name(),
 		ranch_tcp, #{logger => ?MODULE, socket_opts => [<<"garbage">>]},
 		echo_protocol, []),
