@@ -96,10 +96,7 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 					Children = supervisor:which_children(Pid),
 					{_, AcceptorsSup, _, _}
 						= lists:keyfind(ranch_acceptors_sup, 1, Children),
-					%%% Note: the catch is here because SSL crashes when you change
-					%%% the controlling process of a listen socket because of a bug.
-					%%% The bug will be fixed in R16.
-					catch Transport:controlling_process(Socket, AcceptorsSup);
+					Transport:controlling_process(Socket, AcceptorsSup);
 				_ ->
 					ok
 			end,
