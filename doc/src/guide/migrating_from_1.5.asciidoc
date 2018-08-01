@@ -16,6 +16,10 @@ for older releases has been removed.
 
 * Transport options can now be updated for suspended listeners.
 
+* The `Socket` argument given when the protocol starts has been
+  deprecated. In Ranch 2.0 the socket will be obtainable only
+  by calling `ranch:handshake/1,2`.
+
 * Ranch-specific transport options and socket options are now
   better separated. When passing Ranch-specific transport options,
   Ranch now expects to receive a map, in which case socket
@@ -29,7 +33,7 @@ for older releases has been removed.
 * The transport option `ack_timeout` was renamed to `handshake_timeout`
   in the map type.
 
-* The `cacerts` transport option is now silenced in error logs
+* The `cacerts` socket option is now silenced in error logs
   just like the `certs` and `key` options.
 
 * The manual has been heavily updated and now features one
@@ -50,7 +54,7 @@ for older releases has been removed.
 
 === Changed behaviors
 
-* Transport modules must now implement `Transport:handshake/1,2`
+* Transport modules must now implement `Transport:handshake/2,3`
   which deprecates and will replace `Transport:accept_ack/1` in
   Ranch 2.0. It returns a new socket and can therefore be used
   for implementing TLS upgrade mechanisms.
@@ -62,6 +66,9 @@ for older releases has been removed.
   to obtain the running state of a listener.
 
 * A function `ranch:wait_for_connections/3` was added.
+
+* A function `ranch:handshake/1,2` was added to replace the
+  function `ranch:accept_ack/1`.
 
 === Bugs fixed
 
