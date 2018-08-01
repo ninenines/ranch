@@ -582,11 +582,11 @@ ssl_getstat_capability(_) ->
 		{ok, Vsn} when Vsn>="8.0" ->
 			do_ssl_getstat_capability();
 		_ ->
-			{skip, "No getstat/{1,2} support."}
+			{skip, "No getstat/1,2 support."}
 	end.
 
 do_ssl_getstat_capability() ->
-	doc("Ensure getstat/{1,2} capability."),
+	doc("Ensure getstat/1,2 capability."),
 	Name=name(),
 	Opts=ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
@@ -896,7 +896,7 @@ tcp_getopts_capability(_) ->
 	ok.
 
 tcp_getstat_capability(_) ->
-	doc("Ensure getstat/{1,2} capability."),
+	doc("Ensure getstat/1,2 capability."),
 	Name=name(),
 	{ok, _}=ranch:start_listener(Name,
 		ranch_tcp, #{},

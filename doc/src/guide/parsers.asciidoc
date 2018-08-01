@@ -21,7 +21,7 @@ will only cover the first two.
 Text protocols are generally line based. This means that we can't
 do anything with them until we receive the full line.
 
-A simple way to get a full line is to use `binary:split/{2,3}`.
+A simple way to get a full line is to use `binary:split/2,3`.
 
 .Using binary:split/2 to get a line of input
 

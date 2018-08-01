@@ -14,7 +14,7 @@ the call to `ranch:start_listener/5`. This callback must
 return `{ok, Pid}`, with `Pid` the pid of the new process.
 
 The newly started process can then freely initialize itself. However,
-it must call `ranch:handshake/{1,2}` before doing any socket operation.
+it must call `ranch:handshake/1,2` before doing any socket operation.
 This will ensure the connection process is the owner of the socket.
 It expects the listener's name as argument.
 
@@ -25,7 +25,7 @@ It expects the listener's name as argument.
 
 If your protocol code requires specific socket options, you should
 set them while initializing your connection process, after
-calling `ranch:handshake/{1,2}`. You can use `Transport:setopts/2`
+calling `ranch:handshake/1,2`. You can use `Transport:setopts/2`
 for that purpose.
 
 Following is the complete protocol code for the example found
@@ -64,7 +64,7 @@ loop(Socket, Transport) ->
 Special processes like the ones that use the `gen_statem` or `gen_server`
 behaviours have the particularity of having their `start_link` call not
 return until the `init` function returns. This is problematic, because
-you won't be able to call `ranch:handshake/{1,2}` from the `init` callback
+you won't be able to call `ranch:handshake/1,2` from the `init` callback
 as this would cause a deadlock to happen.
 
 Use the `gen_statem:enter_loop/4` function. It allows you to start your process
