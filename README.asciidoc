@@ -19,8 +19,8 @@ to close any of the currently opened sockets.
 
 == Online documentation
 
-* https://ninenines.eu/docs/en/ranch/1.4/guide[User guide]
-* https://ninenines.eu/docs/en/ranch/1.4/manual[Function reference]
+* https://ninenines.eu/docs/en/ranch/1.6/guide[User guide]
+* https://ninenines.eu/docs/en/ranch/1.6/manual[Function reference]
 
 == Offline documentation
 
