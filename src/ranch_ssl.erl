@@ -15,8 +15,10 @@
 -module(ranch_ssl).
 -behaviour(ranch_transport).
 
--ifdef(OTP_RELEASE).
--compile({nowarn_deprecated_function, [{ssl, ssl_accept, 3}]}).
+-ifdef(OTP_RELEASE). %% Defined on OTP ≥ 21
+-define(SSL_HANDSHAKE(A,B,C), ssl:handshake(A,B,C)).
+-else.
+-define(SSL_HANDSHAKE(A,B,C), ssl:ssl_accept(A,B,C)).
 -endif.
 
 -export([name/0]).
@@ -138,7 +140,7 @@ accept_ack(CSocket, Timeout) ->
 -spec handshake(inet:socket() | ssl:sslsocket(), opts(), timeout())
 	-> {ok, ssl:sslsocket()} | {error, any()}.
 handshake(CSocket, Opts, Timeout) ->
-	case ssl:ssl_accept(CSocket, Opts, Timeout) of
+	case ?SSL_HANDSHAKE(CSocket, Opts, Timeout) of
 		ok ->
 			{ok, CSocket};
 		{ok, NewSocket} ->
