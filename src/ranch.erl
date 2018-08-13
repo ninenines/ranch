@@ -16,6 +16,7 @@
 
 -export([start_listener/5]).
 -export([start_listener/6]).
+-export([normalize_opts/1]).
 -export([stop_listener/1]).
 -export([suspend_listener/1]).
 -export([resume_listener/1]).
@@ -111,6 +112,7 @@ start_listener(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
 	start_listener(Ref, Transport, TransOpts#{num_acceptors => NumAcceptors},
 		Protocol, ProtoOpts).
 
+-spec normalize_opts(opts()) -> opts().
 normalize_opts(Map) when is_map(Map) ->
 	Map;
 normalize_opts(List0) when is_list(List0) ->
