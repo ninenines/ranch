@@ -1,0 +1,10 @@
+[appendix]
+== Changes since Ranch 1.6
+
+The following patch versions were released since Ranch 1.6:
+
+=== Ranch 1.6.1
+
+This release fixes a minor issue in the README and adds an
+undocumented function to help Cowboy deal with the transition
+from list to map for the transport options.

@@ -29,6 +29,8 @@ include::internals.asciidoc[Internals]
 
 include::upcoming_2.0_changes.asciidoc[Upcoming changes in Ranch 2.0]
 
+include::migrating_from_1.6.asciidoc[Changes since Ranch 1.6]
+
 include::migrating_from_1.5.asciidoc[Migrating from Ranch 1.5 to 1.6]
 
 include::migrating_from_1.x.asciidoc[Migrating from Ranch 1.x]
