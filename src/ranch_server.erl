@@ -203,10 +203,19 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Request, State) ->
 	{noreply, State}.
 
-handle_info({'DOWN', MonitorRef, process, Pid, _},
+handle_info({'DOWN', MonitorRef, process, Pid, Reason},
 		State=#state{monitors=Monitors}) ->
 	{_, TypeRef} = lists:keyfind({MonitorRef, Pid}, 1, Monitors),
-	_ = ets:delete(?TAB, TypeRef),
+	case {TypeRef, Reason} of
+		{{listener_sup, Ref}, normal} ->
+			ok = cleanup_listener_opts(Ref);
+		{{listener_sup, Ref}, shutdown} ->
+			ok = cleanup_listener_opts(Ref);
+		{{listener_sup, Ref}, {shutdown, _}} ->
+			ok = cleanup_listener_opts(Ref);
+		_ ->
+			_ = ets:delete(?TAB, TypeRef)
+	end,
 	Monitors2 = lists:keydelete({MonitorRef, Pid}, 1, Monitors),
 	{noreply, State#state{monitors=Monitors2}};
 handle_info(_Info, State) ->
