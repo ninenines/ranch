@@ -3,6 +3,11 @@
 
 The following patch versions were released since Ranch 1.6:
 
+=== Ranch 1.6.2
+
+This release fixes an issue where listener information would
+not get cleaned up when an embedded listener was stopped.
+
 === Ranch 1.6.1
 
 This release fixes a minor issue in the README and adds an
