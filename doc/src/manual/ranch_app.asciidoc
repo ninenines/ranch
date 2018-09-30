@@ -22,8 +22,8 @@ Functions:
 
 Transports:
 
-* link:man:ranch_ssl(3)[ranch_ssl(3)] - SSL transport
-* link:man:ranch_tcp(3)[ranch_tcp(3)] - TLS transport
+* link:man:ranch_ssl(3)[ranch_ssl(3)] - SSL/TLS transport
+* link:man:ranch_tcp(3)[ranch_tcp(3)] - TCP transport
 
 Behaviors:
 
@@ -44,8 +44,8 @@ application. To start Ranch and all dependencies at once:
 
 == Environment
 
-The `ranch` application defines one application environment
-configuration parameter.
+The `ranch` application defines three application environment
+configuration parameters.
 
 profile (false)::
 
@@ -54,6 +54,14 @@ When enabled, Ranch will start `eprof` profiling automatically.
 You can use the `ranch_app:profile_output/0` function to stop
 profiling and output the results to the files 'procs.profile'
 and 'total.profile'. Do not use in production.
+
+ranch_sup_intensity (1)::
+
+Restart intensity for the ranch_server process.
+
+ranch_sup_period (5)::
+
+Restart period, in seconds, for the ranch_server process.
 
 == See also
 
