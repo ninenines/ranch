@@ -421,12 +421,12 @@ filter_user_options([Opt = {Key, _}|Tail], DisallowedKeys) ->
 			filter_user_options(Tail, DisallowedKeys)
 	end;
 %% Special option forms.
-filter_user_options([inet|Tail], AllowedKeys) ->
-	[inet|filter_user_options(Tail, AllowedKeys)];
-filter_user_options([inet6|Tail], AllowedKeys) ->
-	[inet6|filter_user_options(Tail, AllowedKeys)];
-filter_user_options([Opt = {raw, _, _, _}|Tail], AllowedKeys) ->
-	[Opt|filter_user_options(Tail, AllowedKeys)];
+filter_user_options([inet|Tail], DisallowedKeys) ->
+	[inet|filter_user_options(Tail, DisallowedKeys)];
+filter_user_options([inet6|Tail], DisallowedKeys) ->
+	[inet6|filter_user_options(Tail, DisallowedKeys)];
+filter_user_options([Opt = {raw, _, _, _}|Tail], DisallowedKeys) ->
+	[Opt|filter_user_options(Tail, DisallowedKeys)];
 filter_user_options([Opt|Tail], DisallowedKeys) ->
 	filter_options_warning(Opt),
 	filter_user_options(Tail, DisallowedKeys);
