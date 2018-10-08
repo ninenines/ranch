@@ -33,6 +33,10 @@ AUTO_CI_WINDOWS ?= OTP-18+
 
 include erlang.mk
 
+# Compile options.
+
+TEST_ERLC_OPTS += +'{parse_transform, eunit_autoexport}'
+
 # Dialyze the tests.
 
 DIALYZER_OPTS += --src -r test
