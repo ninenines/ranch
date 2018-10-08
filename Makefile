@@ -24,10 +24,10 @@ dep_ct_helper = git https://github.com/ninenines/ct_helper master
 dep_ci.erlang.mk = git https://github.com/ninenines/ci.erlang.mk master
 DEP_EARLY_PLUGINS = ci.erlang.mk
 
-AUTO_CI_OTP ?= OTP-18+
+AUTO_CI_OTP ?= OTP-19+
 AUTO_CI_HIPE ?= OTP-LATEST
 # AUTO_CI_ERLLVM ?= OTP-LATEST
-AUTO_CI_WINDOWS ?= OTP-18+
+AUTO_CI_WINDOWS ?= OTP-19+
 
 # Standard targets.
 

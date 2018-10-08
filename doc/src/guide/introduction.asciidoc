@@ -15,10 +15,7 @@ with socket programming and TCP protocols.
 
 Ranch is tested and supported on Linux, FreeBSD, OSX and Windows.
 
-Ranch is developed for Erlang/OTP 18+.
-
-There are known issues with the SSL application found in Erlang/OTP
-18.3.2 and 18.3.3. These versions are therefore not supported.
+Ranch is developed for Erlang/OTP 19+.
 
 Ranch may be compiled on earlier Erlang versions with small source code
 modifications but there is no guarantee that it will work as expected.
