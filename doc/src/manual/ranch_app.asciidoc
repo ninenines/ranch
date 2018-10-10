@@ -22,8 +22,8 @@ Functions:
 
 Transports:
 
-* link:man:ranch_ssl(3)[ranch_ssl(3)] - SSL transport
-* link:man:ranch_tcp(3)[ranch_tcp(3)] - TLS transport
+* link:man:ranch_ssl(3)[ranch_ssl(3)] - SSL/TLS transport
+* link:man:ranch_tcp(3)[ranch_tcp(3)] - TCP transport
 
 Behaviors:
 
