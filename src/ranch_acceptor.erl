@@ -43,8 +43,11 @@ loop(LSocket, Transport, Logger, ConnsSup) ->
 				"Ranch acceptor reducing accept rate: out of file descriptors~n",
 				[], Logger),
 			receive after 100 -> ok end;
-		%% We want to crash if the listening socket got closed.
-		{error, Reason} when Reason =/= closed ->
+		%% Exit if the listening socket got closed.
+		{error, closed} ->
+			exit(closed);
+		%% Continue otherwise.
+		{error, _} ->
 			ok
 	end,
 	flush(Logger),
