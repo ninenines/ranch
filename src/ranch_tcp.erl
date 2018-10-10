@@ -26,6 +26,7 @@
 -export([connect/3]).
 -export([connect/4]).
 -export([recv/3]).
+-export([recv_proxy_header/2]).
 -export([send/2]).
 -export([sendfile/2]).
 -export([sendfile/4]).
@@ -130,6 +131,28 @@ connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
 	-> {ok, any()} | {error, closed | atom()}.
 recv(Socket, Length, Timeout) ->
 	gen_tcp:recv(Socket, Length, Timeout).
+
+-spec recv_proxy_header(inet:socket(), timeout())
+	-> {ok, any()} | {error, closed | atom()} | {error, protocol_error, atom()}.
+recv_proxy_header(Socket, Timeout) ->
+	case recv(Socket, 0, Timeout) of
+		{ok, Data} ->
+			case ranch_proxy_header:parse(Data) of
+				{ok, ProxyInfo, <<>>} ->
+					{ok, ProxyInfo};
+				{ok, ProxyInfo, Rest} ->
+					case gen_tcp:unrecv(Socket, Rest) of
+						ok ->
+							{ok, ProxyInfo};
+						Error ->
+							Error
+					end;
+				{error, HumanReadable} ->
+					{error, protocol_error, HumanReadable}
+			end;
+		Error ->
+			Error
+	end.
 
 -spec send(inet:socket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
