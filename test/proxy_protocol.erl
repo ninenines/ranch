@@ -18,7 +18,7 @@ init(Ref, Transport, _Opts = []) ->
 loop(Socket, Transport) ->
 	case Transport:recv(Socket, 0, 5000) of
 		{ok, Data} ->
-			Transport:send(Socket, Data),
+			_ = Transport:send(Socket, Data),
 			loop(Socket, Transport);
 		_ ->
 			ok = Transport:close(Socket)
