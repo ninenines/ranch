@@ -82,8 +82,7 @@ cleanup_listener_opts(Ref) ->
 
 -spec set_connections_sup(ranch:ref(), pid()) -> ok.
 set_connections_sup(Ref, Pid) ->
-	true = gen_server:call(?MODULE, {set_connections_sup, Ref, Pid}),
-	ok.
+	gen_server:call(?MODULE, {set_connections_sup, Ref, Pid}).
 
 -spec get_connections_sup(ranch:ref()) -> pid().
 get_connections_sup(Ref) ->
@@ -95,8 +94,7 @@ get_connections_sups() ->
 
 -spec set_listener_sup(ranch:ref(), pid()) -> ok.
 set_listener_sup(Ref, Pid) ->
-	true = gen_server:call(?MODULE, {set_listener_sup, Ref, Pid}),
-	ok.
+	gen_server:call(?MODULE, {set_listener_sup, Ref, Pid}).
 
 -spec get_listener_sup(ranch:ref()) -> pid().
 get_listener_sup(Ref) ->
@@ -161,26 +159,12 @@ handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartAr
 	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
 	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
 	{reply, ok, State};
-handle_call({set_connections_sup, Ref, Pid}, _,
-		State=#state{monitors=Monitors}) ->
-	case ets:insert_new(?TAB, {{conns_sup, Ref}, Pid}) of
-		true ->
-			MonitorRef = erlang:monitor(process, Pid),
-			{reply, true,
-				State#state{monitors=[{{MonitorRef, Pid}, {conns_sup, Ref}}|Monitors]}};
-		false ->
-			{reply, false, State}
-	end;
-handle_call({set_listener_sup, Ref, Pid}, _,
-		State=#state{monitors=Monitors}) ->
-	case ets:insert_new(?TAB, {{listener_sup, Ref}, Pid}) of
-		true ->
-			MonitorRef = erlang:monitor(process, Pid),
-			{reply, true,
-				State#state{monitors=[{{MonitorRef, Pid}, {listener_sup, Ref}}|Monitors]}};
-		false ->
-			{reply, false, State}
-	end;
+handle_call({set_connections_sup, Ref, Pid}, _, State0) ->
+	State = set_monitored_process({conns_sup, Ref}, Pid, State0),
+	{reply, ok, State};
+handle_call({set_listener_sup, Ref, Pid}, _, State0) ->
+	State = set_monitored_process({listener_sup, Ref}, Pid, State0),
+	{reply, ok, State};
 handle_call({set_addr, Ref, Addr}, _, State) ->
 	true = ets:insert(?TAB, {{addr, Ref}, Addr}),
 	{reply, ok, State};
@@ -227,3 +211,23 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
+
+%% Internal.
+
+set_monitored_process(Key, Pid, State=#state{monitors=Monitors0}) ->
+	%% First we cleanup the monitor if a residual one exists.
+	%% This can happen during crashes when the restart is faster
+	%% than the cleanup.
+	Monitors = case lists:keytake(Key, 2, Monitors0) of
+		false ->
+			Monitors0;
+		{value, {{OldMonitorRef, _}, _}, Monitors1} ->
+			true = erlang:demonitor(OldMonitorRef, [flush]),
+			Monitors1
+	end,
+	%% Then we unconditionally insert in the ets table.
+	%% If residual data is there, it will be overwritten.
+	true = ets:insert(?TAB, {Key, Pid}),
+	%% Finally we start monitoring this new process.
+	MonitorRef = erlang:monitor(process, Pid),
+	State#state{monitors=[{{MonitorRef, Pid}, Key}|Monitors]}.
