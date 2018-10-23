@@ -41,10 +41,12 @@ TEST_ERLC_OPTS += +'{parse_transform, eunit_autoexport}'
 
 DIALYZER_OPTS += --src -r test
 
-# Use erl_make_certs from the tested release during CI.
+# Use erl_make_certs from the tested release during CI
+# and ensure that ct_helper is always recompiled.
 #
 # Note that erl_make_certs was removed from OTP-20.1. For now
 # we are fine using the most recent version from OTP-20.
 
 ci-setup:: $(DEPS_DIR)/ct_helper
 	$(gen_verbose) cp ~/.kerl/builds/$(CI_OTP_RELEASE)/otp_src_git/lib/ssl/test/erl_make_certs.erl deps/ct_helper/src/ || true
+	$(gen_verbose) $(MAKE) -C $(DEPS_DIR)/ct_helper clean app
