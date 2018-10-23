@@ -133,7 +133,9 @@ recv(Socket, Length, Timeout) ->
 	gen_tcp:recv(Socket, Length, Timeout).
 
 -spec recv_proxy_header(inet:socket(), timeout())
-	-> {ok, any()} | {error, closed | atom()} | {error, protocol_error, atom()}.
+	-> {ok, ranch_proxy_header:proxy_info()}
+	| {error, closed | atom()}
+	| {error, protocol_error, atom()}.
 recv_proxy_header(Socket, Timeout) ->
 	case recv(Socket, 0, Timeout) of
 		{ok, Data} ->

@@ -25,6 +25,7 @@
 -export([accept_ack/1]).
 -export([handshake/1]).
 -export([handshake/2]).
+-export([recv_proxy_header/2]).
 -export([remove_connection/1]).
 -export([get_status/1]).
 -export([get_addr/1]).
@@ -254,6 +255,16 @@ handshake(Ref, Opts) ->
 				ok = Transport:close(CSocket),
 				error(Reason)
 		end
+	end.
+
+-spec recv_proxy_header(ref(), timeout())
+	-> {ok, ranch_proxy_header:proxy_info()}
+	| {error, closed | atom()}
+	| {error, protocol_error, atom()}.
+recv_proxy_header(Ref, Timeout) ->
+	receive HandshakeState={handshake, Ref, Transport, CSocket, _} ->
+		self() ! HandshakeState,
+		Transport:recv_proxy_header(CSocket, Timeout)
 	end.
 
 -spec remove_connection(ref()) -> ok.

@@ -37,6 +37,10 @@
 	-> {ok, socket()} | {error, atom()}.
 -callback recv(socket(), non_neg_integer(), timeout())
 	-> {ok, any()} | {error, closed | timeout | atom()}.
+-callback recv_proxy_header(socket(), timeout())
+	-> {ok, ranch_proxy_header:proxy_info()}
+	| {error, closed | atom()}
+	| {error, protocol_error, atom()}.
 -callback send(socket(), iodata()) -> ok | {error, atom()}.
 -callback sendfile(socket(), file:name_all() | file:fd())
 	-> {ok, non_neg_integer()} | {error, atom()}.

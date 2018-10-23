@@ -9,9 +9,12 @@ start_link(Ref, _Socket, Transport, Opts) ->
 	{ok, Pid}.
 
 init(Ref, Transport, _Opts = []) ->
+	{ok, ProxyInfo} = ranch:recv_proxy_header(Ref, 1000),
 	{ok, Socket} = ranch:handshake(Ref),
-	{ok, ProxyInfo} = Transport:recv_proxy_header(Socket, 1000),
-	Pid = ct_helper:get_remote_pid_tcp(Socket),
+	Pid = case Transport of
+		ranch_tcp -> ct_helper:get_remote_pid_tcp(Socket);
+		ranch_ssl -> ct_helper:get_remote_pid_tls(Socket)
+	end,
 	Pid ! {?MODULE, ProxyInfo},
 	loop(Socket, Transport).
 

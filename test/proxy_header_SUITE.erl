@@ -209,21 +209,17 @@ recv_v2_local_header_ssl_extra_data(_) ->
 	do_proxy_header_ssl(Name, ProxyInfo, <<"HELLO">>, <<"TCP Ranch is working!">>).
 
 do_proxy_header_ssl(Name, ProxyInfo, Data1, Data2) ->
+	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
-		proxy_protocol_ssl, []),
+		ranch_ssl, Opts,
+		proxy_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket0} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket0, [ranch_proxy_header:header(ProxyInfo)]),
-	%% This timeout is necessary to avoid a race condition when trying
-	%% to obtain the pid of the test case from the protocol. The race
-	%% condition is due to the TLS upgrade which changes the process
-	%% owning the socket.
-	timer:sleep(100),
 	{ok, Socket} = ssl:connect(Socket0, [], 1000),
 	ok = ssl:send(Socket, Data1),
 	receive
-		{proxy_protocol_ssl, ProxyInfo} ->
+		{proxy_protocol, ProxyInfo} ->
 			ok
 	after 2000 ->
 		error(timeout)

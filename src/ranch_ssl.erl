@@ -30,6 +30,7 @@
 -export([connect/3]).
 -export([connect/4]).
 -export([recv/3]).
+-export([recv_proxy_header/2]).
 -export([send/2]).
 -export([sendfile/2]).
 -export([sendfile/4]).
@@ -168,6 +169,19 @@ connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
 	-> {ok, any()} | {error, closed | atom()}.
 recv(Socket, Length, Timeout) ->
 	ssl:recv(Socket, Length, Timeout).
+
+-spec recv_proxy_header(ssl:sslsocket(), timeout())
+	-> {ok, ranch_proxy_header:proxy_info()}
+	| {error, closed | atom()}
+	| {error, protocol_error, atom()}.
+recv_proxy_header(SSLSocket, Timeout) ->
+	%% There's currently no documented way to perform a TCP recv
+	%% on an sslsocket(), even before the TLS handshake. However
+	%% nothing prevents us from retrieving the TCP socket and using
+	%% it. Since it's an undocumented interface this may however
+	%% make forward-compatibility more difficult.
+	{sslsocket, {gen_tcp, TCPSocket, _, _}, _} = SSLSocket,
+	ranch_tcp:recv_proxy_header(TCPSocket, Timeout).
 
 -spec send(ssl:sslsocket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
