@@ -70,5 +70,6 @@ init(Ref, Transport, Opts) ->
 == See also
 
 link:man:ranch:start_listener(3)[ranch:start_listener(3)],
+link:man:ranch:recv_proxy_header(3)[ranch:recv_proxy_header(3)],
 link:man:ranch:remove_connection(3)[ranch:remove_connection(3)],
 link:man:ranch(3)[ranch(3)]

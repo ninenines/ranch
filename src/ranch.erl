@@ -257,6 +257,10 @@ handshake(Ref, Opts) ->
 		end
 	end.
 
+%% Unlike handshake/2 this function always return errors because
+%% the communication between the proxy and the server are expected
+%% to be reliable. If there is a problem while receiving the proxy
+%% header, we probably want to know about it.
 -spec recv_proxy_header(ref(), timeout())
 	-> {ok, ranch_proxy_header:proxy_info()}
 	| {error, closed | atom()}

@@ -27,6 +27,7 @@ Connections:
 
 * ranch:accept_ack(3) - Deprecated in favor of link:man:ranch:handshake(3)[ranch:handshake(3)]
 * link:man:ranch:handshake(3)[ranch:handshake(3)] - Perform the transport handshake
+* link:man:ranch:recv_proxy_header(3)[ranch:recv_proxy_header(3)] - Receive the PROXY protocol header
 * link:man:ranch:remove_connection(3)[ranch:remove_connection(3)] - Remove connection from the count
 
 Options:

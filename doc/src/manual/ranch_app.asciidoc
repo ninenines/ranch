@@ -19,6 +19,7 @@ service.
 Functions:
 
 * link:man:ranch(3)[ranch(3)] - Socket acceptor pool
+* link:man:ranch_proxy_header(3)[ranch_proxy_header(3)] - PROXY protocol
 
 Transports:
 
