@@ -48,7 +48,7 @@
 -export_type([proxy_info/0]).
 
 -type build_opts() :: #{
-	checksum => crc32,
+	checksum => crc32c,
 	padding => pos_integer() %% >= 3
 }.
 
@@ -482,6 +482,18 @@ parse_v2_test() ->
 		Path/binary, 0:Padding,
 		"GET / HTTP/1.1\r\n">>),
 	ok.
+
+parse_v2_regression_test() ->
+	%% Real packet received from AWS. We confirm that the CRC32C
+	%% check succeeds only (in other words that ok is returned).
+	{ok, _, <<>>} = parse(<<
+		13, 10, 13, 10, 0, 13, 10, 81, 85, 73, 84, 10, 33, 17, 0, 84,
+		172, 31, 7, 113, 172, 31, 10, 31, 200, 242, 0, 80, 3, 0, 4,
+		232, 214, 137, 45, 234, 0, 23, 1, 118, 112, 99, 101, 45, 48,
+		56, 100, 50, 98, 102, 49, 53, 102, 97, 99, 53, 48, 48, 49, 99,
+		57, 4, 0, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>),
+	ok.
 -endif.
 
 parse_tlv(Rest, 0, Info, _) ->
@@ -497,8 +509,8 @@ parse_tlv(<<16#3, TLVLen:16, CRC32C:32, Rest/bits>>, Len0, Info, Header) when TL
 	Len = Len0 - TLVLen - 3,
 	BeforeLen = byte_size(Header) - Len - TLVLen,
 	<<Before:BeforeLen/binary, _:32, After:Len/binary>> = Header,
-	%% The initial CRC is erlang:crc32(<<"\r\n\r\n\0\r\nQUIT\n", 2:4, 1:4>>).
-	case erlang:crc32(1302506282, [Before, <<0:32>>, After]) of
+	%% The initial CRC is ranch_crc32c:crc32c(<<"\r\n\r\n\0\r\nQUIT\n", 2:4, 1:4>>).
+	case ranch_crc32c:crc32c(2900412422, [Before, <<0:32>>, After]) of
 		CRC32C ->
 			parse_tlv(Rest, Len, Info, Header);
 		_ ->
@@ -591,7 +603,7 @@ header(ProxyInfo=#{version := 2, command := proxy,
 	Addresses = addresses(ProxyInfo),
 	TLVs = tlvs(ProxyInfo, Opts),
 	ExtraLen = case Opts of
-		#{checksum := crc32} -> 7;
+		#{checksum := crc32c} -> 7;
 		_ -> 0
 	end,
 	Len = iolist_size(Addresses) + iolist_size(TLVs) + ExtraLen,
@@ -603,8 +615,8 @@ header(ProxyInfo=#{version := 2, command := proxy,
 		TLVs
 	],
 	case Opts of
-		#{checksum := crc32} ->
-			CRC32C = erlang:crc32([Header, <<16#3, 4:16, 0:32>>]),
+		#{checksum := crc32c} ->
+			CRC32C = ranch_crc32c:crc32c([Header, <<16#3, 4:16, 0:32>>]),
 			[Header, <<16#3, 4:16, CRC32C:32>>];
 		_ ->
 			Header
@@ -849,7 +861,7 @@ v2_checksum_test() ->
 		dest_address => {10, 11, 12, 13},
 		dest_port => 23456
 	},
-	{ok, Test, <<>>} = parse(iolist_to_binary(header(Test, #{checksum => crc32}))),
+	{ok, Test, <<>>} = parse(iolist_to_binary(header(Test, #{checksum => crc32c}))),
 	ok.
 
 v2_padding_test() ->

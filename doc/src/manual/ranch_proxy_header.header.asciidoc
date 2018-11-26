@@ -13,7 +13,7 @@ header(ProxyInfo, BuildOpts) -> iodata()
 
 ProxyInfo :: ranch_proxy_header:proxy_info()
 BuildOpts :: #{
-    checksum => crc32,
+    checksum => crc32c,
     padding  => pos_integer() %% >= 3
 }
 ----
@@ -63,7 +63,7 @@ Data = ranch_proxy_header:parse(ProxyInfo).
 [source,erlang]
 ----
 Data = ranch_proxy_header:parse(ProxyInfo, #{
-    checksum => crc32,
+    checksum => crc32c,
     padding  => 7
 }).
 ----
