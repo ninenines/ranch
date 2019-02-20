@@ -63,6 +63,7 @@ groups() ->
 	]}, {misc, [
 		misc_bad_transport,
 		misc_bad_transport_options,
+		misc_repeated_remove,
 		misc_info,
 		misc_info_embedded,
 		misc_opts_logger,
@@ -290,6 +291,20 @@ misc_opts_logger(_) ->
 
 warning(Format, Args) ->
 	misc_opts_logger ! {warning, Format, Args}.
+
+misc_repeated_remove(_) ->
+	doc("Ensure repeated removal of connection does not crash the connection supervisor."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{},
+		remove_conn_and_wait_protocol, [{remove, 5, 0}]),
+	Port = ranch:get_port(Name),
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	{ok, _} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	timer:sleep(1000),
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	true = erlang:is_process_alive(ConnsSup),
+	ok = ranch:stop_listener(Name).
 
 misc_wait_for_connections(_) ->
 	doc("Ensure wait for connections works."),

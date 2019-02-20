@@ -145,7 +145,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 			case put(Pid, removed) of
 				active ->
 					loop(State, CurConns - 1, NbChildren, Sleepers);
-				remove ->
+				removed ->
 					loop(State, CurConns, NbChildren, Sleepers);
 				undefined ->
 					_ = erase(Pid),
