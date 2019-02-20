@@ -10,10 +10,12 @@ start_link(Ref, _, _, [{remove, MaybeRemove, Timeout}]) ->
 
 init(Ref, MaybeRemove, Timeout) ->
 	{ok, _} = ranch:handshake(Ref),
-	case MaybeRemove of
+	_ = case MaybeRemove of
 		true ->
 			ranch:remove_connection(Ref);
 		false ->
-			ok
+			ok;
+		N ->
+			[ranch:remove_connection(Ref) || _ <- lists:seq(1, N)]
 	end,
 	receive after Timeout -> ok end.

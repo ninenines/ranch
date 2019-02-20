@@ -63,6 +63,7 @@ groups() ->
 	]}, {misc, [
 		misc_bad_transport,
 		misc_bad_transport_options,
+		misc_repeated_remove,
 		misc_info,
 		misc_info_embedded,
 		misc_opts_logger,
@@ -94,6 +95,21 @@ misc_bad_transport_options(_) ->
 		ranch_tcp, [binary, {packet, 4}, <<"garbage">>, raw, backlog],
 		echo_protocol, []),
 	ok.
+
+misc_repeated_remove(_) ->
+        doc("Ensure repeated removal of connection does not crash the connection supervisor."),
+        Name=name(),
+        {ok, _}=ranch:start_listener(Name,
+                ranch_tcp, #{},
+                remove_conn_and_wait_protocol, [{remove, 5, 0}]),
+        Port=ranch:get_port(Name),
+	ConnsSup = ranch_server:get_connections_sup(Name),
+        {ok, _}=gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	receive after 1000 -> ok end,
+	ConnsSup = ranch_server:get_connections_sup(Name),
+	true = erlang:is_process_alive(ConnsSup),
+	ok = ranch:stop_listener(Name),
+        ok.
 
 misc_info(_) ->
 	doc("Information about listeners."),
