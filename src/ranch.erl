@@ -55,12 +55,12 @@
 	| {connection_type, worker | supervisor}
 	| {max_connections, max_conns()}
 	| {num_acceptors, pos_integer()}
-	| {shutdown, timeout() | brutal_kill}
-	| {socket, any()}.
+	| {shutdown, timeout() | brutal_kill}.
 -export_type([opt/0]).
 
 -type opts() :: any() | #{
 	connection_type => worker | supervisor,
+	dedicated_acceptor_sockets => boolean(),
 	handshake_timeout => timeout(),
 	max_connections => max_conns(),
 	logger => module(),
@@ -86,24 +86,6 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 		true ->
 			Res = supervisor:start_child(ranch_sup, child_spec(Ref,
 					Transport, TransOpts, Protocol, ProtoOpts)),
-			Socket = maps:get(socket, TransOpts, undefined),
-			case Res of
-				{ok, Pid} when Socket =/= undefined ->
-					%% Give ownership of the socket to ranch_acceptors_sup
-					%% to make sure the socket stays open as long as the
-					%% listener is alive. If the socket closes however there
-					%% will be no way to recover because we don't know how
-					%% to open it again.
-					Children = supervisor:which_children(Pid),
-					{_, AcceptorsSup, _, _}
-						= lists:keyfind(ranch_acceptors_sup, 1, Children),
-					%%% Note: the catch is here because SSL crashes when you change
-					%%% the controlling process of a listen socket because of a bug.
-					%%% The bug will be fixed in R16.
-					catch Transport:controlling_process(Socket, AcceptorsSup);
-				_ ->
-					ok
-			end,
 			maybe_started(Res)
 	end.
 

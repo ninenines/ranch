@@ -28,7 +28,7 @@ all() ->
 
 groups() ->
 	[{tcp, [
-		tcp_accept_socket,
+%		tcp_accept_socket,
 		tcp_active_echo,
 		tcp_echo,
 		tcp_graceful,
@@ -43,11 +43,13 @@ groups() ->
 		tcp_getopts_capability,
 		tcp_getstat_capability,
 		tcp_upgrade,
+		tcp_dedicated_sockets,
+		tcp_dedicated_sockets_reuseport_disabled,
 		tcp_error_eaddrinuse,
 		tcp_error_eacces
 	]}, {ssl, [
 		ssl_accept_error,
-		ssl_accept_socket,
+%		ssl_accept_socket,
 		ssl_active_echo,
 		ssl_echo,
 		ssl_graceful,
@@ -57,6 +59,8 @@ groups() ->
 		ssl_upgrade_from_tcp,
 		ssl_getopts_capability,
 		ssl_getstat_capability,
+		ssl_dedicated_sockets,
+		ssl_dedicated_sockets_reuseport_disabled,
 		ssl_error_eaddrinuse,
 		ssl_error_no_cert,
 		ssl_error_eacces
@@ -403,6 +407,42 @@ ssl_accept_socket(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+ssl_dedicated_sockets(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			doc("Ensure that dedicated_acceptor_sockets works with SSL."),
+			Name = name(),
+			Opts = ct_helper:get_certs_from_ets(),
+			{ok, ListenerSupPid} = ranch:start_listener(Name,
+				ranch_ssl, #{num_acceptors => 10,
+					dedicated_acceptor_sockets => true,
+					socket_opts => [{raw, 1, 15, <<1:32/native>>}|Opts]},
+				echo_protocol, []),
+			10 = length(do_get_listener_sockets(ListenerSupPid)),
+			ok = ranch:stop_listener(Name),
+			{'EXIT', _} = begin catch ranch:get_port(Name) end,
+			ok;
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
+
+ssl_dedicated_sockets_reuseport_disabled(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			doc("Ensure that dedicated_acceptor_sockets fails with SSL if SO_REUSEPORT is disabled."),
+			Name = name(),
+			Opts = ct_helper:get_certs_from_ets(),
+			{error, eaddrinuse} = ranch:start_listener(Name,
+				ranch_ssl, #{num_acceptors => 10,
+					dedicated_acceptor_sockets => true,
+					socket_opts => [{raw, 1, 15, <<0:32/native>>}|Opts]},
+				echo_protocol, []),
+			{'EXIT', _} = begin catch ranch:get_port(Name) end,
+			ok;
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
+
 ssl_active_echo(_) ->
 	doc("Ensure that active mode works with SSL transport."),
 	Name = name(),
@@ -658,6 +698,40 @@ tcp_accept_socket(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
+
+tcp_dedicated_sockets(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			doc("Ensure that dedicated_acceptor_sockets works with TCP."),
+			Name = name(),
+			{ok, ListenerSupPid} = ranch:start_listener(Name,
+				ranch_tcp, #{num_acceptors => 10,
+					dedicated_acceptor_sockets => true,
+					socket_opts => [{raw, 1, 15, <<1:32/native>>}]},
+				echo_protocol, []),
+			10 = length(do_get_listener_sockets(ListenerSupPid)),
+			ok = ranch:stop_listener(Name),
+			{'EXIT', _} = begin catch ranch:get_port(Name) end,
+			ok;
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
+
+tcp_dedicated_sockets_reuseport_disabled(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			doc("Ensure that dedicated_acceptor_sockets fails with TCP if SO_REUSEPORT is disabled."),
+			Name = name(),
+			{error, eaddrinuse} = ranch:start_listener(Name,
+				ranch_tcp, #{num_acceptors => 10,
+					dedicated_acceptor_sockets => true,
+					socket_opts => [{raw, 1, 15, <<0:32/native>>}]},
+				echo_protocol, []),
+			{'EXIT', _} = begin catch ranch:get_port(Name) end,
+			ok;
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
 
 tcp_active_echo(_) ->
 	doc("Ensure that active mode works with TCP transport."),
@@ -998,15 +1072,17 @@ supervisor_changed_options_restart(_) ->
 		ranch_tcp, [{send_timeout, 300000}],
 		echo_protocol, []),
 	%% Ensure send_timeout is really set to initial value.
+	[ListenerSocket1] = do_get_listener_sockets(ListenerSupPid1),
 	{ok, [{send_timeout, 300000}]}
-		= inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
+		= inet:getopts(ListenerSocket1, [send_timeout]),
 	%% Change send_timeout option.
 	ok = ranch:suspend_listener(Name),
 	ok = ranch:set_transport_options(Name, [{send_timeout, 300001}]),
 	ok = ranch:resume_listener(Name),
 	%% Ensure send_timeout is really set to the changed value.
+	[ListenerSocket2] = do_get_listener_sockets(ListenerSupPid1),
 	{ok, [{send_timeout, 300001}]}
-		= inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
+		= inet:getopts(ListenerSocket2, [send_timeout]),
 	%% Crash the listener_sup process, allow a short time for restart to succeed.
 	exit(ListenerSupPid1, kill),
 	timer:sleep(1000),
@@ -1014,8 +1090,9 @@ supervisor_changed_options_restart(_) ->
 	[ListenerSupPid2] = [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _}
 		<- supervisor:which_children(ranch_sup), Ref =:= Name],
 	%% Ensure send_timeout is still set to the changed value.
+	[ListenerSocket3] = do_get_listener_sockets(ListenerSupPid2),
 	{ok, [{send_timeout, 300001}]}
-		= inet:getopts(do_get_listener_socket(ListenerSupPid2), [send_timeout]),
+		= inet:getopts(ListenerSocket3, [send_timeout]),
 	ok = ranch:stop_listener(Name),
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
@@ -1269,12 +1346,11 @@ clean_traces() ->
 		ok
 	end.
 
-do_get_listener_socket(ListenerSupPid) ->
+do_get_listener_sockets(ListenerSupPid) ->
 	[AcceptorsSupPid] = [Pid || {ranch_acceptors_sup, Pid, supervisor, _}
 		<- supervisor:which_children(ListenerSupPid)],
 	{links, Links} = erlang:process_info(AcceptorsSupPid, links),
-	[LSocket] = [P || P <- Links, is_port(P)],
-	LSocket.
+	[P || P <- Links, is_port(P)].
 
 do_conns_which_children(Name) ->
 	Conns = [supervisor:which_children(ConnsSup) || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
@@ -1295,3 +1371,10 @@ do_conns_count_children(Name) ->
 		undefined,
 		[supervisor:count_children(ConnsSup) || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)]
 	).
+
+do_os_supports_reuseport() ->
+	case {os:type(), os:version()} of
+		{{unix, linux}, {Major, _, _}} when Major>3 -> true;
+		{{unix, linux}, {3, Minor, _}} when Minor>=9 -> true;
+		_ -> false
+	end.

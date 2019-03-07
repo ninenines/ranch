@@ -26,32 +26,40 @@ start_link(Ref, NumAcceptors, Transport) ->
 init([Ref, NumAcceptors, Transport]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	Logger = maps:get(logger, TransOpts, error_logger),
-	LSocket = case maps:get(socket, TransOpts, undefined) of
-		undefined ->
-			SocketOpts = maps:get(socket_opts, TransOpts, []),
-			%% We temporarily put the logger in the process dictionary
-			%% so that it can be used from ranch:filter_options. The
-			%% interface as it currently is does not allow passing it
-			%% down otherwise.
-			put(logger, Logger),
-			case Transport:listen(SocketOpts) of
-				{ok, Socket} ->
-					erase(logger),
-					Socket;
-				{error, Reason} ->
-					listen_error(Ref, Transport, SocketOpts, Reason, Logger)
-			end;
-		Socket ->
-			Socket
-	end,
-	{ok, Addr} = Transport:sockname(LSocket),
+	LSockets = [{_, BaseSocket}|_] = start_listen_sockets(Ref, NumAcceptors, Transport, TransOpts, Logger),
+	{ok, Addr} = Transport:sockname(BaseSocket),
 	ranch_server:set_addr(Ref, Addr),
 	Procs = [
 		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
 			LSocket, Transport, Logger, ranch_server:get_connections_sup(Ref, N)
 		]}, permanent, brutal_kill, worker, []}
-			|| N <- lists:seq(1, NumAcceptors)],
+			|| {N, LSocket} <- LSockets],
 	{ok, {{one_for_one, 1, 5}, Procs}}.
+
+-spec start_listen_sockets(any(), pos_integer(), module(), #{}, module()) -> [{pos_integer(), inet:socket()}].
+start_listen_sockets(Ref, NumAcceptors, Transport, TransOpts, Logger) ->
+	SocketOpts0 = maps:get(socket_opts, TransOpts, []),
+	BaseSocket = start_listen_socket(Ref, Transport, SocketOpts0, Logger),
+	case maps:get(dedicated_acceptor_sockets, TransOpts, false) of
+		true ->
+			{ok, {_, Port}} = Transport:sockname(BaseSocket),
+			SocketOpts1 = [{port, Port}|proplists:delete(port, SocketOpts0)],
+			Sockets = [{N, start_listen_socket(Ref, Transport, SocketOpts1, Logger)} || N <- lists:seq(2, NumAcceptors)],
+			[{1, BaseSocket}|Sockets];
+		false ->
+			[{N, BaseSocket} || N <- lists:seq(1, NumAcceptors)]
+	end.
+
+-spec start_listen_socket(any(), module(), list(), module()) -> inet:socket().
+start_listen_socket(Ref, Transport, SocketOpts, Logger) ->
+	put(logger, Logger),
+	case Transport:listen(SocketOpts) of
+		{ok, Socket} ->
+			erase(logger),
+			Socket;
+		{error, Reason} ->
+			listen_error(Ref, Transport, SocketOpts, Reason, Logger)
+	end.
 
 -spec listen_error(any(), module(), any(), atom(), module()) -> no_return().
 listen_error(Ref, Transport, SocketOpts0, Reason, Logger) ->
