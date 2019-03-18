@@ -51,7 +51,7 @@
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
 	| {certfile, string()}
-	| {ciphers, [ssl_cipher:erl_cipher_suite()]}
+	| {ciphers, [ssl:erl_cipher_suite()]}
 	| {client_renegotiation, boolean()}
 	| {crl_cache, {module(), {internal | any(), list()}}}
 	| {crl_check, boolean() | peer | best_effort}
