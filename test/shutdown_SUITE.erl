@@ -36,8 +36,8 @@ brutal_kill(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
-	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1, ListenerSupChildren),
+	[Pid] = do_get_conn_pids(ConnsSupSup),
 	true = is_process_alive(Pid),
 	ok = ranch:stop_listener(Name),
 	receive after 100 -> ok end,
@@ -56,8 +56,8 @@ infinity(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
-	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1, ListenerSupChildren),
+	[Pid] = do_get_conn_pids(ConnsSupSup),
 	true = is_process_alive(Pid),
 	ok = ranch:stop_listener(Name),
 	receive after 100 -> ok end,
@@ -78,8 +78,8 @@ infinity_trap_exit(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
-	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1, ListenerSupChildren),
+	[Pid] = do_get_conn_pids(ConnsSupSup),
 	true = is_process_alive(Pid),
 	%% This call will block infinitely.
 	SpawnPid = spawn(fun() -> ok = ranch:stop_listener(Name) end),
@@ -107,8 +107,8 @@ timeout(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
-	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1, ListenerSupChildren),
+	[Pid] = do_get_conn_pids(ConnsSupSup),
 	true = is_process_alive(Pid),
 	ok = ranch:stop_listener(Name),
 	receive after 100 -> ok end,
@@ -129,8 +129,8 @@ timeout_trap_exit(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port, []),
 	receive after 100 -> ok end,
 	ListenerSupChildren = supervisor:which_children(ListenerSup),
-	{_, ConnsSup, _, _} = lists:keyfind(ranch_conns_sup, 1, ListenerSupChildren),
-	[{_, Pid, _, _}] = supervisor:which_children(ConnsSup),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1, ListenerSupChildren),
+	[Pid] = do_get_conn_pids(ConnsSupSup),
 	true = is_process_alive(Pid),
 	%% This call will block for the duration of the shutdown.
 	SpawnPid = spawn(fun() -> ok = ranch:stop_listener(Name) end),
@@ -147,3 +147,8 @@ timeout_trap_exit(_) ->
 	false = is_process_alive(ListenerSup),
 	false = is_process_alive(SpawnPid),
 	ok.
+
+do_get_conn_pids(ConnsSupSup) ->
+	ConnsSups = [ConnsSup || {_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
+	ConnChildren = lists:flatten([supervisor:which_children(ConnsSup) || ConnsSup <- ConnsSups]),
+	[ConnPid || {_, ConnPid, _, _} <- ConnChildren].

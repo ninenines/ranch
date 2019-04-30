@@ -18,12 +18,13 @@
 -module(ranch_conns_sup).
 
 %% API.
--export([start_link/3]).
+-export([start_link/4]).
 -export([start_protocol/2]).
+-export([start_protocol/3]).
 -export([active_connections/1]).
 
 %% Supervisor internals.
--export([init/4]).
+-export([init/5]).
 -export([system_continue/3]).
 -export([system_terminate/4]).
 -export([system_code_change/4]).
@@ -34,6 +35,7 @@
 -record(state, {
 	parent = undefined :: pid(),
 	ref :: ranch:ref(),
+	acceptor_id :: non_neg_integer(),
 	conn_type :: conn_type(),
 	shutdown :: shutdown(),
 	transport = undefined :: module(),
@@ -46,10 +48,10 @@
 
 %% API.
 
--spec start_link(ranch:ref(), module(), module()) -> {ok, pid()}.
-start_link(Ref, Transport, Protocol) ->
+-spec start_link(ranch:ref(), non_neg_integer(), module(), module()) -> {ok, pid()}.
+start_link(Ref, AcceptorId, Transport, Protocol) ->
 	proc_lib:start_link(?MODULE, init,
-		[self(), Ref, Transport, Protocol]).
+		[self(), Ref, AcceptorId, Transport, Protocol]).
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
@@ -67,10 +69,22 @@ start_link(Ref, Transport, Protocol) ->
 %% We do not need the reply, we only need the ok from the supervisor
 %% to continue. The supervisor sends its own pid when the acceptor can
 %% continue.
+-spec start_protocol(pid(), reference(), inet:socket()) -> ok.
+start_protocol(SupPid, MonitorRef, Socket) ->
+	SupPid ! {?MODULE, start_protocol, self(), Socket},
+	receive
+		SupPid ->
+			ok;
+		{'DOWN', MonitorRef, process, SupPid, Reason} ->
+			error(Reason)
+	end.
+
 -spec start_protocol(pid(), inet:socket()) -> ok.
 start_protocol(SupPid, Socket) ->
-	SupPid ! {?MODULE, start_protocol, self(), Socket},
-	receive SupPid -> ok end.
+	MonitorRef = monitor(process, SupPid),
+	start_protocol(SupPid, MonitorRef, Socket),
+	demonitor(MonitorRef),
+	ok.
 
 %% We can't make the above assumptions here. This function might be
 %% called from anywhere.
@@ -94,10 +108,10 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), ranch:ref(), module(), module()) -> no_return().
-init(Parent, Ref, Transport, Protocol) ->
+-spec init(pid(), ranch:ref(), non_neg_integer(), module(), module()) -> no_return().
+init(Parent, Ref, AcceptorId, Transport, Protocol) ->
 	process_flag(trap_exit, true),
-	ok = ranch_server:set_connections_sup(Ref, self()),
+	ok = ranch_server:set_connections_sup(Ref, AcceptorId, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	ConnType = maps:get(connection_type, TransOpts, worker),
@@ -106,7 +120,7 @@ init(Parent, Ref, Transport, Protocol) ->
 	Logger = maps:get(logger, TransOpts, error_logger),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
-	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
+	loop(#state{parent=Parent, ref=Ref, acceptor_id=AcceptorId, conn_type=ConnType,
 		shutdown=Shutdown, transport=Transport, protocol=Protocol,
 		opts=ProtoOpts, handshake_timeout=HandshakeTimeout,
 		max_conns=MaxConns, logger=Logger}, 0, 0, []).

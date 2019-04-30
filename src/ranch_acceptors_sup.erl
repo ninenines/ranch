@@ -15,18 +15,16 @@
 -module(ranch_acceptors_sup).
 -behaviour(supervisor).
 
--export([start_link/2]).
+-export([start_link/3]).
 -export([init/1]).
 
--spec start_link(ranch:ref(), module())
+-spec start_link(ranch:ref(), pos_integer(), module())
 	-> {ok, pid()}.
-start_link(Ref, Transport) ->
-	supervisor:start_link(?MODULE, [Ref, Transport]).
+start_link(Ref, NumAcceptors, Transport) ->
+	supervisor:start_link(?MODULE, [Ref, NumAcceptors, Transport]).
 
-init([Ref, Transport]) ->
-	ConnsSup = ranch_server:get_connections_sup(Ref),
+init([Ref, NumAcceptors, Transport]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
-	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	Logger = maps:get(logger, TransOpts, error_logger),
 	SocketOpts = maps:get(socket_opts, TransOpts, []),
 	%% We temporarily put the logger in the process dictionary
@@ -45,7 +43,7 @@ init([Ref, Transport]) ->
 	ranch_server:set_addr(Ref, Addr),
 	Procs = [
 		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
-			LSocket, Transport, Logger, ConnsSup
+			LSocket, Transport, Logger, ranch_server:get_connections_sup(Ref, N)
 		]}, permanent, brutal_kill, worker, []}
 			|| N <- lists:seq(1, NumAcceptors)],
 	{ok, {{one_for_one, 1, 5}, Procs}}.

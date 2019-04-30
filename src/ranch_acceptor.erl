@@ -15,23 +15,24 @@
 -module(ranch_acceptor).
 
 -export([start_link/4]).
--export([loop/4]).
+-export([loop/5]).
 
 -spec start_link(inet:socket(), module(), module(), pid())
 	-> {ok, pid()}.
 start_link(LSocket, Transport, Logger, ConnsSup) ->
-	Pid = spawn_link(?MODULE, loop, [LSocket, Transport, Logger, ConnsSup]),
+	MonitorRef = monitor(process, ConnsSup),
+	Pid = spawn_link(?MODULE, loop, [LSocket, Transport, Logger, ConnsSup, MonitorRef]),
 	{ok, Pid}.
 
--spec loop(inet:socket(), module(), module(), pid()) -> no_return().
-loop(LSocket, Transport, Logger, ConnsSup) ->
+-spec loop(inet:socket(), module(), module(), pid(), reference()) -> no_return().
+loop(LSocket, Transport, Logger, ConnsSup, MonitorRef) ->
 	_ = case Transport:accept(LSocket, infinity) of
 		{ok, CSocket} ->
 			case Transport:controlling_process(CSocket, ConnsSup) of
 				ok ->
 					%% This call will not return until process has been started
 					%% AND we are below the maximum number of connections.
-					ranch_conns_sup:start_protocol(ConnsSup, CSocket);
+					ranch_conns_sup:start_protocol(ConnsSup, MonitorRef, CSocket);
 				{error, _} ->
 					Transport:close(CSocket)
 			end;
@@ -51,7 +52,7 @@ loop(LSocket, Transport, Logger, ConnsSup) ->
 			ok
 	end,
 	flush(Logger),
-	?MODULE:loop(LSocket, Transport, Logger, ConnsSup).
+	?MODULE:loop(LSocket, Transport, Logger, ConnsSup, MonitorRef).
 
 flush(Logger) ->
 	receive Msg ->
