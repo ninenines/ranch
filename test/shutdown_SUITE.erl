@@ -149,6 +149,8 @@ timeout_trap_exit(_) ->
 	ok.
 
 do_get_conn_pids(ConnsSupSup) ->
-	ConnsSups = [ConnsSup || {_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
-	ConnChildren = lists:flatten([supervisor:which_children(ConnsSup) || ConnsSup <- ConnsSups]),
+	ConnsSups = [ConnsSup ||
+		 {_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
+	ConnChildren = lists:flatten(
+		[supervisor:which_children(ConnsSup) || ConnsSup <- ConnsSups]),
 	[ConnPid || {_, ConnPid, _, _} <- ConnChildren].

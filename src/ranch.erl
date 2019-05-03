@@ -258,7 +258,8 @@ remove_connection(Ref) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
 	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
 		supervisor:which_children(ListenerSup)),
-	_ = [ConnsSup ! {remove_connection, Ref, self()} || {_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
+	_ = [ConnsSup ! {remove_connection, Ref, self()} ||
+		{_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
 	ok.
 
 -spec get_status(ref()) -> running | suspended.
@@ -283,10 +284,12 @@ get_port(Ref) ->
 
 -spec get_connections(ref(), active|all) -> non_neg_integer().
 get_connections(Ref, active) ->
-	SupCounts = [ranch_conns_sup:active_connections(ConnsSup) || {_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
+	SupCounts = [ranch_conns_sup:active_connections(ConnsSup) ||
+		{_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
 	lists:sum(SupCounts);
 get_connections(Ref, all) ->
-	SupCounts = [proplists:get_value(active, supervisor:count_children(ConnsSup)) || {_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
+	SupCounts = [proplists:get_value(active, supervisor:count_children(ConnsSup)) ||
+		{_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
 	lists:sum(SupCounts).
 
 -spec get_max_connections(ref()) -> max_conns().

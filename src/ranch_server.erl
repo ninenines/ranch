@@ -97,11 +97,13 @@ get_connections_sup(Ref, AcceptorId) ->
 
 -spec get_connections_sups(ranch:ref()) -> [{non_neg_integer(), pid()}].
 get_connections_sups(Ref) ->
-	[{AcceptorId, Pid} || [AcceptorId, Pid] <- ets:match(?TAB, {{conns_sup, Ref, '$1'}, '$2'})].
+	[{AcceptorId, Pid} ||
+		[AcceptorId, Pid] <- ets:match(?TAB, {{conns_sup, Ref, '$1'}, '$2'})].
 
 -spec get_connections_sups() -> [{ranch:ref(), non_neg_integer(), pid()}].
 get_connections_sups() ->
-	[{Ref, AcceptorId, Pid} || [Ref, AcceptorId, Pid] <- ets:match(?TAB, {{conns_sup, '$1', '$2'}, '$3'})].
+	[{Ref, AcceptorId, Pid} ||
+		[Ref, AcceptorId, Pid] <- ets:match(?TAB, {{conns_sup, '$1', '$2'}, '$3'})].
 
 -spec set_listener_sup(ranch:ref(), pid()) -> ok.
 set_listener_sup(Ref, Pid) ->
@@ -153,7 +155,12 @@ get_listener_start_args(Ref) ->
 
 -spec count_connections(ranch:ref()) -> non_neg_integer().
 count_connections(Ref) ->
-	lists:foldl(fun ({_, ConnsSup}, Acc) -> Acc+ranch_conns_sup:active_connections(ConnsSup) end, 0, get_connections_sups(Ref)).
+	lists:foldl(
+		fun ({_, ConnsSup}, Acc) ->
+			Acc+ranch_conns_sup:active_connections(ConnsSup)
+		end,
+		0,
+		get_connections_sups(Ref)).
 
 %% gen_server.
 

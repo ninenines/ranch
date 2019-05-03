@@ -19,7 +19,6 @@
 
 %% API.
 -export([start_link/4]).
--export([start_protocol/2]).
 -export([start_protocol/3]).
 -export([active_connections/1]).
 
@@ -78,13 +77,6 @@ start_protocol(SupPid, MonitorRef, Socket) ->
 		{'DOWN', MonitorRef, process, SupPid, Reason} ->
 			error(Reason)
 	end.
-
--spec start_protocol(pid(), inet:socket()) -> ok.
-start_protocol(SupPid, Socket) ->
-	MonitorRef = monitor(process, SupPid),
-	start_protocol(SupPid, MonitorRef, Socket),
-	demonitor(MonitorRef),
-	ok.
 
 %% We can't make the above assumptions here. This function might be
 %% called from anywhere.

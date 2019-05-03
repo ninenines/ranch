@@ -1230,7 +1230,8 @@ do_get_listener_socket(ListenerSupPid) ->
 	LSocket.
 
 do_conns_which_children(Name) ->
-	Conns = [supervisor:which_children(ConnsSup) || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
+	Conns = [supervisor:which_children(ConnsSup) ||
+		{_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
 	lists:flatten(Conns).
 
 do_conns_count_children(Name) ->
@@ -1246,5 +1247,6 @@ do_conns_count_children(Name) ->
 				)
 		end,
 		undefined,
-		[supervisor:count_children(ConnsSup) || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)]
+		[supervisor:count_children(ConnsSup) ||
+			{_, ConnsSup} <- ranch_server:get_connections_sups(Name)]
 	).
