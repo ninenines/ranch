@@ -14,12 +14,13 @@
 
 -module(ranch_acceptor).
 
--export([start_link/4]).
+-export([start_link/5]).
 -export([loop/5]).
 
--spec start_link(inet:socket(), module(), module(), pid())
+-spec start_link(ranch:ref(), non_neg_integer(), inet:socket(), module(), module())
 	-> {ok, pid()}.
-start_link(LSocket, Transport, Logger, ConnsSup) ->
+start_link(Ref, AcceptorId, LSocket, Transport, Logger) ->
+	ConnsSup = ranch_server:get_connections_sup(Ref, AcceptorId),
 	MonitorRef = monitor(process, ConnsSup),
 	Pid = spawn_link(?MODULE, loop, [LSocket, Transport, Logger, ConnsSup, MonitorRef]),
 	{ok, Pid}.
