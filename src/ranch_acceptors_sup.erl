@@ -43,7 +43,7 @@ init([Ref, NumAcceptors, Transport]) ->
 	ranch_server:set_addr(Ref, Addr),
 	Procs = [
 		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
-			LSocket, Transport, Logger, ranch_server:get_connections_sup(Ref, N)
+			Ref, N, LSocket, Transport, Logger
 		]}, permanent, brutal_kill, worker, []}
 			|| N <- lists:seq(1, NumAcceptors)],
 	{ok, {{one_for_one, 1, 5}, Procs}}.
