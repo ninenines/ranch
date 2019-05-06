@@ -16,8 +16,9 @@ LOCAL_DEPS = ssl
 
 DOC_DEPS = asciideck
 
-TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper
+TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper havoc
 dep_ct_helper = git https://github.com/ninenines/ct_helper master
+dep_havoc = git https://github.com/ankhers/havoc master
 
 # CI configuration.
 
@@ -32,6 +33,12 @@ AUTO_CI_WINDOWS ?= OTP-19+
 # Standard targets.
 
 include erlang.mk
+
+# Don't run the havoc test suite by default.
+
+ifndef FULL
+CT_SUITES := $(filter-out havoc,$(CT_SUITES))
+endif
 
 # Compile options.
 
