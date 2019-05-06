@@ -92,7 +92,7 @@ name() -> ssl.
 
 -spec secure() -> boolean().
 secure() ->
-    true.
+	true.
 
 messages() -> {ssl, ssl_closed, ssl_error}.
 

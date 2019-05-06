@@ -292,7 +292,7 @@ wait_children(0) ->
 	ok;
 wait_children(NbChildren) ->
 	receive
-        {'DOWN', _, process, Pid, _} ->
+		{'DOWN', _, process, Pid, _} ->
 			case erase(Pid) of
 				active -> wait_children(NbChildren - 1);
 				removed -> wait_children(NbChildren - 1);

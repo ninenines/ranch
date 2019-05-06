@@ -75,7 +75,7 @@ name() -> tcp.
 
 -spec secure() -> boolean().
 secure() ->
-    false.
+	false.
 
 messages() -> {tcp, tcp_closed, tcp_error}.
 
