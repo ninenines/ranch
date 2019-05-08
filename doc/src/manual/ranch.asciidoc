@@ -64,23 +64,6 @@ when accepting new connections. Some connections may
 also be removed from this count explicitly by the user
 code.
 
-=== opt()
-
-[source,erlang]
-----
-opt() = {ack_timeout, timeout()}
-      | {connection_type, worker | supervisor}
-      | {max_connections, max_conns()}
-      | {num_acceptors, pos_integer()}
-      | {shutdown, timeout() | brutal_kill}
-----
-
-Deprecated form for Ranch-specific options.
-
-Please use the `opts()` type when you need to provide
-Ranch-specific transport options. Socket options will
-remain separate from the Ranch-specific options.
-
 === opts()
 
 [source,erlang]
@@ -105,13 +88,6 @@ directly (assuming they are not a map and no Ranch-specific
 option needs to be given) or as part of `socket_opts`.
 
 None of the options are required.
-
-ack_timeout::
-
-When `ack_timeout` is found in a transport options proplist,
-it is converted to the `handshake_timeout` option from the
-map. They are equivalent. The `ack_timeout` option will be
-removed in Ranch 2.0.
 
 connection_type (worker)::
 
@@ -158,6 +134,7 @@ Unique name used to refer to a listener.
 * *2.0*: The option `max_connections` is now per connection supervisor.
 * *2.0*: The `num_conns_sup` option was added.
 * *2.0*: The `socket` option was removed.
+* *2.0*: The `opt()` type was removed.
 * *1.6*: The `logger` option was added.
 * *1.6*: The `opt()` type was deprecated in favor of the new `opts()` type.
 

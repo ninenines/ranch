@@ -51,14 +51,6 @@
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
 
-%% This type is deprecated and will be removed in Ranch 2.0.
--type opt() :: {ack_timeout, timeout()}
-	| {connection_type, worker | supervisor}
-	| {max_connections, max_conns()}
-	| {num_acceptors, pos_integer()}
-	| {shutdown, timeout() | brutal_kill}.
--export_type([opt/0]).
-
 -type opts() :: any() | #{
 	connection_type => worker | supervisor,
 	handshake_timeout => timeout(),
@@ -99,48 +91,8 @@ start_listener(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
 -spec normalize_opts(opts()) -> opts().
 normalize_opts(Map) when is_map(Map) ->
 	Map;
-normalize_opts(List0) when is_list(List0) ->
-	Map0 = #{},
-	{Map1, List1} = case take(ack_timeout, List0) of
-		{value, HandshakeTimeout, Tail0} ->
-			{Map0#{handshake_timeout => HandshakeTimeout}, Tail0};
-		false ->
-			{Map0, List0}
-	end,
-	{Map, List} = lists:foldl(fun(Key, {Map2, List2}) ->
-		case take(Key, List2) of
-			{value, ConnectionType, Tail2} ->
-				{Map2#{Key => ConnectionType}, Tail2};
-			false ->
-				{Map2, List2}
-		end
-	end, {Map1, List1}, [connection_type, max_connections, num_acceptors, shutdown]),
-	if
-		Map =:= #{} ->
-			ok;
-		true ->
-			log(warning,
-				"Setting Ranch options together with socket options "
-				"is deprecated. Please use the new map syntax that allows "
-				"specifying socket options separately from other options.~n",
-				[], Map)
-	end,
-	case List of
-		[] -> Map;
-		_ -> Map#{socket_opts => List}
-	end;
 normalize_opts(Any) ->
 	#{socket_opts => Any}.
-
-take(Key, List) ->
-	take(Key, List, []).
-
-take(_, [], _) ->
-	false;
-take(Key, [{Key, Value}|Tail], Acc) ->
-	{value, Value, lists:reverse(Acc, Tail)};
-take(Key, [Value|Tail], Acc) ->
-	take(Key, Tail, [Value|Acc]).
 
 maybe_started({error, {{shutdown,
 		{failed_to_start_child, ranch_acceptors_sup,

@@ -74,6 +74,8 @@ Child specifications are returned.
 
 == Changelog
 
+* *2.0*: The `TransOpts` argument must no longer contain
+         Ranch-specific options if given as a list. Use a map.
 * *1.4*: The `NumAcceptors` argument was moved to the transport options.
 
 == Examples

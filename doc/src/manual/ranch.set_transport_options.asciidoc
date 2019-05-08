@@ -34,6 +34,11 @@ The new transport options.
 
 The atom `ok` is always returned. It can be safely ignored.
 
+== Changelog
+
+* *2.0*: The `TransOpts` argument must no longer contain
+         Ranch-specific options if given as a list. Use a map.
+
 == Examples
 
 .Set the transport options
