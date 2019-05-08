@@ -65,6 +65,7 @@
 	max_connections => max_conns(),
 	logger => module(),
 	num_acceptors => pos_integer(),
+	num_conns_sups => pos_integer(),
 	shutdown => timeout() | brutal_kill,
 	socket_opts => any()
 }.
@@ -113,7 +114,7 @@ normalize_opts(List0) when is_list(List0) ->
 			false ->
 				{Map2, List2}
 		end
-	end, {Map1, List1}, [connection_type, max_connections, num_acceptors, shutdown]),
+	end, {Map1, List1}, [connection_type, max_connections, num_acceptors, num_conns_sups, shutdown]),
 	if
 		Map =:= #{} ->
 			ok;

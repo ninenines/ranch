@@ -182,9 +182,9 @@ socket and that it is operational.
 === Limiting the number of concurrent connections
 
 The `max_connections` transport option allows you to limit the number
-of concurrent connections. It defaults to 1024. Its purpose is to
-prevent your system from being overloaded and ensuring all the
-connections are handled optimally.
+of concurrent connections per connection supervisor (see below).
+It defaults to 1024. Its purpose is to prevent your system from being
+overloaded and ensuring all the connections are handled optimally.
 
 .Customizing the maximum number of concurrent connections
 
@@ -258,6 +258,25 @@ measure to find the best value for your application.
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
 	ranch_tcp, [{port, 5555}, {num_acceptors, 42}],
+	echo_protocol, []
+).
+
+=== Customizing the number of connection supervisors
+
+By default Ranch will use one connection supervisor for each
+acceptor process (but not vice versa). Their task is to
+supervise the connection processes started by an acceptor.
+
+Note that the association between the individual acceptors and
+connection supervisors is fixed, meaning that connection
+processes started by an individual acceptor will always be
+hosted by the same connection supervisor.
+
+.Specifying a custom number of connection supervisors
+
+[source,erlang]
+{ok, _} = ranch:start_listener(tcp_echo,
+	ranch_tcp, #{socket_opts => [{port, 5555}], num_conns_sups => 42}],
 	echo_protocol, []
 ).
 
