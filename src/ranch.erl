@@ -15,13 +15,11 @@
 -module(ranch).
 
 -export([start_listener/5]).
--export([start_listener/6]).
 -export([normalize_opts/1]).
 -export([stop_listener/1]).
 -export([suspend_listener/1]).
 -export([resume_listener/1]).
 -export([child_spec/5]).
--export([child_spec/6]).
 -export([accept_ack/1]).
 -export([handshake/1]).
 -export([handshake/2]).
@@ -46,7 +44,7 @@
 -export([require/1]).
 -export([log/4]).
 
--deprecated([start_listener/6, child_spec/6, accept_ack/1]).
+-deprecated([accept_ack/1]).
 
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
@@ -79,14 +77,6 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 			maybe_started(supervisor:start_child(ranch_sup, child_spec(Ref,
 					Transport, TransOpts, Protocol, ProtoOpts)))
 	end.
-
--spec start_listener(ref(), non_neg_integer(), module(), opts(), module(), any())
-	-> supervisor:startchild_ret().
-start_listener(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
-		when is_integer(NumAcceptors), is_atom(Transport), is_atom(Protocol) ->
-	TransOpts = normalize_opts(TransOpts0),
-	start_listener(Ref, Transport, TransOpts#{num_acceptors => NumAcceptors},
-		Protocol, ProtoOpts).
 
 -spec normalize_opts(opts()) -> opts().
 normalize_opts(Map) when is_map(Map) ->
@@ -154,14 +144,6 @@ child_spec(Ref, Transport, TransOpts0, Protocol, ProtoOpts) ->
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
 		Ref, Transport, TransOpts, Protocol, ProtoOpts
 	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
-
--spec child_spec(ref(), non_neg_integer(), module(), opts(), module(), any())
-	-> supervisor:child_spec().
-child_spec(Ref, NumAcceptors, Transport, TransOpts0, Protocol, ProtoOpts)
-		when is_integer(NumAcceptors), is_atom(Transport), is_atom(Protocol) ->
-	TransOpts = normalize_opts(TransOpts0),
-	child_spec(Ref, Transport, TransOpts#{num_acceptors => NumAcceptors},
-		Protocol, ProtoOpts).
 
 -spec accept_ack(ref()) -> ok.
 accept_ack(Ref) ->
