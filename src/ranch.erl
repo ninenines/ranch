@@ -65,6 +65,7 @@
 	max_connections => max_conns(),
 	logger => module(),
 	num_acceptors => pos_integer(),
+	num_conns_sups => pos_integer(),
 	shutdown => timeout() | brutal_kill,
 	socket_opts => any()
 }.

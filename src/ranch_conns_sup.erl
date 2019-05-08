@@ -34,7 +34,6 @@
 -record(state, {
 	parent = undefined :: pid(),
 	ref :: ranch:ref(),
-	acceptor_id :: non_neg_integer(),
 	conn_type :: conn_type(),
 	shutdown :: shutdown(),
 	transport = undefined :: module(),
@@ -47,10 +46,10 @@
 
 %% API.
 
--spec start_link(ranch:ref(), non_neg_integer(), module(), module()) -> {ok, pid()}.
-start_link(Ref, AcceptorId, Transport, Protocol) ->
+-spec start_link(ranch:ref(), pos_integer(), module(), module()) -> {ok, pid()}.
+start_link(Ref, Id, Transport, Protocol) ->
 	proc_lib:start_link(?MODULE, init,
-		[self(), Ref, AcceptorId, Transport, Protocol]).
+		[self(), Ref, Id, Transport, Protocol]).
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
@@ -100,10 +99,10 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), ranch:ref(), non_neg_integer(), module(), module()) -> no_return().
-init(Parent, Ref, AcceptorId, Transport, Protocol) ->
+-spec init(pid(), ranch:ref(), pos_integer(), module(), module()) -> no_return().
+init(Parent, Ref, Id, Transport, Protocol) ->
 	process_flag(trap_exit, true),
-	ok = ranch_server:set_connections_sup(Ref, AcceptorId, self()),
+	ok = ranch_server:set_connections_sup(Ref, Id, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	ConnType = maps:get(connection_type, TransOpts, worker),
@@ -112,7 +111,7 @@ init(Parent, Ref, AcceptorId, Transport, Protocol) ->
 	Logger = maps:get(logger, TransOpts, error_logger),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
-	loop(#state{parent=Parent, ref=Ref, acceptor_id=AcceptorId, conn_type=ConnType,
+	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		shutdown=Shutdown, transport=Transport, protocol=Protocol,
 		opts=ProtoOpts, handshake_timeout=HandshakeTimeout,
 		max_conns=MaxConns, logger=Logger}, 0, 0, []).

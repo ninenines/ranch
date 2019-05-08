@@ -69,6 +69,10 @@ groups() ->
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
+		supervisor_10_acceptors_1_conns_sup,
+		supervisor_9_acceptors_4_conns_sups,
+		supervisor_10_acceptors_10_conns_sups,
+		supervisor_1_acceptor_10_conns_sups,
 		supervisor_changed_options_restart,
 		supervisor_clean_child_restart,
 		supervisor_clean_restart,
@@ -964,6 +968,58 @@ connection_type_supervisor_separate_from_connection(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+supervisor_10_acceptors_1_conns_sup(_) ->
+	doc("Ensure that using 10 acceptors and 1 connection supervisor works."),
+	ok = do_supervisor_n_acceptors_m_conns_sups(10, 1).
+
+supervisor_9_acceptors_4_conns_sups(_) ->
+	doc("Ensure that using 9 acceptors and 4 connection supervisors works."),
+	ok = do_supervisor_n_acceptors_m_conns_sups(9, 4).
+
+supervisor_10_acceptors_10_conns_sups(_) ->
+	doc("Ensure that using 10 acceptors and 10 connection supervisors works."),
+	ok = do_supervisor_n_acceptors_m_conns_sups(10, 10).
+
+supervisor_1_acceptor_10_conns_sups(_) ->
+	doc("Ensure that using 1 acceptor and 10 connection supervisors works."),
+	ok = do_supervisor_n_acceptors_m_conns_sups(1, 10).
+
+do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
+	Name = name(),
+	{ok, Pid} = ranch:start_listener(Name,
+		ranch_tcp, #{num_conns_sups => NumConnsSups, num_acceptors => NumAcceptors},
+		notify_and_wait_protocol, [{msg, connected}, {pid, self()}]),
+	Port = ranch:get_port(Name),
+	ConnsSups = [ConnsSup || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
+	NumConnsSups = length(ConnsSups),
+	{ranch_acceptors_sup, AcceptorsSup, supervisor, _} =
+		lists:keyfind(ranch_acceptors_sup, 1, supervisor:which_children(Pid)),
+	AcceptorIds = [AcceptorId ||
+		{{acceptor, _, AcceptorId}, _, worker, _} <- supervisor:which_children(AcceptorsSup)],
+	NumAcceptors = length(AcceptorIds),
+	AcceptorConnsSups0 = [ranch_server:get_connections_sup(Name, AcceptorId) ||
+		AcceptorId <- AcceptorIds],
+	AcceptorConnsSups1 = lists:usort(AcceptorConnsSups0),
+	if
+		NumAcceptors > NumConnsSups ->
+			NumConnsSups = length(AcceptorConnsSups1),
+			[] = ConnsSups -- AcceptorConnsSups1;
+		NumAcceptors < NumConnsSups ->
+			NumAcceptors = length(AcceptorConnsSups1),
+			[] = AcceptorConnsSups1 -- ConnsSups;
+		NumAcceptors =:= NumConnsSups ->
+			NumConnsSups = length(AcceptorConnsSups1),
+			NumAcceptors = length(AcceptorConnsSups1),
+			[] = ConnsSups -- AcceptorConnsSups1,
+			[] = AcceptorConnsSups1 -- ConnsSups
+	end,
+	ok = connect_loop(Port, 100, 0),
+	100 = receive_loop(connected, 100),
+	100 = ranch_server:count_connections(Name),
+	ok = ranch:stop_listener(Name),
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 

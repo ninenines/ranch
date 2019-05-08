@@ -32,7 +32,7 @@ status:: Listener status, either running or suspended.
 ip:: Interface Ranch listens on.
 port:: Port number Ranch listens on.
 num_acceptors:: Number of acceptor processes.
-max_connections:: Maximum number of connections.
+max_connections:: Maximum number of connections per connection supervisor.
 active_connections:: Number of active connections.
 all_connections:: Number of connections, including those removed from the count.
 transport:: Transport module.

@@ -88,22 +88,25 @@ cleanup_connections_sups(Ref) ->
 	ok.
 
 -spec set_connections_sup(ranch:ref(), non_neg_integer(), pid()) -> ok.
-set_connections_sup(Ref, AcceptorId, Pid) ->
-	gen_server:call(?MODULE, {set_connections_sup, Ref, AcceptorId, Pid}).
+set_connections_sup(Ref, Id, Pid) ->
+	gen_server:call(?MODULE, {set_connections_sup, Ref, Id, Pid}).
 
--spec get_connections_sup(ranch:ref(), non_neg_integer()) -> pid().
-get_connections_sup(Ref, AcceptorId) ->
-	ets:lookup_element(?TAB, {conns_sup, Ref, AcceptorId}, 2).
+-spec get_connections_sup(ranch:ref(), pos_integer()) -> pid().
+get_connections_sup(Ref, Id) ->
+	ConnsSups = get_connections_sups(Ref),
+	NConnsSups = length(ConnsSups),
+	{_, Pid} = lists:keyfind((Id rem NConnsSups) + 1, 1, ConnsSups),
+	Pid.
 
--spec get_connections_sups(ranch:ref()) -> [{non_neg_integer(), pid()}].
+-spec get_connections_sups(ranch:ref()) -> [{pos_integer(), pid()}].
 get_connections_sups(Ref) ->
-	[{AcceptorId, Pid} ||
-		[AcceptorId, Pid] <- ets:match(?TAB, {{conns_sup, Ref, '$1'}, '$2'})].
+	[{Id, Pid} ||
+		[Id, Pid] <- ets:match(?TAB, {{conns_sup, Ref, '$1'}, '$2'})].
 
--spec get_connections_sups() -> [{ranch:ref(), non_neg_integer(), pid()}].
+-spec get_connections_sups() -> [{ranch:ref(), pos_integer(), pid()}].
 get_connections_sups() ->
-	[{Ref, AcceptorId, Pid} ||
-		[Ref, AcceptorId, Pid] <- ets:match(?TAB, {{conns_sup, '$1', '$2'}, '$3'})].
+	[{Ref, Id, Pid} ||
+		[Ref, Id, Pid] <- ets:match(?TAB, {{conns_sup, '$1', '$2'}, '$3'})].
 
 -spec set_listener_sup(ranch:ref(), pid()) -> ok.
 set_listener_sup(Ref, Pid) ->
@@ -165,8 +168,8 @@ count_connections(Ref) ->
 %% gen_server.
 
 init([]) ->
-	ConnMonitors = [{{erlang:monitor(process, Pid), Pid}, {conns_sup, Ref, AcceptorId}} ||
-		[Ref, AcceptorId, Pid] <- ets:match(?TAB, {{conns_sup, '$1', '$2'}, '$3'})],
+	ConnMonitors = [{{erlang:monitor(process, Pid), Pid}, {conns_sup, Ref, Id}} ||
+		[Ref, Id, Pid] <- ets:match(?TAB, {{conns_sup, '$1', '$2'}, '$3'})],
 	ListenerMonitors = [{{erlang:monitor(process, Pid), Pid}, {listener_sup, Ref}} ||
 		[Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})],
 	{ok, #state{monitors=ConnMonitors++ListenerMonitors}}.
@@ -177,8 +180,8 @@ handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartAr
 	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
 	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
 	{reply, ok, State};
-handle_call({set_connections_sup, Ref, AcceptorId, Pid}, _, State0) ->
-	State = set_monitored_process({conns_sup, Ref, AcceptorId}, Pid, State0),
+handle_call({set_connections_sup, Ref, Id, Pid}, _, State0) ->
+	State = set_monitored_process({conns_sup, Ref, Id}, Pid, State0),
 	{reply, ok, State};
 handle_call({set_listener_sup, Ref, Pid}, _, State0) ->
 	State = set_monitored_process({listener_sup, Ref}, Pid, State0),

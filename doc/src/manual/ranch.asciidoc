@@ -32,10 +32,10 @@ Connections:
 
 Options:
 
-* link:man:ranch:get_max_connections(3)[ranch:get_max_connections(3)] - Get the max number of connections
+* link:man:ranch:get_max_connections(3)[ranch:get_max_connections(3)] - Get the max number of connections per connection supervisor
 * link:man:ranch:get_protocol_options(3)[ranch:get_protocol_options(3)] - Get the current protocol options
 * link:man:ranch:get_transport_options(3)[ranch:get_transport_options(3)] - Get the current transport options
-* link:man:ranch:set_max_connections(3)[ranch:set_max_connections(3)] - Set the max number of connections
+* link:man:ranch:set_max_connections(3)[ranch:set_max_connections(3)] - Set the max number of connections per connection supervisor
 * link:man:ranch:set_protocol_options(3)[ranch:set_protocol_options(3)] - Set the protocol options
 * link:man:ranch:set_transport_options(3)[ranch:set_transport_options(3)] - Set the transport options
 
@@ -56,7 +56,7 @@ Introspection:
 max_conns() = non_neg_integer() | infinity
 ----
 
-Maximum number of connections allowed on this listener.
+Maximum number of connections allowed per connection supervisor.
 
 This is a soft limit. The actual number of connections
 might be slightly above the limit due to concurrency
@@ -91,6 +91,7 @@ opts() = any() | #{
     max_connections   => max_conns(),
     logger            => module(),
     num_acceptors     => pos_integer(),
+    num_conns_sups    => pos_integer(),
     shutdown          => timeout() | brutal_kill,
     socket_opts       => any()
 }
@@ -122,12 +123,17 @@ Maximum allowed time for the `ranch:handshake/1,2` call to finish.
 
 max_connections (1024)::
 
-Maximum number of active connections. Soft limit.
-Use `infinity` to disable the limit entirely.
+Maximum number of active connections per connection supervisor.
+Soft limit. Use `infinity` to disable the limit entirely.
 
 num_acceptors (10)::
 
 Number of processes that accept connections.
+
+num_conns_sups - see below::
+
+Number of processes that supervise connection processes.
+If not specified, defaults to be equal to `num_acceptors`.
 
 shutdown (5000)::
 
@@ -149,6 +155,8 @@ Unique name used to refer to a listener.
 
 == Changelog
 
+* *2.0*: The option `max_connections` is now per connection supervisor.
+* *2.0*: The `num_conns_sup` option was added.
 * *2.0*: The `socket` option was removed.
 * *1.6*: The `logger` option was added.
 * *1.6*: The `opt()` type was deprecated in favor of the new `opts()` type.

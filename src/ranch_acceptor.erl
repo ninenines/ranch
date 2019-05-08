@@ -17,7 +17,7 @@
 -export([start_link/5]).
 -export([loop/5]).
 
--spec start_link(ranch:ref(), non_neg_integer(), inet:socket(), module(), module())
+-spec start_link(ranch:ref(), pos_integer(), inet:socket(), module(), module())
 	-> {ok, pid()}.
 start_link(Ref, AcceptorId, LSocket, Transport, Logger) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref, AcceptorId),
