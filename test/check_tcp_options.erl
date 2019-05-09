@@ -1,15 +1,16 @@
 -module(check_tcp_options).
 -behaviour(ranch_protocol).
 
--export([start_link/4]).
+-export([start_link/3]).
 -export([init/3]).
 
-start_link(_, Socket, _, [{pid, TestPid}|TcpOptions]) ->
-	{ok, RealTcpOptions} =
-		inet:getopts(Socket, [Key || {Key, _} <- TcpOptions]),
-	Pid = spawn_link(?MODULE, init, [TestPid, RealTcpOptions, TcpOptions]),
+start_link(Ref, _, [{pid, TestPid}|TcpOptions]) ->
+	Pid = spawn_link(?MODULE, init, [Ref, TestPid, TcpOptions]),
 	{ok, Pid}.
 
-init(Pid, TcpOptions, TcpOptions) ->
+init(Ref, Pid, TcpOptions) ->
+	{ok, Socket} = ranch:handshake(Ref),
+	{ok, RealTcpOptions} = inet:getopts(Socket, [Key || {Key, _} <- TcpOptions]),
+	true = TcpOptions =:= RealTcpOptions,
 	Pid ! checked,
 	receive after 2500 -> ok end.

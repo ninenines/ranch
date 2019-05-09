@@ -16,7 +16,6 @@ Ranch protocols implement the following interface:
 [source,erlang]
 ----
 start_link(Ref       :: ranch:ref(),
-           _,
            Transport :: module(),
            ProtoOpts :: any())
     -> {ok, ConnPid :: pid()}
@@ -46,9 +45,10 @@ processes and degrade performance severely.
 
 == Changelog
 
-* *1.6*: The second argument `Socket` was deprecated and will
-         be removed in Ranch 2.0. The socket should be obtained
-         by calling link:man:ranch:handshake(3)[ranch:handshake(3)].
+* *2.0*: The second argument `Socket` was removed.
+* *1.6*: The second argument `Socket` was deprecated. Call
+         link:man:ranch:handshake(3)[ranch:handshake(3)]
+         to obtain the socket.
 
 == See also
 

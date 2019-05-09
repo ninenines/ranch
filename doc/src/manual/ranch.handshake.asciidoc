@@ -24,11 +24,6 @@ handshake necessary to give control of the socket to this
 process and also does the transport handshake, for example
 setting up the TLS connection.
 
-Currently the socket can be obtained from a
-`Protocol:start_link/4` argument and as a return value
-from `ranch:handshake/1,2`. In Ranch 2.0 the socket will
-only be available from `ranch:handshake/1,2`.
-
 == Arguments
 
 Ref::

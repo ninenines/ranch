@@ -5,7 +5,7 @@
 -behaviour(ranch_protocol).
 
 %% API.
--export([start_link/4]).
+-export([start_link/3]).
 
 %% gen_statem.
 -export([callback_mode/0]).
@@ -20,7 +20,7 @@
 
 %% API.
 
-start_link(Ref, _Socket, Transport, Opts) ->
+start_link(Ref, Transport, Opts) ->
 	{ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Transport, Opts}])}.
 
 %% gen_statem.

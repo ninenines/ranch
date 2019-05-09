@@ -121,7 +121,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		max_conns=MaxConns, logger=Logger}, CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
-			try Protocol:start_link(Ref, Socket, Transport, Opts) of
+			try Protocol:start_link(Ref, Transport, Opts) of
 				{ok, Pid} ->
 					handshake(State, CurConns, NbChildren, Sleepers, To, Socket, Pid, Pid);
 				{ok, SupPid, ProtocolPid} when ConnType =:= supervisor ->
