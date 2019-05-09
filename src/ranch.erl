@@ -20,7 +20,6 @@
 -export([suspend_listener/1]).
 -export([resume_listener/1]).
 -export([child_spec/5]).
--export([accept_ack/1]).
 -export([handshake/1]).
 -export([handshake/2]).
 -export([recv_proxy_header/2]).
@@ -43,8 +42,6 @@
 -export([set_option_default/3]).
 -export([require/1]).
 -export([log/4]).
-
--deprecated([accept_ack/1]).
 
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
@@ -144,11 +141,6 @@ child_spec(Ref, Transport, TransOpts0, Protocol, ProtoOpts) ->
 	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
 		Ref, Transport, TransOpts, Protocol, ProtoOpts
 	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
-
--spec accept_ack(ref()) -> ok.
-accept_ack(Ref) ->
-	{ok, _} = handshake(Ref),
-	ok.
 
 -spec handshake(ref()) -> {ok, ranch_transport:socket()}.
 handshake(Ref) ->

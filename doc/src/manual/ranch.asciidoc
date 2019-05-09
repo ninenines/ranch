@@ -25,7 +25,6 @@ Suspend/resume:
 
 Connections:
 
-* ranch:accept_ack(3) - Deprecated in favor of link:man:ranch:handshake(3)[ranch:handshake(3)]
 * link:man:ranch:handshake(3)[ranch:handshake(3)] - Perform the transport handshake
 * link:man:ranch:recv_proxy_header(3)[ranch:recv_proxy_header(3)] - Receive the PROXY protocol header
 * link:man:ranch:remove_connection(3)[ranch:remove_connection(3)] - Remove connection from the count
@@ -131,6 +130,8 @@ Unique name used to refer to a listener.
 
 == Changelog
 
+* *2.0*: The function `ranch:accept_ack/1` was removed in favor of
+         link:man:ranch:handshake(3)[ranch:handshake(3)].
 * *2.0*: The option `max_connections` is now per connection supervisor.
 * *2.0*: The `num_conns_sup` option was added.
 * *2.0*: The `socket` option was removed.
