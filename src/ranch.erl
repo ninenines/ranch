@@ -53,6 +53,7 @@
 	logger => module(),
 	num_acceptors => pos_integer(),
 	num_conns_sups => pos_integer(),
+	num_listen_sockets => pos_integer(),
 	shutdown => timeout() | brutal_kill,
 	socket_opts => any()
 }.
