@@ -41,6 +41,8 @@ groups() ->
 		tcp_getopts_capability,
 		tcp_getstat_capability,
 		tcp_upgrade,
+		tcp_10_acceptors_10_listen_sockets,
+		tcp_many_listen_sockets_no_reuseport,
 		tcp_error_eaddrinuse,
 		tcp_error_eacces
 	]}, {ssl, [
@@ -53,6 +55,8 @@ groups() ->
 		ssl_upgrade_from_tcp,
 		ssl_getopts_capability,
 		ssl_getstat_capability,
+		ssl_10_acceptors_10_listen_sockets,
+		ssl_many_listen_sockets_no_reuseport,
 		ssl_error_eaddrinuse,
 		ssl_error_no_cert,
 		ssl_error_eacces
@@ -399,6 +403,50 @@ ssl_accept_error(_) ->
 	true = is_process_alive(AcceptorPid),
 	ok = ranch:stop_listener(Name).
 
+ssl_10_acceptors_10_listen_sockets(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			ok = do_ssl_10_acceptors_10_listen_sockets();
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
+
+do_ssl_10_acceptors_10_listen_sockets() ->
+	doc("Ensure that we can use 10 listen sockets across 10 acceptors with SSL."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, ListenerSupPid} = ranch:start_listener(Name,
+		ranch_ssl, #{
+			num_acceptors => 10,
+			num_listen_sockets => 10,
+			socket_opts => [{raw, 1, 15, <<1:32/native>>}|Opts]},
+		echo_protocol, []),
+	10 = length(do_get_listener_sockets(ListenerSupPid)),
+	ok = ranch:stop_listener(Name),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_many_listen_sockets_no_reuseport(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			ok = do_ssl_many_listen_sockets_no_reuseport();
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
+
+do_ssl_many_listen_sockets_no_reuseport() ->
+	doc("Confirm that ranch:start_listener/5 fails when SO_REUSEPORT is not available with SSL."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{error, eaddrinuse} = ranch:start_listener(Name,
+		ranch_ssl, #{
+			num_acceptors => 10,
+			num_listen_sockets => 10,
+			socket_opts => [{raw, 1, 15, <<0:32/native>>}|Opts]},
+		echo_protocol, []),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
 ssl_active_echo(_) ->
 	doc("Ensure that active mode works with SSL transport."),
 	Name = name(),
@@ -621,6 +669,48 @@ ssl_error_eacces(_) ->
 	end.
 
 %% tcp.
+
+tcp_10_acceptors_10_listen_sockets(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			ok = do_tcp_10_acceptors_10_listen_sockets();
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
+
+do_tcp_10_acceptors_10_listen_sockets() ->
+	doc("Ensure that we can use 10 listen sockets across 10 acceptors with TCP."),
+	Name = name(),
+	{ok, ListenerSupPid} = ranch:start_listener(Name,
+		ranch_tcp, #{
+			num_acceptors => 10,
+			num_listen_sockets => 10,
+			socket_opts => [{raw, 1, 15, <<1:32/native>>}]},
+		echo_protocol, []),
+	10 = length(do_get_listener_sockets(ListenerSupPid)),
+	ok = ranch:stop_listener(Name),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+tcp_many_listen_sockets_no_reuseport(_) ->
+	case do_os_supports_reuseport() of
+		true ->
+			ok = do_tcp_many_listen_sockets_no_reuseport();
+		false ->
+			{skip, "No SO_REUSEPORT support."}
+	end.
+
+do_tcp_many_listen_sockets_no_reuseport() ->
+	doc("Confirm that ranch:start_listener/5 fails when SO_REUSEPORT is not available with TCP."),
+	Name = name(),
+	{error, eaddrinuse} = ranch:start_listener(Name,
+		ranch_tcp, #{
+			num_acceptors => 10,
+			num_listen_sockets => 10,
+			socket_opts => [{raw, 1, 15, <<0:32/native>>}]},
+		echo_protocol, []),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
 
 tcp_active_echo(_) ->
 	doc("Ensure that active mode works with TCP transport."),
@@ -1246,11 +1336,14 @@ clean_traces() ->
 	end.
 
 do_get_listener_socket(ListenerSupPid) ->
+	[LSocket] = do_get_listener_sockets(ListenerSupPid),
+	LSocket.
+
+do_get_listener_sockets(ListenerSupPid) ->
 	[AcceptorsSupPid] = [Pid || {ranch_acceptors_sup, Pid, supervisor, _}
 		<- supervisor:which_children(ListenerSupPid)],
 	{links, Links} = erlang:process_info(AcceptorsSupPid, links),
-	[LSocket] = [P || P <- Links, is_port(P)],
-	LSocket.
+	[P || P <- Links, is_port(P)].
 
 do_conns_which_children(Name) ->
 	Conns = [supervisor:which_children(ConnsSup) ||
@@ -1273,3 +1366,10 @@ do_conns_count_children(Name) ->
 		[supervisor:count_children(ConnsSup) ||
 			{_, ConnsSup} <- ranch_server:get_connections_sups(Name)]
 	).
+
+do_os_supports_reuseport() ->
+	case {os:type(), os:version()} of
+		{{unix, linux}, {Major, _, _}} when Major > 3 -> true;
+		{{unix, linux}, {3, Minor, _}} when Minor >= 9 -> true;
+		_ -> false
+	end.

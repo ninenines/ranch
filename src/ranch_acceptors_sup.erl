@@ -26,27 +26,51 @@ start_link(Ref, NumAcceptors, Transport) ->
 init([Ref, NumAcceptors, Transport]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	Logger = maps:get(logger, TransOpts, error_logger),
+	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
 	SocketOpts = maps:get(socket_opts, TransOpts, []),
 	%% We temporarily put the logger in the process dictionary
 	%% so that it can be used from ranch:filter_options. The
 	%% interface as it currently is does not allow passing it
 	%% down otherwise.
 	put(logger, Logger),
-	LSocket = case Transport:listen(SocketOpts) of
+	LSockets = start_listen_sockets(Ref, NumListenSockets, Transport, SocketOpts, Logger),
+	erase(logger),
+	Procs = [begin
+		LSocketId = (AcceptorId rem NumListenSockets) + 1,
+		{_, LSocket} = lists:keyfind(LSocketId, 1, LSockets),
+		{
+			{acceptor, self(), AcceptorId},
+			{ranch_acceptor, start_link, [Ref, AcceptorId, LSocket, Transport, Logger]},
+			permanent, brutal_kill, worker, []
+		}
+	end || AcceptorId <- lists:seq(1, NumAcceptors)],
+	{ok, {{one_for_one, 1, 5}, Procs}}.
+
+-spec start_listen_sockets(any(), pos_integer(), module(), list(), module())
+	-> [{pos_integer(), inet:socket()}].
+start_listen_sockets(Ref, NumListenSockets, Transport, SocketOpts0, Logger) when NumListenSockets > 0 ->
+	BaseSocket = start_listen_socket(Ref, Transport, SocketOpts0, Logger),
+	{ok, Addr={_, Port}} = Transport:sockname(BaseSocket),
+	ranch_server:set_addr(Ref, Addr),
+	SocketOpts = case lists:keyfind(port, 1, SocketOpts0) of
+		{port, Port} ->
+			SocketOpts0;
+		_ ->
+			[{port, Port}|lists:keydelete(port, 1, SocketOpts0)]
+	end,
+	ExtraSockets = [
+		{N, start_listen_socket(Ref, Transport, SocketOpts, Logger)}
+	|| N <- lists:seq(2, NumListenSockets)],
+	[{1, BaseSocket}|ExtraSockets].
+
+-spec start_listen_socket(any(), module(), list(), module()) -> inet:socket().
+start_listen_socket(Ref, Transport, SocketOpts, Logger) ->
+	case Transport:listen(SocketOpts) of
 		{ok, Socket} ->
-			erase(logger),
 			Socket;
 		{error, Reason} ->
 			listen_error(Ref, Transport, SocketOpts, Reason, Logger)
-	end,
-	{ok, Addr} = Transport:sockname(LSocket),
-	ranch_server:set_addr(Ref, Addr),
-	Procs = [
-		{{acceptor, self(), N}, {ranch_acceptor, start_link, [
-			Ref, N, LSocket, Transport, Logger
-		]}, permanent, brutal_kill, worker, []}
-			|| N <- lists:seq(1, NumAcceptors)],
-	{ok, {{one_for_one, 1, 5}, Procs}}.
+	end.
 
 -spec listen_error(any(), module(), any(), atom(), module()) -> no_return().
 listen_error(Ref, Transport, SocketOpts0, Reason, Logger) ->
