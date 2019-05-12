@@ -25,7 +25,7 @@ start_link(Ref, NumAcceptors, Transport) ->
 
 init([Ref, NumAcceptors, Transport]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
-	Logger = maps:get(logger, TransOpts, error_logger),
+	Logger = maps:get(logger, TransOpts, logger),
 	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
 	SocketOpts = maps:get(socket_opts, TransOpts, []),
 	%% We temporarily put the logger in the process dictionary

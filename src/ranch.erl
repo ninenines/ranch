@@ -379,7 +379,7 @@ filter_user_options([], _) ->
 
 filter_options_warning(Opt) ->
 	Logger = case get(logger) of
-		undefined -> error_logger;
+		undefined -> logger;
 		Logger0 -> Logger0
 	end,
 	log(warning,
@@ -416,9 +416,8 @@ log(Level, Format, Args, #{logger := Logger})
 		when Logger =/= error_logger ->
 	_ = Logger:Level(Format, Args),
 	ok;
-%% We use error_logger by default. Because error_logger does
-%% not have all the levels we accept we have to do some
-%% mapping to error_logger functions.
+%% Because error_logger does not have all the levels
+%% we accept we have to do some mapping to error_logger functions.
 log(Level, Format, Args, _) ->
 	Function = case Level of
 		emergency -> error_msg;

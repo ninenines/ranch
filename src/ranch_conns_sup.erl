@@ -108,7 +108,7 @@ init(Parent, Ref, Id, Transport, Protocol) ->
 	ConnType = maps:get(connection_type, TransOpts, worker),
 	Shutdown = maps:get(shutdown, TransOpts, 5000),
 	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
-	Logger = maps:get(logger, TransOpts, error_logger),
+	Logger = maps:get(logger, TransOpts, logger),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,

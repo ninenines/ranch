@@ -96,6 +96,10 @@ handshake_timeout (5000)::
 
 Maximum allowed time for the `ranch:handshake/1,2` call to finish.
 
+logger (logger)::
+
+The module that will be used to write log messages.
+
 max_connections (1024)::
 
 Maximum number of active connections per connection supervisor.
@@ -135,8 +139,10 @@ Unique name used to refer to a listener.
 * *2.0*: The option `max_connections` is now per connection supervisor.
 * *2.0*: The `num_conns_sup` option was added.
 * *2.0*: The `socket` option was removed.
+* *2.0*: The `logger` option is no longer experimental. It now defaults
+         to `logger` instead of `error_logger`.
 * *2.0*: The `opt()` type was removed.
-* *1.6*: The `logger` option was added.
+* *1.6*: The experimental `logger` option was added.
 * *1.6*: The `opt()` type was deprecated in favor of the new `opts()` type.
 
 == See also
