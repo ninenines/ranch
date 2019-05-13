@@ -13,7 +13,7 @@ init(Ref, Transport, _Opts = []) ->
 	loop(Socket, Transport).
 
 loop(Socket, Transport) ->
-	{OK, Closed, Error} = Transport:messages(),
+	{OK, Closed, Error, _Passive} = Transport:messages(),
 	Transport:setopts(Socket, [{active, once}]),
 	receive
 		{OK, Socket, Data} ->

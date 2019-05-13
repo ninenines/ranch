@@ -115,9 +115,10 @@ means a random available port number will be chosen.
 [source,erlang]
 ----
 messages()
-    -> {OK     :: atom(),
-        Closed :: atom(),
-        Error  :: atom()}
+    -> {OK      :: atom(),
+        Closed  :: atom(),
+        Error   :: atom(),
+        Passive :: atom()}
 ----
 
 Return the tuple keys for the messages sent by the socket.
@@ -284,6 +285,8 @@ The exact type will vary depending on the transport module.
 
 == Changelog
 
+* *2.0*: The callback `messages/0` return value was updated to
+         include the passive message for `{active, N}`.
 * *1.6*: The `socket()` type was added for documentation purposes.
 * *1.6*: The type of the sendfile filename was extended.
 

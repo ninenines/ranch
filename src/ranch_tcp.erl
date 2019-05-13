@@ -76,7 +76,7 @@ name() -> tcp.
 secure() ->
 	false.
 
-messages() -> {tcp, tcp_closed, tcp_error}.
+messages() -> {tcp, tcp_closed, tcp_error, tcp_passive}.
 
 -spec listen(opts()) -> {ok, inet:socket()} | {error, atom()}.
 listen(Opts) ->

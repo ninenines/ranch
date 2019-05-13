@@ -89,7 +89,7 @@ name() -> ssl.
 secure() ->
 	true.
 
-messages() -> {ssl, ssl_closed, ssl_error}.
+messages() -> {ssl, ssl_closed, ssl_error, ssl_passive}.
 
 -spec listen(opts()) -> {ok, ssl:sslsocket()} | {error, atom()}.
 listen(Opts) ->
