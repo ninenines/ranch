@@ -28,8 +28,8 @@ start_link(Ref, NumConnsSups, Transport, Protocol) ->
 
 init({Ref, NumConnsSups, Transport, Protocol}) ->
 	ChildSpecs = [
-		{{ranch_conns_sup, N}, {ranch_conns_sup, start_link,
+		#{id => {ranch_conns_sup, N}, start => {ranch_conns_sup, start_link,
 				[Ref, N, Transport, Protocol]},
-			permanent, infinity, supervisor, [ranch_conns_sup]}
+			type => supervisor}
 		|| N <- lists:seq(1, NumConnsSups)],
-	{ok, {{one_for_one, 1, 5}, ChildSpecs}}.
+	{ok, {#{}, ChildSpecs}}.
