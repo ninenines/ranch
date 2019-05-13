@@ -51,7 +51,6 @@ init([Ref, NumAcceptors, Transport]) ->
 start_listen_sockets(Ref, NumListenSockets, Transport, SocketOpts0, Logger) when NumListenSockets > 0 ->
 	BaseSocket = start_listen_socket(Ref, Transport, SocketOpts0, Logger),
 	{ok, Addr={_, Port}} = Transport:sockname(BaseSocket),
-	ranch_server:set_addr(Ref, Addr),
 	SocketOpts = case lists:keyfind(port, 1, SocketOpts0) of
 		{port, Port} ->
 			SocketOpts0;
@@ -61,6 +60,7 @@ start_listen_sockets(Ref, NumListenSockets, Transport, SocketOpts0, Logger) when
 	ExtraSockets = [
 		{N, start_listen_socket(Ref, Transport, SocketOpts, Logger)}
 	|| N <- lists:seq(2, NumListenSockets)],
+	ranch_server:set_addr(Ref, Addr),
 	[{1, BaseSocket}|ExtraSockets].
 
 -spec start_listen_socket(any(), module(), list(), module()) -> inet:socket().
