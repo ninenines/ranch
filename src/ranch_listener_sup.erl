@@ -33,11 +33,15 @@ start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 init({Ref, NumAcceptors, NumConnsSups, Transport, Protocol}) ->
 	ok = ranch_server:set_listener_sup(Ref, self()),
 	ChildSpecs = [
-		{ranch_conns_sup_sup, {ranch_conns_sup_sup, start_link,
-				[Ref, NumConnsSups, Transport, Protocol]},
-			permanent, infinity, supervisor, [ranch_conns_sup_sup]},
-		{ranch_acceptors_sup, {ranch_acceptors_sup, start_link,
-				[Ref, NumAcceptors, Transport]},
-			permanent, infinity, supervisor, [ranch_acceptors_sup]}
+		#{
+			id => ranch_conns_sup_sup,
+			start => {ranch_conns_sup_sup, start_link, [Ref, NumConnsSups, Transport, Protocol]},
+			type => supervisor
+		},
+		#{
+			id => ranch_acceptors_sup,
+			start => {ranch_acceptors_sup, start_link, [Ref, NumAcceptors, Transport]},
+			type => supervisor
+		}
 	],
-	{ok, {{rest_for_one, 1, 5}, ChildSpecs}}.
+	{ok, {#{strategy => rest_for_one}, ChildSpecs}}.

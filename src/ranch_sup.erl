@@ -34,7 +34,6 @@ init([]) ->
 	ranch_server = ets:new(ranch_server, [
 		ordered_set, public, named_table]),
 	Procs = [
-		{ranch_server, {ranch_server, start_link, []},
-			permanent, 5000, worker, [ranch_server]}
+		#{id => ranch_server, start => {ranch_server, start_link, []}}
 	],
-	{ok, {{one_for_one, Intensity, Period}, Procs}}.
+	{ok, {#{intensity => Intensity, period => Period}, Procs}}.

@@ -38,13 +38,13 @@ init([Ref, NumAcceptors, Transport]) ->
 	Procs = [begin
 		LSocketId = (AcceptorId rem NumListenSockets) + 1,
 		{_, LSocket} = lists:keyfind(LSocketId, 1, LSockets),
-		{
-			{acceptor, self(), AcceptorId},
-			{ranch_acceptor, start_link, [Ref, AcceptorId, LSocket, Transport, Logger]},
-			permanent, brutal_kill, worker, []
+		#{
+			id => {acceptor, self(), AcceptorId},
+			start => {ranch_acceptor, start_link, [Ref, AcceptorId, LSocket, Transport, Logger]},
+			shutdown => brutal_kill
 		}
 	end || AcceptorId <- lists:seq(1, NumAcceptors)],
-	{ok, {{one_for_one, 1, 5}, Procs}}.
+	{ok, {#{}, Procs}}.
 
 -spec start_listen_sockets(any(), pos_integer(), module(), list(), module())
 	-> [{pos_integer(), inet:socket()}].
