@@ -120,11 +120,13 @@ get_listener_sup(Ref) ->
 get_listener_sups() ->
 	[{Ref, Pid} || [Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})].
 
--spec set_addr(ranch:ref(), {inet:ip_address(), inet:port_number()} | {undefined, undefined}) -> ok.
+-spec set_addr(ranch:ref(), {inet:ip_address(), inet:port_number()} |
+	{local, binary()} | {undefined, undefined}) -> ok.
 set_addr(Ref, Addr) ->
 	gen_server:call(?MODULE, {set_addr, Ref, Addr}).
 
--spec get_addr(ranch:ref()) -> {inet:ip_address(), inet:port_number()} | {undefined, undefined}.
+-spec get_addr(ranch:ref()) -> {inet:ip_address(), inet:port_number()} |
+	{local, binary()} | {undefined, undefined}.
 get_addr(Ref) ->
 	ets:lookup_element(?TAB, {addr, Ref}, 2).
 

@@ -201,14 +201,19 @@ get_status(Ref) ->
 			running
 	end.
 
--spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()} | {undefined, undefined}.
+-spec get_addr(ref()) -> {inet:ip_address(), inet:port_number()} |
+	{local, binary()} | {undefined, undefined}.
 get_addr(Ref) ->
 	ranch_server:get_addr(Ref).
 
 -spec get_port(ref()) -> inet:port_number() | undefined.
 get_port(Ref) ->
-	{_, Port} = get_addr(Ref),
-	Port.
+	case get_addr(Ref) of
+		{local, _} ->
+			undefined;
+		{_, Port} ->
+			Port
+	end.
 
 -spec get_connections(ref(), active|all) -> non_neg_integer().
 get_connections(Ref, active) ->
@@ -263,7 +268,12 @@ info(Ref) ->
 listener_info(Ref, Pid) ->
 	[_, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
 	Status = get_status(Ref),
-	{IP, Port} = get_addr(Ref),
+	{IP, Port} = case get_addr(Ref) of
+		Addr = {local, _} ->
+			{Addr, undefined};
+		Addr ->
+			Addr
+	end,
 	MaxConns = get_max_connections(Ref),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	ProtoOpts = get_protocol_options(Ref),
