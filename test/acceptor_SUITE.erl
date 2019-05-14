@@ -29,6 +29,7 @@ all() ->
 groups() ->
 	[{tcp, [
 		tcp_active_echo,
+		tcp_active_n_echo,
 		tcp_echo,
 		tcp_local_echo,
 		tcp_graceful,
@@ -49,6 +50,7 @@ groups() ->
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_active_echo,
+		ssl_active_n_echo,
 		ssl_echo,
 		ssl_local_echo,
 		ssl_graceful,
@@ -466,6 +468,36 @@ ssl_active_echo(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+ssl_active_n_echo(_) ->
+	case application:get_key(ssl, vsn) of
+		{ok, Vsn} when Vsn >= "9.2" ->
+			do_ssl_active_n_echo();
+		_ ->
+			{skip, "No Active N support."}
+	end.
+
+do_ssl_active_n_echo() ->
+	doc("Ensure that active N mode works with SSL transport."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, Opts,
+		batch_echo_protocol, [{batch_size, 3}]),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = ssl:send(Socket, <<"One">>),
+	{ok, <<"OK">>} = ssl:recv(Socket, 2, 1000),
+	ok = ssl:send(Socket, <<"Two">>),
+	{ok, <<"OK">>} = ssl:recv(Socket, 2, 1000),
+	ok = ssl:send(Socket, <<"Three">>),
+	{ok, <<"OK">>} = ssl:recv(Socket, 2, 1000),
+	{ok, <<"OneTwoThree">>} = ssl:recv(Socket, 11, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
 ssl_echo(_) ->
 	doc("Ensure that passive mode works with SSL transport."),
 	Name = name(),
@@ -754,6 +786,27 @@ tcp_active_echo(_) ->
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
 	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+tcp_active_n_echo(_) ->
+	doc("Ensure that active N mode works with TCP transport."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{},
+		batch_echo_protocol, [{batch_size, 3}]),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"One">>),
+	{ok, <<"OK">>} = gen_tcp:recv(Socket, 2, 1000),
+	ok = gen_tcp:send(Socket, <<"Two">>),
+	{ok, <<"OK">>} = gen_tcp:recv(Socket, 2, 1000),
+	ok = gen_tcp:send(Socket, <<"Three">>),
+	{ok, <<"OK">>} = gen_tcp:recv(Socket, 2, 1000),
+	{ok, <<"OneTwoThree">>} = gen_tcp:recv(Socket, 11, 1000),
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
