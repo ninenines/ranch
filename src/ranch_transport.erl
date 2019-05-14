@@ -56,9 +56,9 @@
 -callback controlling_process(socket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.
 -callback peername(socket())
-	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 -callback sockname(socket())
-	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 -callback shutdown(socket(), read | write | read_write)
 	-> ok | {error, atom()}.
 -callback close(socket()) -> ok.

@@ -50,16 +50,22 @@ init([Ref, NumAcceptors, Transport]) ->
 	-> [{pos_integer(), inet:socket()}].
 start_listen_sockets(Ref, NumListenSockets, Transport, SocketOpts0, Logger) when NumListenSockets > 0 ->
 	BaseSocket = start_listen_socket(Ref, Transport, SocketOpts0, Logger),
-	{ok, Addr={_, Port}} = Transport:sockname(BaseSocket),
-	SocketOpts = case lists:keyfind(port, 1, SocketOpts0) of
-		{port, Port} ->
-			SocketOpts0;
-		_ ->
-			[{port, Port}|lists:keydelete(port, 1, SocketOpts0)]
+	{ok, Addr} = Transport:sockname(BaseSocket),
+	ExtraSockets = case Addr of
+		{local, _} when NumListenSockets > 1 ->
+			listen_error(Ref, Transport, SocketOpts0, reuseport_local, Logger);
+		{local, _} ->
+			[];
+		{_, Port} ->
+			SocketOpts = case lists:keyfind(port, 1, SocketOpts0) of
+				{port, Port} ->
+					SocketOpts0;
+				_ ->
+					[{port, Port}|lists:keydelete(port, 1, SocketOpts0)]
+			end,
+			[{N, start_listen_socket(Ref, Transport, SocketOpts, Logger)}
+				|| N <- lists:seq(2, NumListenSockets)]
 	end,
-	ExtraSockets = [
-		{N, start_listen_socket(Ref, Transport, SocketOpts, Logger)}
-	|| N <- lists:seq(2, NumListenSockets)],
 	ranch_server:set_addr(Ref, Addr),
 	[{1, BaseSocket}|ExtraSockets].
 
@@ -84,5 +90,7 @@ listen_error(Ref, Transport, SocketOpts0, Reason, Logger) ->
 
 format_error(no_cert) ->
 	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
+format_error(reuseport_local) ->
+	"num_listen_sockets must be set to 1 for local sockets";
 format_error(Reason) ->
 	inet:format_error(Reason).

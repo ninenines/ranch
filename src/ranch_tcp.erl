@@ -220,12 +220,12 @@ controlling_process(Socket, Pid) ->
 	gen_tcp:controlling_process(Socket, Pid).
 
 -spec peername(inet:socket())
-	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 peername(Socket) ->
 	inet:peername(Socket).
 
 -spec sockname(inet:socket())
-	-> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 sockname(Socket) ->
 	inet:sockname(Socket).
 

@@ -30,6 +30,7 @@ groups() ->
 	[{tcp, [
 		tcp_active_echo,
 		tcp_echo,
+		tcp_local_echo,
 		tcp_graceful,
 		tcp_inherit_options,
 		tcp_max_connections,
@@ -49,6 +50,7 @@ groups() ->
 		ssl_accept_error,
 		ssl_active_echo,
 		ssl_echo,
+		ssl_local_echo,
 		ssl_graceful,
 		ssl_sni_echo,
 		ssl_sni_fail,
@@ -481,6 +483,36 @@ ssl_echo(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+ssl_local_echo(_) ->
+	case do_os_supports_local_sockets() of
+		true ->
+			do_ssl_local_echo();
+		false ->
+			{skip, "No local socket support."}
+	end.
+
+do_ssl_local_echo() ->
+	doc("Ensure that listening on a local socket works with SSL transport."),
+	SockFile = do_tempname(),
+	try
+		Name = name(),
+		Opts = ct_helper:get_certs_from_ets(),
+		{ok, _} = ranch:start_listener(Name,
+			ranch_ssl, #{socket_opts => [{ip, {local, SockFile}}|Opts]},
+			echo_protocol, []),
+		undefined = ranch:get_port(Name),
+		{ok, Socket} = ssl:connect({local, SockFile}, 0, [binary, {active, false}, {packet, raw}]),
+		ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
+		{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
+		ok = ranch:stop_listener(Name),
+		{error, closed} = ssl:recv(Socket, 0, 1000),
+		%% Make sure the listener stopped.
+		{'EXIT', _} = begin catch ranch:get_port(Name) end,
+		ok
+	after
+		file:delete(SockFile)
+	end.
+
 ssl_sni_echo(_) ->
 	case application:get_key(ssl, vsn) of
 		{ok, Vsn} when Vsn >= "7.0" ->
@@ -743,6 +775,35 @@ tcp_echo(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
+
+tcp_local_echo(_) ->
+	case do_os_supports_local_sockets() of
+		true ->
+			do_tcp_local_echo();
+		false ->
+			{skip, "No local socket support."}
+	end.
+
+do_tcp_local_echo() ->
+	doc("Ensure that listening on a local socket works with TCP transport."),
+	SockFile = do_tempname(),
+	try
+		Name = name(),
+		{ok, _} = ranch:start_listener(Name,
+			ranch_tcp, #{socket_opts => [{ip, {local, SockFile}}]},
+			echo_protocol, []),
+		undefined = ranch:get_port(Name),
+		{ok, Socket} = gen_tcp:connect({local, SockFile}, 0, [binary, {active, false}, {packet, raw}]),
+		ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+		{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+		ok = ranch:stop_listener(Name),
+		{error, closed} = gen_tcp:recv(Socket, 0, 1000),
+		%% Make sure the listener stopped.
+		{'EXIT', _} = begin catch ranch:get_port(Name) end,
+		ok
+	after
+		file:delete(SockFile)
+	end.
 
 tcp_graceful(_) ->
 	doc("Ensure suspending and resuming of listeners does not kill active connections."),
@@ -1373,3 +1434,12 @@ do_os_supports_reuseport() ->
 		{{unix, linux}, {3, Minor, _}} when Minor >= 9 -> true;
 		_ -> false
 	end.
+
+do_os_supports_local_sockets() ->
+	case os:type() of
+		{unix, _} -> true;
+		_ -> false
+	end.
+
+do_tempname() ->
+	lists:droplast(os:cmd("mktemp -u")).
