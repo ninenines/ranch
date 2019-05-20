@@ -50,7 +50,7 @@
 	| {high_watermark, non_neg_integer()}
 	| inet
 	| inet6
-	| {ip, inet:ip_address()}
+	| {ip, inet:ip_address() | inet:local_address()}
 	| {ipv6_v6only, boolean()}
 	| {keepalive, boolean()}
 	| {linger, {boolean(), non_neg_integer()}}
