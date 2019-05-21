@@ -32,7 +32,7 @@ opt() = {backlog, non_neg_integer()}
       | {high_watermark, non_neg_integer()}
       | inet
       | inet6
-      | {ip, inet:ip_address()}
+      | {ip, inet:ip_address() | inet:local_address()}
       | {ipv6_v6only, boolean()}
       | {keepalive, boolean()}
       | {linger, {boolean(), non_neg_integer()}}
@@ -108,7 +108,10 @@ Set up the socket for IPv6.
 
 ip::
 
-Interface to listen on. Listen on all interfaces by default.
+Interface to listen on. Listen on all network interfaces by default.
+
+On UNIX systems, it is also possible to use a UNIX Domain
+socket file by specifying `{local, SocketFile}`.
 
 ipv6_v6only (false)::
 
