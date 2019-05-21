@@ -9,7 +9,7 @@ ranch:get_port - Get the listening port
 [source,erlang]
 ----
 get_port(Ref :: ranch:ref())
-    -> Port :: inet:port_number()
+    -> Port :: inet:port_number() | undefined
 ----
 
 Get the listening port.
@@ -27,6 +27,10 @@ The listener name.
 == Return value
 
 The listening port is returned.
+
+When the listener is suspended or using a UNIX Domain
+socket instead of a network interface, `undefined`
+will be returned.
 
 == Examples
 

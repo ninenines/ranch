@@ -2,7 +2,7 @@
 
 == Name
 
-ranch:get_addr - Get the listening port and IP
+ranch:get_addr - Get the listening address
 
 == Description
 
@@ -10,10 +10,12 @@ ranch:get_addr - Get the listening port and IP
 ----
 get_addr(Ref :: ranch:ref())
     -> {IP   :: inet:ip_address(),
-        Port :: inet:port_number()}
+        Port :: inet:port_number()} |
+       LocalAddr :: {local, binary()} |
+       {undefined, undefined}
 ----
 
-Get the listening port and IP.
+Get the listening address.
 
 == Arguments
 
@@ -23,9 +25,16 @@ The listener name.
 
 == Return value
 
-The address of the listener is returned as a tuple.
+The address of the listener is returned as a tuple of the form
+`{IP, Port}` when listening on a network interface, or
+`{local, SocketFile}` when listening on a UNIX Domain socket.
+When the listener is suspended, `{undefined, undefined}` will
+be returned.
 
 The IP address is the IP of the network interface the
+socket is bound to.
+
+The socket file is the path of a file on your system the
 socket is bound to.
 
 == Examples
@@ -34,6 +43,12 @@ socket is bound to.
 [source,erlang]
 ----
 {IP, Port} = ranch:get_addr(example).
+----
+
+.Get the listening UNIX Domain socket file
+[source,erlang]
+----
+{local, SocketFile} = ranch:get_addr(example).
 ----
 
 == See also

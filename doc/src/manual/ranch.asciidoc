@@ -40,7 +40,7 @@ Options:
 
 Introspection:
 
-* link:man:ranch:get_addr(3)[ranch:get_addr(3)] - Get the listening port and IP
+* link:man:ranch:get_addr(3)[ranch:get_addr(3)] - Get the listening address
 * link:man:ranch:get_port(3)[ranch:get_port(3)] - Get the listening port
 * link:man:ranch:info(3)[ranch:info(3)] - Overview of Ranch listeners
 * link:man:ranch:procs(3)[ranch:procs(3)] - Retrieve pids from a listener

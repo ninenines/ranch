@@ -138,11 +138,15 @@ Return the name of the transport.
 ----
 peername(Socket :: socket())
     -> {ok, {inet:ip_address(), inet:port_number()}}
-     | {error, atom()}.
+     | {local, binary()} | {error, atom()}.
 ----
 
 Return the address and port number for the other end of
 the connection.
+
+If the connection was created through a UNIX Domain socket,
+`{local, PeerSocket}` is returned, where `PeerSocket` is
+usually an empty binary.
 
 === recv
 
@@ -249,6 +253,9 @@ sockname(Socket :: socket())
 
 Return the address and port number for the local end
 of the connection.
+
+If the connection was created through a UNIX Domain socket,
+`{local, SocketFile}` will be returned instead.
 
 == Exports
 
