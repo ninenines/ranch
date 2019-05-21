@@ -160,6 +160,23 @@ We recommend the use of port rewriting for systems with a single server,
 and load balancing for systems with multiple servers. Documenting these
 solutions is however out of the scope of this guide.
 
+=== Listening on a UNIX Domain socket
+
+On UNIX systems, it is also possible to use Ranch to listen on a UNIX
+domain socket by specifying `{local, SocketFile}` for the `ip` socket
+option. In this case, the port must be set to 0 or omitted. The given
+file must not exist: Ranch must be able to create it.
+
+.Starting a listener for TCP connections on a UNIX Domain socket
+
+[source,erlang]
+{ok, _} = ranch:start_listener(tcp_echo,
+    ranch_tcp, #{socket_opts => [
+        {ip, {local, "/tmp/ranch_echo.sock"}},
+        {port, 0}
+    ]}, echo_protocol, []
+).
+
 === Accepting connections on an existing socket
 
 If you want to accept connections on an existing socket, you can write
