@@ -17,6 +17,7 @@
 -compile(nowarn_export_all).
 
 -dialyzer({nowarn_function, misc_wait_for_connections/1}).
+-dialyzer({nowarn_function, do_ssl_local_echo/0}).
 
 -import(ct_helper, [doc/1]).
 -import(ct_helper, [name/0]).
