@@ -723,6 +723,8 @@ ssl_error_eacces(_) ->
 	case os:type() of
 		{win32, nt} ->
 			doc("There are no privileged ports on Windows.");
+		{unix, darwin} ->
+			doc("There are no privileged ports on MacOS.");
 		_ ->
 			doc("Ensure that failure due to an eacces returns a compact readable error."),
 			Name = name(),
@@ -1098,6 +1100,8 @@ tcp_error_eacces(_) ->
 	case os:type() of
 		{win32, nt} ->
 			doc("There are no privileged ports on Windows.");
+		{unix, darwin} ->
+			doc("There are no privileged ports on MacOS.");
 		_ ->
 			doc("Ensure that failure due to an eacces returns a compact readable error."),
 			Name = name(),
