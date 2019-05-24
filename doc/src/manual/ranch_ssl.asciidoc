@@ -41,41 +41,44 @@ List of listen options.
 ----
 ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {beast_mitigation, one_n_minus_one | zero_n | disabled}
-          | {cacertfile, string()}
+          | {cacertfile, file:filename()}
           | {cacerts, [public_key:der_encoded()]}
           | {cert, public_key:der_encoded()}
-          | {certfile, string()}
-          | {ciphers, [ssl:erl_cipher_suite()] | string()}
+          | {certfile, file:filename()}
+          | {ciphers, ssl:ciphers()}
           | {client_renegotiation, boolean()}
-          | {crl_cache, {module(), {internal | any(), list()}}}
+          | {crl_cache, [any()]}
           | {crl_check, boolean() | peer | best_effort}
-          | {depth, 0..255}
-          | {dh, public_key:der_encoded()}
-          | {dhfile, string()}
+          | {depth, integer()}
+          | {dh, binary()}
+          | {dhfile, file:filename()}
+          | {eccs, [atom()]}
           | {fail_if_no_peer_cert, boolean()}
-          | {hibernate_after, integer() | undefined}
+          | {hibernate_after, timeout()}
           | {honor_cipher_order, boolean()}
-          | {key, {'RSAPrivateKey' | 'DSAPrivateKey' | 'PrivateKeyInfo',
-                public_key:der_encoded()}}
-          | {keyfile, string()}
+          | {honor_ecc_order, boolean()}
+          | {key, ssl:key()}
+          | {keyfile, file:filename()}
           | {log_alert, boolean()}
+          | {log_level, logger:level()}
+          | {max_handshake_size, integer()}
           | {next_protocols_advertised, [binary()]}
           | {padding_check, boolean()}
-          | {partial_chain, fun(([public_key:der_encoded()])
-                -> {trusted_ca, public_key:der_encoded()} | unknown_ca)}
+          | {partial_chain, fun()}
           | {password, string()}
+          | {protocol, tls | dtls}
           | {psk_identity, string()}
           | {reuse_session, fun()}
           | {reuse_sessions, boolean()}
           | {secure_renegotiate, boolean()}
-          | {signature_algs, [{atom(), atom()}]}
+          | {signature_algs, [{ssl:hash(), ssl:sign_algo()}]}
+          | {signature_algs_cert, [atom()]}
           | {sni_fun, fun()}
           | {sni_hosts, [{string(), ssl_opt()}]}
           | {user_lookup_fun, {fun(), any()}}
-          | {v2_hello_compatible, boolean()}
-          | {verify, ssl:verify_type()}
+          | {verify, verify_none | verify_peer}
           | {verify_fun, {fun(), any()}}
-          | {versions, [atom()]}
+          | {versions, [ssl:protocol_version()]}
 ----
 
 SSL-specific listen options.
@@ -91,7 +94,7 @@ alpn_preferred_protocols::
 Perform Application-Layer Protocol Negotiation
 with the given list of preferred protocols.
 
-beast_mitigation::
+beast_mitigation (one_n_minus_one)::
 
 Change the BEAST mitigation strategy for SSL-3.0 and TLS-1.0
 to interoperate with legacy software.
@@ -144,6 +147,10 @@ dhfile::
 
 Path to the PEM encoded Diffie-Hellman parameters file.
 
+eccs::
+
+List of named ECC curves.
+
 fail_if_no_peer_cert (false)::
 
 Whether to refuse the connection if the client sends an
@@ -159,6 +166,11 @@ honor_cipher_order (false)::
 If true, use the server's preference for cipher selection.
 If false, use the client's preference.
 
+honor_ecc_order (false)::
+
+If true, use the server's preference for ECC curve selection.
+If false, use the client's preference.
+
 key::
 
 DER encoded user private key.
@@ -171,6 +183,15 @@ the certfile.
 log_alert (true)::
 
 If false, error reports will not be displayed.
+
+log_level::
+
+Specifies the log level for TLS/DTLS.
+
+max_handshake_size (256*1024)::
+
+Used to limit the size of valid TLS handshake packets to
+avoid DoS attacks.
 
 next_protocols_advertised::
 
@@ -189,6 +210,10 @@ Claim an intermediate CA in the chain as trusted.
 password::
 
 Password to the private key file, if password protected.
+
+protocol (tls)::
+
+Choose TLS or DTLS protocol for the transport layer security.
 
 psk_identity::
 
@@ -214,6 +239,12 @@ The TLS signature algorithm extension may be used, from TLS 1.2,
 to negotiate which signature algorithm to use during the TLS
 handshake.
 
+signature_algs_cert::
+
+List of signature schemes for the signature_algs_cert extension
+introduced in TLS 1.3, in order to make special requirements
+on signatures used in certificates.
+
 sni_fun::
 
 Function called when the client requests a host using Server
@@ -228,11 +259,6 @@ user_lookup_fun::
 
 Function called to determine the shared secret when using PSK,
 or provide parameters when using SRP.
-
-v2_hello_compatible::
-
-Accept clients that send hello messages in SSL-2.0 format while
-offering supported SSL/TLS versions.
 
 verify (verify_none)::
 
@@ -253,6 +279,10 @@ with the `verify` option. The `verify_fun` option allows
 greater control over the client certificate validation.
 
 The options `sni_fun` and `sni_hosts` are mutually exclusive.
+
+== Changelog
+
+* *2.0*: The `ssl_opt()` type was updated for OTP-22.0.
 
 == See also
 
