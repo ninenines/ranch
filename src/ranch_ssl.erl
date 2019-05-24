@@ -42,39 +42,46 @@
 
 -type ssl_opt() :: {alpn_preferred_protocols, [binary()]}
 	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
-	| {cacertfile, string()}
+	| {cacertfile, file:filename()}
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
-	| {certfile, string()}
-	| {ciphers, [ssl:erl_cipher_suite()]}
+	| {certfile, file:filename()}
+	| {ciphers, ssl:ciphers()}
 	| {client_renegotiation, boolean()}
-	| {crl_cache, {module(), {internal | any(), list()}}}
+	| {crl_cache, [any()]}
 	| {crl_check, boolean() | peer | best_effort}
-	| {depth, 0..255}
-	| {dh, public_key:der_encoded()}
-	| {dhfile, string()}
+	| {depth, integer()}
+	| {dh, binary()}
+	| {dhfile, file:filename()}
+	%% @todo Update when ssl exports named_curve().
+	| {eccs, [atom()]}
 	| {fail_if_no_peer_cert, boolean()}
-	| {hibernate_after, integer() | undefined}
+	| {hibernate_after, timeout()}
 	| {honor_cipher_order, boolean()}
-	| {key, {'RSAPrivateKey' | 'DSAPrivateKey' | 'PrivateKeyInfo', public_key:der_encoded()}}
-	| {keyfile, string()}
+	| {honor_ecc_order, boolean()}
+	| {key, ssl:key()}
+	| {keyfile, file:filename()}
 	| {log_alert, boolean()}
+	| {log_level, logger:level()}
+	| {max_handshake_size, integer()}
 	| {next_protocols_advertised, [binary()]}
 	| {padding_check, boolean()}
-	| {partial_chain, fun(([public_key:der_encoded()]) -> {trusted_ca, public_key:der_encoded()} | unknown_ca)}
+	| {partial_chain, fun()}
 	| {password, string()}
+	| {protocol, tls | dtls}
 	| {psk_identity, string()}
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
-	| {signature_algs, [{atom(), atom()}]}
+	| {signature_algs, [{ssl:hash(), ssl:sign_algo()}]}
+	%% @todo Update when ssl exports sign_scheme().
+	| {signature_algs_cert, [atom()]}
 	| {sni_fun, fun()}
 	| {sni_hosts, [{string(), ssl_opt()}]}
 	| {user_lookup_fun, {fun(), any()}}
-	| {v2_hello_compatible, boolean()}
 	| {verify, verify_none | verify_peer}
 	| {verify_fun, {fun(), any()}}
-	| {versions, [atom()]}.
+	| {versions, [ssl:protocol_version()]}.
 -export_type([ssl_opt/0]).
 
 -type opt() :: ranch_tcp:opt() | ssl_opt().
