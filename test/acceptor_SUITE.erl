@@ -1501,4 +1501,3 @@ do_os_supports_local_sockets() ->
 
 do_tempname() ->
 	lists:droplast(os:cmd("mktemp -u")).
-
