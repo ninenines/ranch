@@ -91,28 +91,30 @@ secure() ->
 
 messages() -> {ssl, ssl_closed, ssl_error, ssl_passive}.
 
--spec listen(opts()) -> {ok, ssl:sslsocket()} | {error, atom()}.
-listen(Opts) ->
-	case lists:keymember(cert, 1, Opts)
-			orelse lists:keymember(certfile, 1, Opts)
-			orelse lists:keymember(sni_fun, 1, Opts)
-			orelse lists:keymember(sni_hosts, 1, Opts) of
+-spec listen(ranch:transport_opts(opts())) -> {ok, ssl:sslsocket()} | {error, atom()}.
+listen(TransOpts) ->
+	SocketOpts = maps:get(socket_opts, TransOpts, []),
+	case lists:keymember(cert, 1, SocketOpts)
+			orelse lists:keymember(certfile, 1, SocketOpts)
+			orelse lists:keymember(sni_fun, 1, SocketOpts)
+			orelse lists:keymember(sni_hosts, 1, SocketOpts) of
 		true ->
-			do_listen(Opts);
+			Logger = maps:get(logger, TransOpts, logger),
+			do_listen(SocketOpts, Logger);
 		false ->
 			{error, no_cert}
 	end.
 
-do_listen(Opts0) ->
-	Opts1 = ranch:set_option_default(Opts0, backlog, 1024),
-	Opts2 = ranch:set_option_default(Opts1, nodelay, true),
-	Opts3 = ranch:set_option_default(Opts2, send_timeout, 30000),
-	Opts = ranch:set_option_default(Opts3, send_timeout_close, true),
+do_listen(SocketOpts0, Logger) ->
+	SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
+	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
+	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
+	SocketOpts = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(Opts, disallowed_listen_options(),
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
+	ssl:listen(0, ranch:filter_options(SocketOpts, disallowed_listen_options(),
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)).
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.

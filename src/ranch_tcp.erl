@@ -78,17 +78,19 @@ secure() ->
 
 messages() -> {tcp, tcp_closed, tcp_error, tcp_passive}.
 
--spec listen(opts()) -> {ok, inet:socket()} | {error, atom()}.
-listen(Opts) ->
-	Opts2 = ranch:set_option_default(Opts, backlog, 1024),
-	Opts3 = ranch:set_option_default(Opts2, nodelay, true),
-	Opts4 = ranch:set_option_default(Opts3, send_timeout, 30000),
-	Opts5 = ranch:set_option_default(Opts4, send_timeout_close, true),
+-spec listen(ranch:transport_opts(opts())) -> {ok, inet:socket()} | {error, atom()}.
+listen(TransOpts) ->
+	Logger = maps:get(logger, TransOpts, logger),
+	SocketOpts0 = maps:get(socket_opts, TransOpts, []),
+	SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
+	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
+	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
+	SocketOpts4 = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	gen_tcp:listen(0, ranch:filter_options(Opts5, disallowed_listen_options(),
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}])).
+	gen_tcp:listen(0, ranch:filter_options(SocketOpts4, disallowed_listen_options(),
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)).
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.

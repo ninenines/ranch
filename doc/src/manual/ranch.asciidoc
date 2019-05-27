@@ -67,7 +67,30 @@ code.
 
 [source,erlang]
 ----
-opts() = any() | #{
+opts() = any() | transport_opts(any())
+----
+
+Transport or socket options.
+
+It is possible to give the full transport options in a map
+(see `transport_opts()` below), or only the socket options
+(assuming they are not a map and no Ranch-specific option
+needs to be given).
+
+=== ref()
+
+[source,erlang]
+----
+ref() = any()
+----
+
+Unique name used to refer to a listener.
+
+=== transport_opts()
+
+[source,erlang]
+----
+transport_opts(SocketOpts) = #{
     connection_type   => worker | supervisor,
     handshake_timeout => timeout(),
     max_connections   => max_conns(),
@@ -75,16 +98,14 @@ opts() = any() | #{
     num_acceptors     => pos_integer(),
     num_conns_sups    => pos_integer(),
     shutdown          => timeout() | brutal_kill,
-    socket_opts       => any()
+    socket_opts       => SocketOpts
 }
 ----
 
 Transport options.
 
 The transport options are a combination of Ranch-specific
-options and socket options. Socket options may be given
-directly (assuming they are not a map and no Ranch-specific
-option needs to be given) or as part of `socket_opts`.
+options and transport-specific socket options.
 
 None of the options are required.
 
@@ -120,20 +141,12 @@ Maximum allowed time for children to stop on listener shutdown.
 
 socket_opts::
 
-Socket options given to `Transport:listen/1`. Please refer to the
+Socket options to be used by `Transport:listen/1`. Please refer to the
 documentation of the transport module you are using for more details.
-
-=== ref()
-
-[source,erlang]
-----
-ref() = any()
-----
-
-Unique name used to refer to a listener.
 
 == Changelog
 
+* *2.0*: The `transport_opts(SocketOpts)` type was added.
 * *2.0*: The function `ranch:accept_ack/1` was removed in favor of
          link:man:ranch:handshake(3)[ranch:handshake(3)].
 * *2.0*: The option `max_connections` is now per connection supervisor.

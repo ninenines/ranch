@@ -101,11 +101,12 @@ be upgraded to a `ranch_ssl` one using this function.
 
 [source,erlang]
 ----
-listen(SockOpts :: any())
+listen(TransportOpts :: ranch:transport_opts(any()))
     -> {ok, LSocket :: socket()} | {error, atom()}
 ----
 
-Create a socket that listens on the given port.
+Create a socket that listens on the port given in the
+socket options.
 
 The port may not be specified or may be set to 0, which
 means a random available port number will be chosen.
@@ -285,6 +286,8 @@ The exact type will vary depending on the transport module.
 
 == Changelog
 
+* *2.0*: The callback `listen/1` has changed to accept a map of
+         transport options instead of socket options.
 * *2.0*: The callback `messages/0` return value was updated to
          include the passive message for `{active, N}`.
 * *1.6*: The `socket()` type was added for documentation purposes.

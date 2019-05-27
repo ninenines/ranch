@@ -270,7 +270,7 @@ do_ssl_chunk_size(Config) ->
 sockets(Config) ->
 	Transport = config(transport, Config),
 	TransportOpts = config(transport_opts, Config),
-	{ok, LSocket} = Transport:listen(TransportOpts),
+	{ok, LSocket} = Transport:listen(#{socket_opts => TransportOpts}),
 	{ok, {_, Port}} = Transport:sockname(LSocket),
 	Self = self(),
 	Fun = fun() ->

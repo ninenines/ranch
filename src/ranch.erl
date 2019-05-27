@@ -38,7 +38,7 @@
 -export([procs/2]).
 -export([wait_for_connections/3]).
 -export([wait_for_connections/4]).
--export([filter_options/3]).
+-export([filter_options/4]).
 -export([set_option_default/3]).
 -export([require/1]).
 -export([log/4]).
@@ -46,7 +46,10 @@
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
 
--type opts() :: any() | #{
+-type opts() :: any() | transport_opts(any()).
+-export_type([opts/0]).
+
+-type transport_opts(SocketOpts) :: #{
 	connection_type => worker | supervisor,
 	handshake_timeout => timeout(),
 	max_connections => max_conns(),
@@ -55,9 +58,9 @@
 	num_conns_sups => pos_integer(),
 	num_listen_sockets => pos_integer(),
 	shutdown => timeout() | brutal_kill,
-	socket_opts => any()
+	socket_opts => SocketOpts
 }.
--export_type([opts/0]).
+-export_type([transport_opts/1]).
 
 -type ref() :: any().
 -export_type([ref/0]).
@@ -76,7 +79,7 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 					Transport, TransOpts, Protocol, ProtoOpts)))
 	end.
 
--spec normalize_opts(opts()) -> opts().
+-spec normalize_opts(opts()) -> transport_opts(any()).
 normalize_opts(Map) when is_map(Map) ->
 	Map;
 normalize_opts(Any) ->
@@ -233,7 +236,7 @@ get_max_connections(Ref) ->
 set_max_connections(Ref, MaxConnections) ->
 	ranch_server:set_max_connections(Ref, MaxConnections).
 
--spec get_transport_options(ref()) -> any().
+-spec get_transport_options(ref()) -> transport_opts(any()).
 get_transport_options(Ref) ->
 	ranch_server:get_transport_options(Ref).
 
@@ -247,7 +250,7 @@ set_transport_options(Ref, TransOpts0) ->
 			{error, running}
 	end.
 
--spec get_protocol_options(ref()) -> opts().
+-spec get_protocol_options(ref()) -> any().
 get_protocol_options(Ref) ->
 	ranch_server:get_protocol_options(Ref).
 
@@ -360,38 +363,34 @@ wait_for_connections_loop(Ref, Op, NumConns, Interval) ->
 	end.
 
 -spec filter_options([inet | inet6 | {atom(), any()} | {raw, any(), any(), any()}],
-	[atom()], Acc) -> Acc when Acc :: [any()].
-filter_options(UserOptions, DisallowedKeys, DefaultOptions) ->
-	AllowedOptions = filter_user_options(UserOptions, DisallowedKeys),
+	[atom()], Acc, module()) -> Acc when Acc :: [any()].
+filter_options(UserOptions, DisallowedKeys, DefaultOptions, Logger) ->
+	AllowedOptions = filter_user_options(UserOptions, DisallowedKeys, Logger),
 	lists:foldl(fun merge_options/2, DefaultOptions, AllowedOptions).
 
 %% 2-tuple options.
-filter_user_options([Opt = {Key, _}|Tail], DisallowedKeys) ->
+filter_user_options([Opt = {Key, _}|Tail], DisallowedKeys, Logger) ->
 	case lists:member(Key, DisallowedKeys) of
 		false ->
-			[Opt|filter_user_options(Tail, DisallowedKeys)];
+			[Opt|filter_user_options(Tail, DisallowedKeys, Logger)];
 		true ->
-			filter_options_warning(Opt),
-			filter_user_options(Tail, DisallowedKeys)
+			filter_options_warning(Opt, Logger),
+			filter_user_options(Tail, DisallowedKeys, Logger)
 	end;
 %% Special option forms.
-filter_user_options([inet|Tail], DisallowedKeys) ->
-	[inet|filter_user_options(Tail, DisallowedKeys)];
-filter_user_options([inet6|Tail], DisallowedKeys) ->
-	[inet6|filter_user_options(Tail, DisallowedKeys)];
-filter_user_options([Opt = {raw, _, _, _}|Tail], DisallowedKeys) ->
-	[Opt|filter_user_options(Tail, DisallowedKeys)];
-filter_user_options([Opt|Tail], DisallowedKeys) ->
-	filter_options_warning(Opt),
-	filter_user_options(Tail, DisallowedKeys);
-filter_user_options([], _) ->
+filter_user_options([inet|Tail], DisallowedKeys, Logger) ->
+	[inet|filter_user_options(Tail, DisallowedKeys, Logger)];
+filter_user_options([inet6|Tail], DisallowedKeys, Logger) ->
+	[inet6|filter_user_options(Tail, DisallowedKeys, Logger)];
+filter_user_options([Opt = {raw, _, _, _}|Tail], DisallowedKeys, Logger) ->
+	[Opt|filter_user_options(Tail, DisallowedKeys, Logger)];
+filter_user_options([Opt|Tail], DisallowedKeys, Logger) ->
+	filter_options_warning(Opt, Logger),
+	filter_user_options(Tail, DisallowedKeys, Logger);
+filter_user_options([], _, _) ->
 	[].
 
-filter_options_warning(Opt) ->
-	Logger = case get(logger) of
-		undefined -> logger;
-		Logger0 -> Logger0
-	end,
+filter_options_warning(Opt, Logger) ->
 	log(warning,
 		"Transport option ~p unknown or invalid.~n",
 		[Opt], Logger).
