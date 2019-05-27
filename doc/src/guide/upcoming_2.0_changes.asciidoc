@@ -5,6 +5,11 @@ The following changes will be done in Ranch 2.0. In most
 cases an alternative is already available in the most
 recent Ranch version.
 
+* The callback function `ranch_transport:listen/1` and its
+  implementations in `ranch_tcp` and `ranch_ssl` have changed
+  to accept a map of transport options instead of socket
+  options.
+
 * The function `ranch:start_listener/6` has been deprecated
   in favor of `ranch:start_listener/5`. The number of acceptors
   was removed and will be taken from the transport options.
