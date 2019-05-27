@@ -27,14 +27,11 @@ init([Ref, NumAcceptors, Transport]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	Logger = maps:get(logger, TransOpts, logger),
 	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
-	SocketOpts = maps:get(socket_opts, TransOpts, []),
 	%% We temporarily put the logger in the process dictionary
 	%% so that it can be used from ranch:filter_options. The
 	%% interface as it currently is does not allow passing it
 	%% down otherwise.
-	put(logger, Logger),
-	LSockets = start_listen_sockets(Ref, NumListenSockets, Transport, SocketOpts, Logger),
-	erase(logger),
+	LSockets = start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts, Logger),
 	Procs = [begin
 		LSocketId = (AcceptorId rem NumListenSockets) + 1,
 		{_, LSocket} = lists:keyfind(LSocketId, 1, LSockets),
@@ -46,46 +43,50 @@ init([Ref, NumAcceptors, Transport]) ->
 	end || AcceptorId <- lists:seq(1, NumAcceptors)],
 	{ok, {#{}, Procs}}.
 
--spec start_listen_sockets(any(), pos_integer(), module(), list(), module())
+-spec start_listen_sockets(any(), pos_integer(), module(), map(), module())
 	-> [{pos_integer(), inet:socket()}].
-start_listen_sockets(Ref, NumListenSockets, Transport, SocketOpts0, Logger) when NumListenSockets > 0 ->
-	BaseSocket = start_listen_socket(Ref, Transport, SocketOpts0, Logger),
+start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts0, Logger) when NumListenSockets > 0 ->
+	BaseSocket = start_listen_socket(Ref, Transport, TransOpts0, Logger),
 	{ok, Addr} = Transport:sockname(BaseSocket),
 	ExtraSockets = case Addr of
 		{local, _} when NumListenSockets > 1 ->
-			listen_error(Ref, Transport, SocketOpts0, reuseport_local, Logger);
+			listen_error(Ref, Transport, TransOpts0, reuseport_local, Logger);
 		{local, _} ->
 			[];
 		{_, Port} ->
-			SocketOpts = case lists:keyfind(port, 1, SocketOpts0) of
+			SocketOpts = maps:get(socket_opts, TransOpts0, []),
+			SocketOpts1 = case lists:keyfind(port, 1, SocketOpts) of
 				{port, Port} ->
-					SocketOpts0;
+					SocketOpts;
 				_ ->
-					[{port, Port}|lists:keydelete(port, 1, SocketOpts0)]
+					[{port, Port}|lists:keydelete(port, 1, SocketOpts)]
 			end,
-			[{N, start_listen_socket(Ref, Transport, SocketOpts, Logger)}
+			TransOpts1 = TransOpts0#{socket_opts => SocketOpts1},
+			[{N, start_listen_socket(Ref, Transport, TransOpts1, Logger)}
 				|| N <- lists:seq(2, NumListenSockets)]
 	end,
 	ranch_server:set_addr(Ref, Addr),
 	[{1, BaseSocket}|ExtraSockets].
 
--spec start_listen_socket(any(), module(), list(), module()) -> inet:socket().
-start_listen_socket(Ref, Transport, SocketOpts, Logger) ->
-	case Transport:listen(SocketOpts) of
+-spec start_listen_socket(any(), module(), map(), module()) -> inet:socket().
+start_listen_socket(Ref, Transport, TransOpts, Logger) ->
+	case Transport:listen(TransOpts) of
 		{ok, Socket} ->
 			Socket;
 		{error, Reason} ->
-			listen_error(Ref, Transport, SocketOpts, Reason, Logger)
+			listen_error(Ref, Transport, TransOpts, Reason, Logger)
 	end.
 
 -spec listen_error(any(), module(), any(), atom(), module()) -> no_return().
-listen_error(Ref, Transport, SocketOpts0, Reason, Logger) ->
+listen_error(Ref, Transport, TransOpts0, Reason, Logger) ->
+	SocketOpts0 = maps:get(socket_opts, TransOpts0, []),
 	SocketOpts1 = [{cert, '...'}|proplists:delete(cert, SocketOpts0)],
 	SocketOpts2 = [{key, '...'}|proplists:delete(key, SocketOpts1)],
 	SocketOpts = [{cacerts, '...'}|proplists:delete(cacerts, SocketOpts2)],
+	TransOpts = TransOpts0#{socket_opts => SocketOpts},
 	ranch:log(error,
 		"Failed to start Ranch listener ~p in ~p:listen(~999999p) for reason ~p (~s)~n",
-		[Ref, Transport, SocketOpts, Reason, format_error(Reason)], Logger),
+		[Ref, Transport, TransOpts, Reason, format_error(Reason)], Logger),
 	exit({listen_error, Ref, Reason}).
 
 format_error(no_cert) ->

@@ -27,7 +27,7 @@
 -callback name() -> atom().
 -callback secure() -> boolean().
 -callback messages() -> {OK::atom(), Closed::atom(), Error::atom(), Passive::atom()}.
--callback listen(opts()) -> {ok, socket()} | {error, atom()}.
+-callback listen(ranch:transport_opts(any())) -> {ok, socket()} | {error, atom()}.
 -callback accept(socket(), timeout())
 	-> {ok, socket()} | {error, closed | timeout | atom()}.
 -callback handshake(socket(), opts(), timeout()) -> {ok, socket()} | {error, any()}.
