@@ -21,8 +21,8 @@
 -import(ct_helper, [doc/1]).
 
 all() ->
-%	[{group, tcp}, {group, ssl}].
-	[{group, tcp}].
+	[{group, tcp}, {group, ssl}].
+%	[{group, tcp}].
 
 suite() ->
 	[{timetrap, {seconds, 60}}].
