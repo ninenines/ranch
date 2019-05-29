@@ -20,6 +20,7 @@ init(_, _) ->
 	%% Allow a more relaxed restart intensity because
 	%% some tests will cause quick restarts of several
 	%% ranch_sup children.
+application:set_env(ssl, internal_active_n, 1),
 	application:set_env(ranch, ranch_sup_intensity, 10),
 	application:set_env(ranch, ranch_sup_period, 1),
 	ct_helper:start([ranch]),
