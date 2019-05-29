@@ -293,7 +293,7 @@ sockets(Config) ->
 recv(Transport, Server, Size) ->
 	Self = self(),
 	Ref = make_ref(),
-	spawn_link(fun() -> Self ! {Ref, Transport:recv(Server, Size, 25000)} end),
+	spawn_link(fun() -> Self ! {Ref, Transport:recv(Server, Size, 10000)} end),
 	Ref.
 
 result(Ref) ->
