@@ -127,19 +127,23 @@ sendfile_loop(_Transport, _Socket, _RawFile, Sent, Sent, _ChunkSize)
 	{ok, Sent};
 sendfile_loop(Transport, Socket, RawFile, Bytes, Sent, ChunkSize) ->
 	ReadSize = read_size(Bytes, Sent, ChunkSize),
-	case file:read(RawFile, ReadSize) of
-		{ok, IoData} ->
-			case Transport:send(Socket, IoData) of
-				ok ->
+	case timer:tc(fun () -> file:read(RawFile, ReadSize) end) of
+		{TR, {ok, IoData}} ->
+			case timer:tc(fun () -> Transport:send(Socket, IoData) end) of
+				{TS, ok} ->
 					Sent2 = iolist_size(IoData) + Sent,
+ct:pal("OK-SEND Sent: ~pB/~pB; File Read: ~pus; Socket Write: ~pus~n", [Sent2, Bytes, TR, TS]),
 					sendfile_loop(Transport, Socket, RawFile, Bytes, Sent2,
 						ChunkSize);
-				{error, _Reason} = Error ->
+				{TS, {error, _Reason}} = Error ->
+ct:pal("ERROR-SEND Sent: ~pB/~pB; File Read: ~pus; Socket Write: ~pus~n", [Sent, Bytes, TR, TS]),
 					Error
 			end;
-		eof ->
+		{TR, eof} ->
+ct:pal("EOF-READ Sent: ~pB/~pB; File Read: ~pus~n", [Sent, Bytes, TR]),
 			{ok, Sent};
-		{error, _Reason} = Error ->
+		{TR, {error, _Reason}} = Error ->
+ct:pal("ERROR-READ Sent: ~pB/~pB; File Read: ~pus~n", [Sent, Bytes, TR]),
 			Error
 	end.
 
