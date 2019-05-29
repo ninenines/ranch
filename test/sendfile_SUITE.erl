@@ -285,6 +285,12 @@ sockets(Config) ->
 	receive
 		{ok, Client} ->
 			ok = Transport:close(LSocket),
+case Transport of
+	ranch_ssl ->
+		ct:pal("Server: ~p~n", [ssl:connection_information(Server)]),
+		ct:pal("Client: ~p~n", [ssl:connection_information(Client)]);
+	_ -> ok
+end,
 			{ok, {Server, Client}}
 	after 1000 ->
 		{error, timeout}
