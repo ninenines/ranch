@@ -39,7 +39,7 @@ groups() ->
 		rawfile_range_medium,
 		rawfile_range_small
 	],
-	[{tcp, [parallel], Tests}, {ssl, [parallel], Tests ++ [ssl_chunk_size]}].
+	[{tcp, [], Tests}, {ssl, [], Tests ++ [ssl_chunk_size]}].
 
 init_per_suite(Config) ->
 	Filename = filename:join(config(priv_dir, Config), "sendfile"),
