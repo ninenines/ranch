@@ -721,7 +721,9 @@ ssl_error_no_cert(_) ->
 ssl_error_eacces(_) ->
 	case os:type() of
 		{win32, nt} ->
-			doc("There are no privileged ports on Windows.");
+			{skip, "No privileged ports."};
+		{unix, darwin} ->
+			{skip, "No privileged ports."};
 		_ ->
 			doc("Ensure that failure due to an eacces returns a compact readable error."),
 			Name = name(),
@@ -1096,7 +1098,9 @@ tcp_error_eaddrinuse(_) ->
 tcp_error_eacces(_) ->
 	case os:type() of
 		{win32, nt} ->
-			doc("There are no privileged ports on Windows.");
+			{skip, "No privileged ports."};
+		{unix, darwin} ->
+			{skip, "No privileged ports."};
 		_ ->
 			doc("Ensure that failure due to an eacces returns a compact readable error."),
 			Name = name(),
