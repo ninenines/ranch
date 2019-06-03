@@ -279,8 +279,8 @@ sockets(Config) ->
 		Self ! {ok, Client}
 	end,
 	_ = spawn_link(Fun),
-	{ok, Server} = Transport:accept(LSocket, 500),
-	{ok, _} = Transport:handshake(Server, [], 500),
+	{ok, Server} = Transport:accept(LSocket, 5000),
+	{ok, _} = Transport:handshake(Server, [], 5000),
 	receive
 		{ok, Client} ->
 			ok = Transport:close(LSocket),
