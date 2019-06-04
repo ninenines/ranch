@@ -2,13 +2,15 @@
 -behaviour(ranch_protocol).
 
 -export([start_link/3]).
--export([init/3]).
+-export([init/4]).
 
-start_link(_, _, Opts = #{msg := Msg, pid := TestPid}) ->
-	Timeout = maps:get(timeout, Opts, 2500),
-	Pid = spawn_link(?MODULE, init, [Msg, TestPid, Timeout]),
+start_link(_, _, Opts = #{pid := TestPid}) ->
+	Msg = maps:get(msg, Opts, connected),
+	TerminateMsg = maps:get(terminate_msg, Opts, stop),
+	Timeout = maps:get(timeout, Opts, infinity),
+	Pid = spawn_link(?MODULE, init, [Msg, TestPid, TerminateMsg, Timeout]),
 	{ok, Pid}.
 
-init(Msg, Pid, Timeout) ->
-	Pid ! Msg,
-	receive after Timeout -> ok end.
+init(Msg, Pid, TerminateMsg, Timeout) ->
+	Pid ! {self(), Msg},
+	receive TerminateMsg -> ok after Timeout -> ok end.

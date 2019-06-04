@@ -920,12 +920,14 @@ tcp_max_connections(_) ->
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
-		notify_and_wait_protocol, #{msg => connected, pid => self()}),
+		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 11, 150),
 	10 = ranch_server:count_connections(Name),
-	10 = receive_loop(connected, 400),
-	1 = receive_loop(connected, 1000),
+	{10, Pids1} = receive_loop(connected, 400),
+	ok = terminate_loop(stop, Pids1),
+	{1, Pids2} = receive_loop(connected, 1000),
+	ok = terminate_loop(stop, Pids2),
 	ok = ranch:stop_listener(Name).
 
 tcp_max_connections_and_beyond(_) ->
@@ -960,11 +962,11 @@ tcp_max_connections_infinity(_) ->
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
-		notify_and_wait_protocol, #{msg => connected, pid => self()}),
+		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 20, 0),
 	10 = ranch_server:count_connections(Name),
-	10 = receive_loop(connected, 1000),
+	{10, Pids1} = receive_loop(connected, 1000),
 	10 = ranch_server:count_connections(Name),
 	10 = ranch:get_max_connections(Name),
 	ranch:set_max_connections(Name, infinity),
@@ -973,7 +975,8 @@ tcp_max_connections_infinity(_) ->
 	infinity = ranch:get_max_connections(Name),
 	ranch:set_max_connections(Name, 10),
 	20 = ranch_server:count_connections(Name),
-	10 = receive_loop(connected, 1000),
+	{10, Pids2} = receive_loop(connected, 1000),
+	ok = terminate_loop(stop, Pids1 ++ Pids2),
 	ok = ranch:stop_listener(Name).
 
 tcp_remove_connections(_) ->
@@ -993,15 +996,16 @@ tcp_set_max_connections(_) ->
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
-		notify_and_wait_protocol, #{msg => connected, pid => self()}),
+		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 20, 0),
 	10 = ranch_server:count_connections(Name),
-	10 = receive_loop(connected, 1000),
+	{10, Pids1} = receive_loop(connected, 1000),
 	10 = ranch:get_max_connections(Name),
 	ranch:set_max_connections(Name, 20),
-	10 = receive_loop(connected, 1000),
+	{10, Pids2} = receive_loop(connected, 1000),
 	20 = ranch:get_max_connections(Name),
+	ok = terminate_loop(stop, Pids1 ++ Pids2),
 	ok = ranch:stop_listener(Name).
 
 tcp_set_max_connections_clean(Config) ->
@@ -1015,7 +1019,7 @@ do_tcp_set_max_connections_clean(_) ->
 	Name = name(),
 	{ok, ListSupPid} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 4},
-		notify_and_wait_protocol, #{msg => connected, pid => self()}),
+		notify_and_wait_protocol, #{pid => self()}),
 	Children = supervisor:which_children(ListSupPid),
 	{_, AccSupPid, _, _} = lists:keyfind(ranch_acceptors_sup, 1, Children),
 	1 = erlang:trace(ListSupPid, true, [procs]),
@@ -1073,13 +1077,14 @@ tcp_upgrade(_) ->
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{},
-		notify_and_wait_protocol, #{msg => connected, pid => self()}),
+		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 1, 0),
-	receive connected -> ok after 1000 -> error(timeout) end,
+	{1, Pids1} = receive_loop(connected, 1000),
 	ranch:set_protocol_options(Name, #{msg => upgraded, pid => self()}),
 	ok = connect_loop(Port, 1, 0),
-	receive upgraded -> ok after 1000 -> error(timeout) end,
+	{1, Pids2} = receive_loop(upgraded, 1000),
+	ok = terminate_loop(stop, Pids1 ++ Pids2),
 	ok = ranch:stop_listener(Name).
 
 tcp_error_eaddrinuse(_) ->
@@ -1168,7 +1173,7 @@ do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
 	Name = name(),
 	{ok, Pid} = ranch:start_listener(Name,
 		ranch_tcp, #{num_conns_sups => NumConnsSups, num_acceptors => NumAcceptors},
-		notify_and_wait_protocol, #{msg => connected, pid => self(), timeout => 10000}),
+		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ConnsSups = [ConnsSup || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
 	NumConnsSups = length(ConnsSups),
@@ -1194,8 +1199,9 @@ do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
 			[] = AcceptorConnsSups1 -- ConnsSups
 	end,
 	ok = connect_loop(Port, 100, 0),
-	100 = receive_loop(connected, 100),
+	{100, Pids} = receive_loop(connected, 1000),
 	100 = ranch_server:count_connections(Name),
+	ok = terminate_loop(stop, Pids),
 	ok = ranch:stop_listener(Name),
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
@@ -1437,13 +1443,19 @@ connect_loop(Port, N, Sleep) ->
 	connect_loop(Port, N - 1, Sleep).
 
 receive_loop(Message, Timeout) ->
-	receive_loop(Message, Timeout, 0).
-receive_loop(Message, Timeout, N) ->
-	receive Message ->
-		receive_loop(Message, Timeout, N + 1)
+	receive_loop(Message, Timeout, 0, []).
+receive_loop(Message, Timeout, N, Acc) ->
+	receive {Pid, Message} ->
+		receive_loop(Message, Timeout, N + 1, [Pid|Acc])
 	after Timeout ->
-		N
+		{N, Acc}
 	end.
+
+terminate_loop(_, []) ->
+	ok;
+terminate_loop(Message, [Pid|Pids]) ->
+	Pid ! Message,
+	terminate_loop(Message, Pids).
 
 clean_traces() ->
 	receive
