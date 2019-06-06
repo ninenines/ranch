@@ -472,10 +472,12 @@ ssl_active_echo(_) ->
 
 ssl_active_n_echo(_) ->
 	case application:get_key(ssl, vsn) of
-		{ok, Vsn} when Vsn >= "9.2" ->
-			do_ssl_active_n_echo();
-		_ ->
-			{skip, "No Active N support."}
+		{ok, "9.0"++_} ->
+			{skip, "No Active N support."};
+		{ok, "9.1"++_} ->
+			{skip, "No Active N support."};
+		{ok, _} ->
+			do_ssl_active_n_echo()
 	end.
 
 do_ssl_active_n_echo() ->
@@ -548,14 +550,6 @@ do_ssl_local_echo() ->
 	end.
 
 ssl_sni_echo(_) ->
-	case application:get_key(ssl, vsn) of
-		{ok, Vsn} when Vsn >= "7.0" ->
-			do_ssl_sni_echo();
-		_ ->
-			{skip, "No SNI support."}
-	end.
-
-do_ssl_sni_echo() ->
 	doc("Ensure that SNI works with SSL transport."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
@@ -573,14 +567,6 @@ do_ssl_sni_echo() ->
 	ok.
 
 ssl_sni_fail(_) ->
-	case application:get_key(ssl, vsn) of
-		{ok, Vsn} when Vsn >= "7.0" ->
-			do_ssl_sni_fail();
-		_ ->
-			{skip, "No SNI support."}
-	end.
-
-do_ssl_sni_fail() ->
 	doc("Ensure that connection fails when host is not in SNI list."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
@@ -672,14 +658,6 @@ ssl_getopts_capability(_) ->
 	ok.
 
 ssl_getstat_capability(_) ->
-	case application:get_key(ssl, vsn) of
-		{ok, Vsn} when Vsn>="8.0" ->
-			do_ssl_getstat_capability();
-		_ ->
-			{skip, "No getstat/1,2 support."}
-	end.
-
-do_ssl_getstat_capability() ->
 	doc("Ensure getstat/1,2 capability."),
 	Name=name(),
 	Opts=ct_helper:get_certs_from_ets(),

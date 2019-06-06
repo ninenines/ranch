@@ -28,7 +28,9 @@ init(_, _) ->
 		%% OTP 21.2/ssl 9.1.
 		%% @todo Put an upper limit on the version when
 		%% this is fixed in a future OTP version.
-		{{win32, nt}, {ok, Vsn}} when Vsn >= "9.1" ->
+		{_, {ok, "9.0"++_}} ->
+			ok;
+		{{win32, nt}, {ok, "9."++_}} ->
 			application:set_env(ssl, internal_active_n, 1);
 		_ ->
 			ok
