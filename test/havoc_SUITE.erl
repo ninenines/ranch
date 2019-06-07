@@ -29,14 +29,12 @@ init_per_suite(Config) ->
 	ok = application:start(havoc),
 	%% Comment to hide progress reports in the terminal.
 	application:set_env(kernel, logger_sasl_compatible, true),
-	ok = application:start(sasl),
 	%% Enable logging of progress reports.
 	%% They will only be available in the HTML reports by default.
 	ok = logger:set_primary_config(level, info),
 	Config.
 
 end_per_suite(_) ->
-	ok = application:stop(sasl),
 	ok = application:stop(havoc),
 	ok = application:stop(ranch).
 
@@ -50,17 +48,24 @@ havoc_tcp(_) ->
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{},
 		echo_protocol, []),
-	Port = ranch:get_port(Name),
+	Port1 = ranch:get_port(Name),
 	%% Establish a hundred connections.
 	_ = [begin
-		{ok, Socket} = gen_tcp:connect("localhost", Port, [{active, false}]),
+		{ok, Socket} = gen_tcp:connect("localhost", Port1, [{active, false}]),
 		Socket
 	end || _ <- lists:seq(1, 100)],
 	%% Run Havoc.
-	havoc:on([{applications, [ranch]}]),
+	LogFun = fun
+		(Pid) when is_pid(Pid) ->
+			logger:info("~p~n", [erlang:process_info(Pid)]);
+		(Port) when is_port(Port) ->
+			logger:info("~p~n", [erlang:port_info(Port)])
+	end,
+	havoc:on([{applications, [ranch]}, {prekill_callback, LogFun}]),
 	timer:sleep(60000),
 	havoc:off(),
 	timer:sleep(1000),
 	%% Confirm we can still connect.
-	{ok, _} = gen_tcp:connect("localhost", Port, [{active, false}]),
+	Port2 = ranch:get_port(Name),
+	{ok, _} = gen_tcp:connect("localhost", Port2, [{active, false}]),
 	ok = ranch:stop_listener(Name).
