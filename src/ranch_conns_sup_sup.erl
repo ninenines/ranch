@@ -32,4 +32,4 @@ init({Ref, NumConnsSups, Transport, Protocol}) ->
 		start => {ranch_conns_sup, start_link, [Ref, N, Transport, Protocol]},
 		type => supervisor
 	} || N <- lists:seq(1, NumConnsSups)],
-	{ok, {#{}, ChildSpecs}}.
+	{ok, {#{intensity => 1 + ceil(math:log2(NumConnsSups))}, ChildSpecs}}.
