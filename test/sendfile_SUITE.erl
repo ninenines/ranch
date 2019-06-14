@@ -242,7 +242,7 @@ do_ssl_chunk_size(Config) ->
 	Self = self(),
 	ChunkSize = 8 * 1024,
 	Fun = fun() ->
-		receive go -> ok after 1000 -> error(timeout) end,
+		receive go -> ok after 5000 -> error(timeout) end,
 		{ok, {Server, Client}} = sockets(Config),
 		{ok, RawFile} = file:open(Filename, [read, raw, binary]),
 		Ref = recv(Transport, Server, Size),
