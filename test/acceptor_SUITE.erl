@@ -94,8 +94,8 @@ groups() ->
 
 misc_bad_transport(_) ->
 	doc("Reject invalid transport modules."),
-	{error, badarg} = ranch:start_listener(misc_bad_transport,
-		bad_transport, #{},
+	{error, {bad_transport, invalid_transport}} = ranch:start_listener(misc_bad_transport,
+		invalid_transport, #{},
 		echo_protocol, []),
 	ok.
 
@@ -1202,8 +1202,21 @@ supervisor_changed_options_restart(_) ->
 	{ok, [{send_timeout, 300001}]}
 		= inet:getopts(do_get_listener_socket(ListenerSupPid1), [send_timeout]),
 	%% Crash the listener_sup process, allow a short time for restart to succeed.
-	exit(ListenerSupPid1, kill),
-	timer:sleep(1000),
+	%% We silence the excepted log events coming from the relevant supervisors.
+	ListenerChilds = [ChildPid || {_, ChildPid, _, _} <- supervisor:which_children(ListenerSupPid1)],
+	FilterFun = fun (#{meta := #{pid := EventPid}}, _) ->
+		case lists:member(EventPid, ListenerChilds) of
+			true -> stop;
+			false -> ignore
+		end
+	end,
+	ok = logger:add_primary_filter(?MODULE, {FilterFun, undefined}),
+	try
+		exit(ListenerSupPid1, kill),
+		timer:sleep(1000)
+	after
+		ok = logger:remove_primary_filter(?MODULE)
+	end,
 	%% Obtain pid of restarted listener_sup process.
 	[ListenerSupPid2] = [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _}
 		<- supervisor:which_children(ranch_sup), Ref =:= Name],

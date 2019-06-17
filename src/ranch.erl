@@ -71,12 +71,14 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 		when is_atom(Transport), is_atom(Protocol) ->
 	TransOpts = normalize_opts(TransOpts0),
 	_ = code:ensure_loaded(Transport),
-	case erlang:function_exported(Transport, name, 0) of
-		false ->
-			{error, badarg};
-		true ->
+	case {erlang:function_exported(Transport, name, 0), validate_transport_opts(TransOpts)} of
+		{true, ok} ->
 			maybe_started(supervisor:start_child(ranch_sup, child_spec(Ref,
-					Transport, TransOpts, Protocol, ProtoOpts)))
+					Transport, TransOpts, Protocol, ProtoOpts)));
+		{false, _} ->
+			{error, {bad_transport, Transport}};
+		{_, TransOptsError} ->
+			TransOptsError
 	end.
 
 -spec normalize_opts(opts()) -> transport_opts(any()).
@@ -84,6 +86,55 @@ normalize_opts(Map) when is_map(Map) ->
 	Map;
 normalize_opts(Any) ->
 	#{socket_opts => Any}.
+
+-spec validate_transport_opts(transport_opts(any())) -> ok | {error, any()}.
+validate_transport_opts(Opts) ->
+	maps:fold(fun
+		(Key, Value, ok) ->
+			case validate_transport_opt(Key, Value, Opts) of
+				true ->
+					ok;
+				false ->
+					{error, {bad_option, Key}}
+			end;
+		(_, _, Acc) ->
+			Acc
+	end,
+	ok,
+	Opts).
+
+-spec validate_transport_opt(any(), any(), transport_opts(any())) -> boolean().
+validate_transport_opt(connection_type, worker, _) ->
+	true;
+validate_transport_opt(connection_type, supervisor, _) ->
+	true;
+validate_transport_opt(handshake_timeout, infinity, _) ->
+	true;
+validate_transport_opt(handshake_timeout, Value, _) ->
+	is_integer(Value) andalso Value >= 0;
+validate_transport_opt(max_connections, infinity, _) ->
+	true;
+validate_transport_opt(max_connections, Value, _) ->
+	is_integer(Value) andalso Value >= 0;
+validate_transport_opt(logger, Value, _) ->
+	is_atom(Value);
+validate_transport_opt(num_acceptors, Value, _) ->
+	is_integer(Value) andalso Value > 0;
+validate_transport_opt(num_conns_sups, Value, _) ->
+	is_integer(Value) andalso Value > 0;
+validate_transport_opt(num_listen_sockets, Value, Opts) ->
+	is_integer(Value) andalso Value > 0
+	andalso Value =< maps:get(num_acceptors, Opts, 10);
+validate_transport_opt(shutdown, brutal_kill, _) ->
+	true;
+validate_transport_opt(shutdown, infinity, _) ->
+	true;
+validate_transport_opt(shutdown, Value, _) ->
+	is_integer(Value) andalso Value >= 0;
+validate_transport_opt(socket_opts, _, _) ->
+	true;
+validate_transport_opt(_, _, _) ->
+	false.
 
 maybe_started({error, {{shutdown,
 		{failed_to_start_child, ranch_acceptors_sup,
