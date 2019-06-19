@@ -27,8 +27,6 @@ all() ->
 init_per_suite(Config) ->
 	{ok, _} = application:ensure_all_started(ranch),
 	ok = application:start(havoc),
-	%% Comment to hide progress reports in the terminal.
-	application:set_env(kernel, logger_sasl_compatible, true),
 	%% Enable logging of progress reports.
 	%% They will only be available in the HTML reports by default.
 	ok = logger:set_primary_config(level, info),
@@ -54,15 +52,19 @@ havoc_tcp(_) ->
 		{ok, Socket} = gen_tcp:connect("localhost", Port1, [{active, false}]),
 		Socket
 	end || _ <- lists:seq(1, 100)],
-	%% Run Havoc.
+	%% Log process info of process about to be killed.
 	LogFun = fun
 		(Pid) when is_pid(Pid) ->
 			logger:info("~p~n", [erlang:process_info(Pid)]);
 		(Port) when is_port(Port) ->
 			logger:info("~p~n", [erlang:port_info(Port)])
 	end,
-	havoc:on([{applications, [ranch]}, {prekill_callback, LogFun}]),
-	timer:sleep(60000),
+	%% Don't kill faster than ranch_sup can handle.
+	KillInterval = 1000 * application:get_env(ranch, ranch_sup_period, 5),
+	%% Run Havoc.
+	havoc:on([{avg_wait, KillInterval}, {deviation, 0}, {applications, [ranch]},
+		supervisor, {prekill_callback, LogFun}]),
+	timer:sleep(10000),
 	havoc:off(),
 	timer:sleep(1000),
 	%% Confirm we can still connect.
