@@ -140,6 +140,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 					"Ranch listener ~p connection process start failure; "
 					"~p:start_link/4 crashed with reason: ~p:~999999p~n",
 					[Ref, Protocol, Class, Reason], Logger),
+				Transport:close(Socket),
 				loop(State, CurConns, NbChildren, Sleepers)
 			end;
 		{?MODULE, active_connections, To, Tag} ->
