@@ -15,15 +15,20 @@
 -module(ranch_acceptor).
 
 -export([start_link/5]).
+-export([init/4]).
 -export([loop/5]).
 
 -spec start_link(ranch:ref(), pos_integer(), inet:socket(), module(), module())
 	-> {ok, pid()}.
 start_link(Ref, AcceptorId, LSocket, Transport, Logger) ->
 	ConnsSup = ranch_server:get_connections_sup(Ref, AcceptorId),
-	MonitorRef = monitor(process, ConnsSup),
-	Pid = spawn_link(?MODULE, loop, [LSocket, Transport, Logger, ConnsSup, MonitorRef]),
+	Pid = spawn_link(?MODULE, init, [LSocket, Transport, Logger, ConnsSup]),
 	{ok, Pid}.
+
+-spec init(inet:socket(), module(), module(), pid()) -> no_return().
+init(LSocket, Transport, Logger, ConnsSup) ->
+	MonitorRef = monitor(process, ConnsSup),
+	loop(LSocket, Transport, Logger, ConnsSup, MonitorRef).
 
 -spec loop(inet:socket(), module(), module(), pid(), reference()) -> no_return().
 loop(LSocket, Transport, Logger, ConnsSup, MonitorRef) ->
