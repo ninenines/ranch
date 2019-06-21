@@ -16,18 +16,20 @@ child_spec(Ref       :: ranch_ref(),
     -> supervisor:child_spec()
 ----
 
-Build child specifications for a new listener.
+Build child specifications for a new listener which can
+be embedded directly in an application's supervision
+tree.
 
-This function can be used to embed a listener directly
-in an application's supervision tree.
+The actual listener is placed under a supervisor which
+monitors `ranch_server` via a proxy process and will
+restart the listener if `ranch_server` crashes.
 
 == Arguments
 
 Ref::
 
 The listener name is used to refer to this listener in
-future calls, for example when stopping it or when
-updating the configuration.
+future calls, for example when updating the configuration.
 +
 It can be any Erlang term. An atom is generally good enough,
 for example `api`, `my_app_clear` or `my_app_tls`.
@@ -74,6 +76,8 @@ Child specifications are returned.
 
 == Changelog
 
+* *2.0*: The actual listener is placed under a supervisor in order to
+         restart the listener if `ranch_server` crashes.
 * *2.0*: The `TransOpts` argument must no longer contain
          Ranch-specific options if given as a list. Use a map.
 * *1.4*: The `NumAcceptors` argument was moved to the transport options.

@@ -73,8 +73,10 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 	_ = code:ensure_loaded(Transport),
 	case {erlang:function_exported(Transport, name, 0), validate_transport_opts(TransOpts)} of
 		{true, ok} ->
-			maybe_started(supervisor:start_child(ranch_sup, child_spec(Ref,
-					Transport, TransOpts, Protocol, ProtoOpts)));
+			ChildSpec = #{id => {ranch_listener_sup, Ref}, start => {ranch_listener_sup, start_link, [
+				Ref, Transport, TransOpts, Protocol, ProtoOpts
+			]}, type => supervisor},
+			maybe_started(supervisor:start_child(ranch_sup, ChildSpec));
 		{false, _} ->
 			{error, {bad_transport, Transport}};
 		{_, TransOptsError} ->
@@ -191,9 +193,9 @@ maybe_resumed(Res) ->
 	-> supervisor:child_spec().
 child_spec(Ref, Transport, TransOpts0, Protocol, ProtoOpts) ->
 	TransOpts = normalize_opts(TransOpts0),
-	{{ranch_listener_sup, Ref}, {ranch_listener_sup, start_link, [
+	#{id => {ranch_embedded_sup, Ref}, start => {ranch_embedded_sup, start_link, [
 		Ref, Transport, TransOpts, Protocol, ProtoOpts
-	]}, permanent, infinity, supervisor, [ranch_listener_sup]}.
+	]}, type => supervisor}.
 
 -spec handshake(ref()) -> {ok, ranch_transport:socket()}.
 handshake(Ref) ->
