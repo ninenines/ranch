@@ -23,6 +23,6 @@ start_listener(SupPid, Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 	).
 
 stop_listener(SupPid, Ref) ->
-	ok = supervisor:terminate_child(SupPid, {ranch_listener_sup, Ref}),
-	ok = supervisor:delete_child(SupPid, {ranch_listener_sup, Ref}),
+	ok = supervisor:terminate_child(SupPid, {ranch_embedded_sup, Ref}),
+	ok = supervisor:delete_child(SupPid, {ranch_embedded_sup, Ref}),
 	ranch_server:cleanup_listener_opts(Ref).

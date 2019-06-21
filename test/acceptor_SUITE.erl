@@ -85,6 +85,7 @@ groups() ->
 		supervisor_clean_child_restart,
 		supervisor_clean_restart,
 		supervisor_conns_alive,
+		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
 		supervisor_unexpected_message
@@ -190,20 +191,26 @@ misc_info_embedded(_) ->
 	doc("Information about listeners in embedded mode."),
 	{ok, SupPid} = embedded_sup:start_link(),
 	%% Open a listener with a few connections.
-	{ok, Pid1} = embedded_sup:start_listener(SupPid, {misc_info_embedded, tcp},
+	{ok, EmbeddedSupPid1} = embedded_sup:start_listener(SupPid, {misc_info_embedded, tcp},
 		ranch_tcp, #{num_acceptors => 1},
 		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
+	{_, Pid1, _, _} = lists:keyfind({ranch_listener_sup, {misc_info_embedded, tcp}}, 1,
+		supervisor:which_children(EmbeddedSupPid1)),
 	Port1 = ranch:get_port({misc_info_embedded, tcp}),
 	%% Open a few more listeners with different arguments.
-	{ok, Pid2} = embedded_sup:start_listener(SupPid, {misc_info_embedded, act},
+	{ok, EmbeddedSupPid2} = embedded_sup:start_listener(SupPid, {misc_info_embedded, act},
 		ranch_tcp, #{num_acceptors => 2},
 		active_echo_protocol, {}),
+	{_, Pid2, _, _} = lists:keyfind({ranch_listener_sup, {misc_info_embedded, act}}, 1,
+		supervisor:which_children(EmbeddedSupPid2)),
 	Port2 = ranch:get_port({misc_info_embedded, act}),
 	ranch:set_max_connections({misc_info_embedded, act}, infinity),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, Pid3} = embedded_sup:start_listener(SupPid, {misc_info_embedded, ssl},
+	{ok, EmbeddedSupPid3} = embedded_sup:start_listener(SupPid, {misc_info_embedded, ssl},
 		ranch_ssl, #{num_acceptors => 3, socket_opts => Opts},
 		echo_protocol, [{}]),
+	{_, Pid3, _, _} = lists:keyfind({ranch_listener_sup, {misc_info_embedded, ssl}}, 1,
+		supervisor:which_children(EmbeddedSupPid3)),
 	Port3 = ranch:get_port({misc_info_embedded, ssl}),
 	%% Open 5 connections, 3 removed from the count.
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
@@ -1351,6 +1358,28 @@ do_supervisor_conns_alive(_) ->
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
 	ok = ranch:stop_listener(Name).
+
+supervisor_embedded_ranch_server_crash(_) ->
+	doc("Ensure that restarting ranch_server also restarts embedded listeners."),
+	Name = name(),
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{},
+		echo_protocol, []),
+	[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
+		{ranch_server_proxy, ProxyPid, worker, _}] = supervisor:which_children(EmbeddedSupPid),
+	ProxyMonitor = monitor(process, ProxyPid),
+	ListenerMonitor = monitor(process, ListenerPid),
+	ok = supervisor:terminate_child(ranch_sup, ranch_server),
+	receive {'DOWN', ProxyMonitor, process, ProxyPid, shutdown} -> ok after 1000 -> exit(timeout) end,
+	receive {'DOWN', ListenerMonitor, process, ListenerPid, shutdown} -> ok after 1000 -> exit(timeout) end,
+	{ok, _} = supervisor:restart_child(ranch_sup, ranch_server),
+	receive after 1000 -> ok end,
+	[{{ranch_listener_sup, Name}, _, supervisor, _},
+		{ranch_server_proxy, _, worker, _}] = supervisor:which_children(EmbeddedSupPid),
+	embedded_sup:stop_listener(SupPid, Name),
+	embedded_sup:stop(SupPid),
+	ok.
 
 supervisor_protocol_start_link_crash(_) ->
 	doc("Ensure a protocol start crash does not kill all connections."),
