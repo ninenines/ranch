@@ -306,6 +306,7 @@ wait_children(NbChildren) ->
 			ok
 	end.
 
+-spec system_continue(_, _, any()) -> no_return().
 system_continue(_, _, {State, CurConns, NbChildren, Sleepers}) ->
 	loop(State, CurConns, NbChildren, Sleepers).
 
@@ -313,6 +314,7 @@ system_continue(_, _, {State, CurConns, NbChildren, Sleepers}) ->
 system_terminate(Reason, _, _, {State, _, NbChildren, _}) ->
 	terminate(State, Reason, NbChildren).
 
+-spec system_code_change(any(), _, _, _) -> {ok, any()}.
 system_code_change(Misc, _, _, _) ->
 	{ok, Misc}.
 

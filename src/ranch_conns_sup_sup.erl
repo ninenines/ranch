@@ -26,6 +26,8 @@ start_link(Ref, NumConnsSups, Transport, Protocol) ->
 		Ref, NumConnsSups, Transport, Protocol
 	}).
 
+-spec init({ranch:ref(), pos_integer(), module(), module()})
+	-> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init({Ref, NumConnsSups, Transport, Protocol}) ->
 	ChildSpecs = [#{
 		id => {ranch_conns_sup, N},

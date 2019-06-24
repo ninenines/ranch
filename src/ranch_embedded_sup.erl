@@ -24,6 +24,8 @@
 start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 	supervisor:start_link(?MODULE, {Ref, Transport, TransOpts, Protocol, ProtoOpts}).
 
+-spec init({ranch:ref(), module(), any(), module(), any()})
+	-> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init({Ref, Transport, TransOpts, Protocol, ProtoOpts}) ->
 	Proxy = #{id => ranch_server_proxy,
 		start => {ranch_server_proxy, start_link, []},

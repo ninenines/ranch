@@ -34,6 +34,8 @@ AUTO_CI_WINDOWS ?= OTP-21+
 
 include erlang.mk
 
+ERLC_OPTS += +warn_missing_spec +warn_untyped_record
+
 # Don't run the havoc test suite by default.
 
 ifndef FULL
