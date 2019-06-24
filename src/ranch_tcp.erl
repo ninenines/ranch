@@ -70,12 +70,14 @@
 -type opts() :: [opt()].
 -export_type([opts/0]).
 
+-spec name() -> tcp.
 name() -> tcp.
 
 -spec secure() -> boolean().
 secure() ->
 	false.
 
+-spec messages() -> {tcp, tcp_closed, tcp_error, tcp_passive}.
 messages() -> {tcp, tcp_closed, tcp_error, tcp_passive}.
 
 -spec listen(ranch:transport_opts(opts())) -> {ok, inet:socket()} | {error, atom()}.
@@ -94,6 +96,7 @@ listen(TransOpts) ->
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.
+-spec disallowed_listen_options() -> [atom()].
 disallowed_listen_options() ->
 	[active, header, mode, packet, packet_size, line_delimiter, reuseaddr].
 

@@ -23,6 +23,7 @@
 start_link(Ref, NumAcceptors, Transport) ->
 	supervisor:start_link(?MODULE, [Ref, NumAcceptors, Transport]).
 
+-spec init([term()]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([Ref, NumAcceptors, Transport]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	Logger = maps:get(logger, TransOpts, logger),

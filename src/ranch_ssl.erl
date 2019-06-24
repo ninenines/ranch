@@ -90,12 +90,14 @@
 -type opts() :: [opt()].
 -export_type([opts/0]).
 
+-spec name() -> ssl.
 name() -> ssl.
 
 -spec secure() -> boolean().
 secure() ->
 	true.
 
+-spec messages() -> {ssl, ssl_closed, ssl_error, ssl_passive}.
 messages() -> {ssl, ssl_closed, ssl_error, ssl_passive}.
 
 -spec listen(ranch:transport_opts(opts())) -> {ok, ssl:sslsocket()} | {error, atom()}.
@@ -125,6 +127,7 @@ do_listen(SocketOpts0, Logger) ->
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.
+-spec disallowed_listen_options() -> [atom()].
 disallowed_listen_options() ->
 	[alpn_advertised_protocols, client_preferred_next_protocols,
 		fallback, server_name_indication, srp_identity

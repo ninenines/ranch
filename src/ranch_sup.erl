@@ -22,6 +22,7 @@
 start_link() ->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+-spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
 	Intensity = case application:get_env(ranch_sup_intensity) of
 		{ok, Value1} -> Value1;

@@ -42,6 +42,7 @@ endif
 
 # Compile options.
 
+ERLC_OPTS += +warn_missing_spec +warn_untyped_record
 TEST_ERLC_OPTS += +'{parse_transform, eunit_autoexport}'
 
 # Dialyze the tests.

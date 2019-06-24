@@ -169,6 +169,7 @@ count_connections(Ref) ->
 
 %% gen_server.
 
+-spec init([]) -> {ok, #state{}}.
 init([]) ->
 	ConnMonitors = [{{erlang:monitor(process, Pid), Pid}, {conns_sup, Ref, Id}} ||
 		[Ref, Id, Pid] <- ets:match(?TAB, {{conns_sup, '$1', '$2'}, '$3'})],
@@ -176,6 +177,7 @@ init([]) ->
 		[Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})],
 	{ok, #state{monitors=ConnMonitors++ListenerMonitors}}.
 
+-spec handle_call(term(), {pid(), reference()}, #state{}) -> {reply, ok | ignore, #state{}}.
 handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}, _, State) ->
 	ets:insert_new(?TAB, {{max_conns, Ref}, MaxConns}),
 	ets:insert_new(?TAB, {{trans_opts, Ref}, TransOpts}),
@@ -205,9 +207,11 @@ handle_call({set_proto_opts, Ref, Opts}, _, State) ->
 handle_call(_Request, _From, State) ->
 	{reply, ignore, State}.
 
+-spec handle_cast(_, #state{}) -> {noreply, #state{}}.
 handle_cast(_Request, State) ->
 	{noreply, State}.
 
+-spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info({'DOWN', MonitorRef, process, Pid, Reason},
 		State=#state{monitors=Monitors}) ->
 	{_, TypeRef} = lists:keyfind({MonitorRef, Pid}, 1, Monitors),
@@ -227,9 +231,11 @@ handle_info({'DOWN', MonitorRef, process, Pid, Reason},
 handle_info(_Info, State) ->
 	{noreply, State}.
 
+-spec terminate(_, #state{}) -> ok.
 terminate(_Reason, _State) ->
 	ok.
 
+-spec code_change(term() | {down, term()}, #state{}, term()) -> {ok, term()}.
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 

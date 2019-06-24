@@ -23,9 +23,11 @@
 -export([handle_info/2]).
 -export([code_change/3]).
 
+-spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
 	gen_server:start_link(?MODULE, [], []).
 
+-spec init([]) -> {ok, pid()} | {stop, term()}.
 init([]) ->
 	case wait_ranch_server(50) of
 		{ok, Monitor} ->
@@ -34,17 +36,21 @@ init([]) ->
 			{stop, Reason}
 	end.
 
+-spec handle_call(_, _, reference()) -> {noreply, reference(), hibernate}.
 handle_call(_, _, Monitor) ->
 	{noreply, Monitor, hibernate}.
 
+-spec handle_cast(_, reference()) -> {noreply, reference(), hibernate}.
 handle_cast(_, Monitor) ->
 	{noreply, Monitor, hibernate}.
 
+-spec handle_info(term(), reference()) -> {noreply, reference(), hibernate} | {stop, term(), reference()}.
 handle_info({'DOWN', Monitor, process, _, Reason}, Monitor) ->
 	{stop, Reason, Monitor};
 handle_info(_, Monitor) ->
 	{noreply, Monitor, hibernate}.
 
+-spec code_change(term() | {down, term()}, reference(), term()) -> {ok, reference()}.
 code_change(_, Monitor, _) ->
 	{ok, Monitor}.
 
