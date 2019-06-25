@@ -107,7 +107,7 @@ init(Parent, Ref, Id, Transport, Protocol) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	ConnType = maps:get(connection_type, TransOpts, worker),
 	Shutdown = maps:get(shutdown, TransOpts, 5000),
-	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
+	HandshakeTimeout = ranch_server:get_handshake_timeout(Ref),
 	Logger = maps:get(logger, TransOpts, logger),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
@@ -165,6 +165,10 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 				CurConns, NbChildren, []);
 		{set_max_conns, MaxConns2} ->
 			loop(State#state{max_conns=MaxConns2},
+				CurConns, NbChildren, Sleepers);
+		%% Upgrade the handshake timeout.
+		{set_handshake_timeout, HandshakeTimeout2} ->
+			loop(State#state{handshake_timeout=HandshakeTimeout2},
 				CurConns, NbChildren, Sleepers);
 		%% Upgrade the protocol options.
 		{set_opts, Opts2} ->

@@ -24,7 +24,8 @@ start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumConnsSups = maps:get(num_conns_sups, TransOpts, NumAcceptors),
 	MaxConns = maps:get(max_connections, TransOpts, 1024),
-	ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
+	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
+	ranch_server:set_new_listener_opts(Ref, MaxConns, HandshakeTimeout, TransOpts, ProtoOpts,
 		[Ref, Transport, TransOpts, Protocol, ProtoOpts]),
 	supervisor:start_link(?MODULE, {
 		Ref, NumAcceptors, NumConnsSups, Transport, Protocol

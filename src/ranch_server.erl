@@ -17,7 +17,7 @@
 
 %% API.
 -export([start_link/0]).
--export([set_new_listener_opts/5]).
+-export([set_new_listener_opts/6]).
 -export([cleanup_listener_opts/1]).
 -export([cleanup_connections_sups/1]).
 -export([set_connections_sup/3]).
@@ -29,6 +29,8 @@
 -export([get_listener_sups/0]).
 -export([set_addr/2]).
 -export([get_addr/1]).
+-export([set_handshake_timeout/2]).
+-export([get_handshake_timeout/1]).
 -export([set_max_connections/2]).
 -export([get_max_connections/1]).
 -export([set_transport_options/2]).
@@ -59,14 +61,16 @@
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any(), any(), [any()]) -> ok.
-set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts, StartArgs) ->
-	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}).
+-spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), timeout(), any(), any(), [any()]) -> ok.
+set_new_listener_opts(Ref, MaxConns, HandshakeTimeout, TransOpts, ProtoOpts, StartArgs) ->
+	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, HandshakeTimeout,
+		TransOpts, ProtoOpts, StartArgs}).
 
 -spec cleanup_listener_opts(ranch:ref()) -> ok.
 cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {addr, Ref}),
 	_ = ets:delete(?TAB, {max_conns, Ref}),
+	_ = ets:delete(?TAB, {handshake_timeout, Ref}),
 	_ = ets:delete(?TAB, {trans_opts, Ref}),
 	_ = ets:delete(?TAB, {proto_opts, Ref}),
 	_ = ets:delete(?TAB, {listener_start_args, Ref}),
@@ -130,6 +134,14 @@ set_addr(Ref, Addr) ->
 get_addr(Ref) ->
 	ets:lookup_element(?TAB, {addr, Ref}, 2).
 
+-spec set_handshake_timeout(ranch:ref(), timeout()) -> ok.
+set_handshake_timeout(Ref, HandshakeTimeout) ->
+	gen_server:call(?MODULE, {set_handshake_timeout, Ref, HandshakeTimeout}).
+
+-spec get_handshake_timeout(ranch:ref()) -> timeout().
+get_handshake_timeout(Ref) ->
+	ets:lookup_element(?TAB, {handshake_timeout, Ref}, 2).
+
 -spec set_max_connections(ranch:ref(), ranch:max_conns()) -> ok.
 set_max_connections(Ref, MaxConnections) ->
 	gen_server:call(?MODULE, {set_max_conns, Ref, MaxConnections}).
@@ -176,8 +188,9 @@ init([]) ->
 		[Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})],
 	{ok, #state{monitors=ConnMonitors++ListenerMonitors}}.
 
-handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}, _, State) ->
+handle_call({set_new_listener_opts, Ref, MaxConns, HandshakeTimeout, TransOpts, ProtoOpts, StartArgs}, _, State) ->
 	ets:insert_new(?TAB, {{max_conns, Ref}, MaxConns}),
+	ets:insert_new(?TAB, {{handshake_timeout, Ref}, HandshakeTimeout}),
 	ets:insert_new(?TAB, {{trans_opts, Ref}, TransOpts}),
 	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
 	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
@@ -190,6 +203,10 @@ handle_call({set_listener_sup, Ref, Pid}, _, State0) ->
 	{reply, ok, State};
 handle_call({set_addr, Ref, Addr}, _, State) ->
 	true = ets:insert(?TAB, {{addr, Ref}, Addr}),
+	{reply, ok, State};
+handle_call({set_handshake_timeout, Ref, HandshakeTimeout}, _, State) ->
+	ets:insert(?TAB, {{handshake_timeout, Ref}, HandshakeTimeout}),
+	_ = [ConnsSup ! {set_handshake_timeout, HandshakeTimeout} || {_, ConnsSup} <- get_connections_sups(Ref)],
 	{reply, ok, State};
 handle_call({set_max_conns, Ref, MaxConns}, _, State) ->
 	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),

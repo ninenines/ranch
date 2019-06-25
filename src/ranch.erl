@@ -27,6 +27,8 @@
 -export([get_status/1]).
 -export([get_addr/1]).
 -export([get_port/1]).
+-export([get_handshake_timeout/1]).
+-export([set_handshake_timeout/2]).
 -export([get_max_connections/1]).
 -export([set_max_connections/2]).
 -export([get_transport_options/1]).
@@ -279,6 +281,14 @@ get_connections(Ref, all) ->
 		{_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
 	lists:sum(SupCounts).
 
+-spec get_handshake_timeout(ref()) -> timeout().
+get_handshake_timeout(Ref) ->
+	ranch_server:get_handshake_timeout(Ref).
+
+-spec set_handshake_timeout(ref(), timeout()) -> ok.
+set_handshake_timeout(Ref, HandshakeTimeout) ->
+	ranch_server:set_handshake_timeout(Ref, HandshakeTimeout).
+
 -spec get_max_connections(ref()) -> max_conns().
 get_max_connections(Ref) ->
 	ranch_server:get_max_connections(Ref).
@@ -294,12 +304,23 @@ get_transport_options(Ref) ->
 -spec set_transport_options(ref(), opts()) -> ok | {error, running}.
 set_transport_options(Ref, TransOpts0) ->
 	TransOpts = normalize_opts(TransOpts0),
-	case get_status(Ref) of
-		suspended ->
-			ok = ranch_server:set_transport_options(Ref, TransOpts);
-		running ->
-			{error, running}
+	case {get_status(Ref), validate_transport_opts(TransOpts)} of
+		{suspended, ok} ->
+			ok = ranch_server:set_transport_options(Ref, TransOpts),
+			ok = apply_transport_option(Ref, max_connections, TransOpts),
+			ok = apply_transport_option(Ref, handshake_timeout, TransOpts);
+		{running, _} ->
+			{error, running};
+		{_, TransOptsError} ->
+			TransOptsError
 	end.
+
+apply_transport_option(Ref, max_connections, Opts) ->
+	MaxConns = maps:get(max_connections, Opts, 1024),
+	ok = set_max_connections(Ref, MaxConns);
+apply_transport_option(Ref, handshake_timeout, Opts) ->
+	HandshakeTimeout = maps:get(handshake_timeout, Opts, 5000),
+	ok = set_handshake_timeout(Ref, HandshakeTimeout).
 
 -spec get_protocol_options(ref()) -> any().
 get_protocol_options(Ref) ->
@@ -329,6 +350,7 @@ listener_info(Ref, Pid) ->
 			Addr
 	end,
 	MaxConns = get_max_connections(Ref),
+	HandshakeTimeout = get_handshake_timeout(Ref),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	ProtoOpts = get_protocol_options(Ref),
 	[
@@ -337,6 +359,7 @@ listener_info(Ref, Pid) ->
 		{ip, IP},
 		{port, Port},
 		{max_connections, MaxConns},
+		{handshake_timeout, HandshakeTimeout},
 		{active_connections, get_connections(Ref, active)},
 		{all_connections, get_connections(Ref, all)},
 		{transport, Transport},

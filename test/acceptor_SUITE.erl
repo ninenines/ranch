@@ -73,7 +73,8 @@ groups() ->
 		misc_info,
 		misc_info_embedded,
 		misc_opts_logger,
-		misc_wait_for_connections
+		misc_wait_for_connections,
+		misc_set_transport_options
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -125,6 +126,7 @@ misc_info(_) ->
 		ranch_ssl, #{num_acceptors => 3, socket_opts => Opts},
 		echo_protocol, [{}]),
 	Port3 = ranch:get_port({misc_info, ssl}),
+	ranch:set_handshake_timeout({misc_info, ssl}, infinity),
 	%% Open 5 connections, 3 removed from the count.
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
@@ -143,6 +145,7 @@ misc_info(_) ->
 			{ip, _},
 			{port, Port2},
 			{max_connections, infinity}, %% Option was modified.
+			{handshake_timeout, 5000},
 			{active_connections, 0},
 			{all_connections, 0},
 			{transport, ranch_tcp},
@@ -156,6 +159,7 @@ misc_info(_) ->
 			{ip, _},
 			{port, Port3},
 			{max_connections, 1024},
+			{handshake_timeout, infinity}, %% Option was modified.
 			{active_connections, 0},
 			{all_connections, 0},
 			{transport, ranch_ssl},
@@ -169,6 +173,7 @@ misc_info(_) ->
 			{ip, _},
 			{port, Port1},
 			{max_connections, 1024},
+			{handshake_timeout, 5000},
 			{active_connections, 2},
 			{all_connections, 5},
 			{transport, ranch_tcp},
@@ -212,6 +217,7 @@ misc_info_embedded(_) ->
 	{_, Pid3, _, _} = lists:keyfind({ranch_listener_sup, {misc_info_embedded, ssl}}, 1,
 		supervisor:which_children(EmbeddedSupPid3)),
 	Port3 = ranch:get_port({misc_info_embedded, ssl}),
+	ranch:set_handshake_timeout({misc_info_embedded, ssl}, infinity),
 	%% Open 5 connections, 3 removed from the count.
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
@@ -230,6 +236,7 @@ misc_info_embedded(_) ->
 			{ip, _},
 			{port, Port2},
 			{max_connections, infinity}, %% Option was modified.
+			{handshake_timeout, 5000},
 			{active_connections, 0},
 			{all_connections, 0},
 			{transport, ranch_tcp},
@@ -243,6 +250,7 @@ misc_info_embedded(_) ->
 			{ip, _},
 			{port, Port3},
 			{max_connections, 1024},
+			{handshake_timeout, infinity}, %% Option was modified.
 			{active_connections, 0},
 			{all_connections, 0},
 			{transport, ranch_ssl},
@@ -256,6 +264,7 @@ misc_info_embedded(_) ->
 			{ip, _},
 			{port, Port1},
 			{max_connections, 1024},
+			{handshake_timeout, 5000},
 			{active_connections, 2},
 			{all_connections, 5},
 			{transport, ranch_tcp},
@@ -395,6 +404,25 @@ do_expect_waiter(WaiterPid) ->
 					timeout
 			end
 	end.
+
+misc_set_transport_options(_) ->
+	doc("Ensure that max_connections and handshake_timeout changes via set_transport_options are applied."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{}, echo_protocol, []),
+	ok = ranch:suspend_listener(Name),
+	ConnsSups = [Pid || {_, Pid} <- ranch_server:get_connections_sups(Name)],
+	_ = [begin
+		{State, _, _, _} = sys:get_state(ConnsSup),
+		1024 = element(10, State),
+		5000 = element(9, State)
+	end || ConnsSup <- ConnsSups],
+	ok = ranch:set_transport_options(Name, #{max_connections => 2048, handshake_timeout => 10000}),
+	_ = [begin
+		{State, _, _, _} = sys:get_state(ConnsSup),
+		2048 = element(10, State),
+		10000 = element(9, State)
+	end || ConnsSup <- ConnsSups],
+	ok = ranch:stop_listener(Name).
 
 %% ssl.
 
