@@ -21,28 +21,27 @@
 -spec start_link(ranch:ref(), module(), any(), module(), any())
 	-> {ok, pid()}.
 start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
-	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
-	NumConnsSups = maps:get(num_conns_sups, TransOpts, NumAcceptors),
 	MaxConns = maps:get(max_connections, TransOpts, 1024),
+	Logger = maps:get(logger, TransOpts, logger),
 	ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
 		[Ref, Transport, TransOpts, Protocol, ProtoOpts]),
 	supervisor:start_link(?MODULE, {
-		Ref, NumAcceptors, NumConnsSups, Transport, Protocol
+		Ref, Transport, Protocol, Logger
 	}).
 
--spec init({ranch:ref(), pos_integer(), pos_integer(), module(), module()})
+-spec init({ranch:ref(), module(), module(), module()})
 	-> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
-init({Ref, NumAcceptors, NumConnsSups, Transport, Protocol}) ->
+init({Ref, Transport, Protocol, Logger}) ->
 	ok = ranch_server:set_listener_sup(Ref, self()),
 	ChildSpecs = [
 		#{
 			id => ranch_conns_sup_sup,
-			start => {ranch_conns_sup_sup, start_link, [Ref, NumConnsSups, Transport, Protocol]},
+			start => {ranch_conns_sup_sup, start_link, [Ref, Transport, Protocol, Logger]},
 			type => supervisor
 		},
 		#{
 			id => ranch_acceptors_sup,
-			start => {ranch_acceptors_sup, start_link, [Ref, NumAcceptors, Transport]},
+			start => {ranch_acceptors_sup, start_link, [Ref, Transport, Logger]},
 			type => supervisor
 		}
 	],

@@ -291,15 +291,21 @@ set_max_connections(Ref, MaxConnections) ->
 get_transport_options(Ref) ->
 	ranch_server:get_transport_options(Ref).
 
--spec set_transport_options(ref(), opts()) -> ok | {error, running}.
+-spec set_transport_options(ref(), opts()) -> ok | {error, term()}.
 set_transport_options(Ref, TransOpts0) ->
 	TransOpts = normalize_opts(TransOpts0),
-	case get_status(Ref) of
-		suspended ->
-			ok = ranch_server:set_transport_options(Ref, TransOpts);
-		running ->
-			{error, running}
+	case validate_transport_opts(TransOpts) of
+		ok ->
+			ok = ranch_server:set_transport_options(Ref, TransOpts),
+			ok = apply_transport_options(Ref, TransOpts);
+		TransOptsError ->
+			TransOptsError
 	end.
+
+apply_transport_options(Ref, TransOpts) ->
+	_ = [ConnsSup ! {set_transport_options, TransOpts}
+		|| {_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
+	ok.
 
 -spec get_protocol_options(ref()) -> any().
 get_protocol_options(Ref) ->

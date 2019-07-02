@@ -202,7 +202,7 @@ handle_call({set_trans_opts, Ref, Opts}, _, State) ->
 	{reply, ok, State};
 handle_call({set_proto_opts, Ref, Opts}, _, State) ->
 	ets:insert(?TAB, {{proto_opts, Ref}, Opts}),
-	_ = [ConnsSup ! {set_opts, Opts} || {_, ConnsSup} <- get_connections_sups(Ref)],
+	_ = [ConnsSup ! {set_protocol_options, Opts} || {_, ConnsSup} <- get_connections_sups(Ref)],
 	{reply, ok, State};
 handle_call(_Request, _From, State) ->
 	{reply, ignore, State}.

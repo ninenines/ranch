@@ -18,15 +18,15 @@
 -export([start_link/3]).
 -export([init/1]).
 
--spec start_link(ranch:ref(), pos_integer(), module())
+-spec start_link(ranch:ref(), module(), module())
 	-> {ok, pid()}.
-start_link(Ref, NumAcceptors, Transport) ->
-	supervisor:start_link(?MODULE, [Ref, NumAcceptors, Transport]).
+start_link(Ref, Transport, Logger) ->
+	supervisor:start_link(?MODULE, [Ref, Transport, Logger]).
 
 -spec init([term()]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
-init([Ref, NumAcceptors, Transport]) ->
+init([Ref, Transport, Logger]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
-	Logger = maps:get(logger, TransOpts, logger),
+	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
 	%% We temporarily put the logger in the process dictionary
 	%% so that it can be used from ranch:filter_options. The

@@ -9,16 +9,25 @@ ranch:set_transport_options - Set the transport options
 [source,erlang]
 ----
 set_transport_options(Ref       :: ranch:ref(),
-                      TransOpts :: any())
-    -> ok | {error, running}
+                      TransOpts :: ranch:opts())
+    -> ok | {error, Reason :: term()}
 ----
 
 Set the transport options.
 
-The listener must be suspended for this call to succeed.
-If the listener is running, `{error, running}` will be returned.
+Changes to the following options will take effect...
 
-The change will take effect when the listener resumes.
+* immediately:
+** `max_connections`
+** `handshake_timeout`
+** `shutdown`
+* only after the listener has been suspended and resumed:
+** `num_acceptors`
+** `num_listen_sockets`
+** `socket_opts`
+* only when the entire listener is restarted:
+** `num_conns_sups`
+** `logger`
 
 == Arguments
 
@@ -32,10 +41,15 @@ The new transport options.
 
 == Return value
 
-The atom `ok` is always returned. It can be safely ignored.
+The atom `ok` is returned on success.
+
+An error tuple is returned on failure, for example if the given
+transport options contain invalid values.
 
 == Changelog
 
+* *2.0*: The restriction that the listener must be suspended
+         has been removed.
 * *2.0*: The `TransOpts` argument must no longer contain
          Ranch-specific options if given as a list. Use a map.
 

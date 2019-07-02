@@ -73,6 +73,7 @@ groups() ->
 		misc_info,
 		misc_info_embedded,
 		misc_opts_logger,
+		misc_set_transport_options,
 		misc_wait_for_connections
 	]}, {supervisor, [
 		connection_type_supervisor,
@@ -321,6 +322,28 @@ misc_repeated_remove(_) ->
 	timer:sleep(1000),
 	ConnsSups = lists:sort(ranch_server:get_connections_sups(Name)),
 	true = lists:all(fun ({_, ConnsSup}) -> erlang:is_process_alive(ConnsSup) end, ConnsSups),
+	ok = ranch:stop_listener(Name).
+
+misc_set_transport_options(_) ->
+	doc(""),
+	Name = name(),
+	{ok, ListenerSupPid} = ranch:start_listener(Name, ranch_tcp, #{max_connections => 10,
+		handshake_timeout => 5000, shutdown => 1000, num_acceptors => 1,
+		socket_opts => [{send_timeout, 5000}]}, echo_protocol, []),
+	ok = ranch:set_transport_options(Name, #{max_connections => 20, handshake_timeout => 5001,
+		num_acceptors => 2, shutdown => 1001, socket_opts => [{send_timeout, 5002}]}),
+	ConnsSups = [ConnsSup || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
+	_ = [begin
+		{State, _, _, _} = sys:get_state(ConnsSup),
+		20 = element(10, State),
+		5001 = element(9, State),
+		1001 = element(5, State)
+	end || ConnsSup <- ConnsSups],
+	ok = ranch:suspend_listener(Name),
+	ok = ranch:resume_listener(Name),
+	2 = length(ranch:procs(Name, acceptors)),
+	LSocket = do_get_listener_socket(ListenerSupPid),
+	{ok, [{send_timeout, 5002}]} = ranch_tcp:getopts(LSocket, [send_timeout]),
 	ok = ranch:stop_listener(Name).
 
 misc_wait_for_connections(_) ->
@@ -621,8 +644,6 @@ ssl_graceful(_) ->
 		[binary, {active, false}, {packet, raw}]),
 	ok = ssl:send(Socket1, <<"SSL with fresh listener">>),
 	{ok, <<"SSL with fresh listener">>} = ssl:recv(Socket1, 23, 1000),
-	%% Make sure transport options cannot be changed on a running listener.
-	{error, running} = ranch:set_transport_options(Name, #{socket_opts => [{port, Port}|Opts]}),
 	%% Suspend listener, make sure established connections keep running.
 	ok = ranch:suspend_listener(Name),
 	suspended = ranch:get_status(Name),
@@ -640,8 +661,6 @@ ssl_graceful(_) ->
 		[binary, {active, false}, {packet, raw}]),
 	ok = ssl:send(Socket2, <<"SSL with resumed listener">>),
 	{ok, <<"SSL with resumed listener">>} = ssl:recv(Socket2, 25, 1000),
-	%% Make sure transport options cannot be changed on resumed listener.
-	{error, running} = ranch:set_transport_options(Name, #{socket_opts => [{port, Port}|Opts]}),
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket1, 0, 1000),
 	{error, closed} = ssl:recv(Socket2, 0, 1000),
@@ -860,8 +879,6 @@ tcp_graceful(_) ->
 		[binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket1, <<"TCP with fresh listener">>),
 	{ok, <<"TCP with fresh listener">>} = gen_tcp:recv(Socket1, 23, 1000),
-	%% Make sure transport options cannot be changed on a running listener.
-	{error, running} = ranch:set_transport_options(Name, [{port, Port}]),
 	%% Suspend listener, make sure established connections keep running.
 	ok = ranch:suspend_listener(Name),
 	suspended = ranch:get_status(Name),
@@ -879,8 +896,6 @@ tcp_graceful(_) ->
 		[binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket2, <<"TCP with resumed listener">>),
 	{ok, <<"TCP with resumed listener">>} = gen_tcp:recv(Socket2, 25, 1000),
-	%% Make sure transport options cannot be changed on resumed listener.
-	{error, running} = ranch:set_transport_options(Name, [{port, Port}]),
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket1, 0, 1000),
 	{error, closed} = gen_tcp:recv(Socket2, 0, 1000),

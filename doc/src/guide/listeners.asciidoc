@@ -358,14 +358,23 @@ Opts = ranch:get_protocol_options(tcp_echo).
 
 === Changing transport options
 
-Ranch allows you to change the transport options of a listener, for
-example to make it listen on a different port.
+Ranch allows you to change the transport options of a listener with
+the `ranch:set_transport_options/2` function, for example to change the
+number of acceptors or to make it listen on a different port.
 
-To change transport options, the listener has to be suspended first.
-Then you are allowed to change the transport options by calling
-`ranch:set_transport_options/2` with the listener name and the new
-transport options as arguments.
-After that, you can resume the listener.
+Changes to the following options will take effect...
+
+* immediately:
+** `max_connections`
+** `handshake_timeout`
+** `shutdown`
+* only after the listener has been suspended and resumed:
+** `num_acceptors`
+** `num_listen_sockets`
+** `socket_opts`
+* only when the entire listener is restarted:
+** `num_conns_sups`
+** `logger`
 
 .Changing the transport options
 

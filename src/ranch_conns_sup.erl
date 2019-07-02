@@ -18,12 +18,12 @@
 -module(ranch_conns_sup).
 
 %% API.
--export([start_link/4]).
+-export([start_link/6]).
 -export([start_protocol/3]).
 -export([active_connections/1]).
 
 %% Supervisor internals.
--export([init/5]).
+-export([init/7]).
 -export([system_continue/3]).
 -export([system_terminate/4]).
 -export([system_code_change/4]).
@@ -46,10 +46,10 @@
 
 %% API.
 
--spec start_link(ranch:ref(), pos_integer(), module(), module()) -> {ok, pid()}.
-start_link(Ref, Id, Transport, Protocol) ->
+-spec start_link(ranch:ref(), pos_integer(), module(), any(), module(), module()) -> {ok, pid()}.
+start_link(Ref, Id, Transport, TransOpts, Protocol, Logger) ->
 	proc_lib:start_link(?MODULE, init,
-		[self(), Ref, Id, Transport, Protocol]).
+		[self(), Ref, Id, Transport, TransOpts, Protocol, Logger]).
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
@@ -99,16 +99,14 @@ active_connections(SupPid) ->
 
 %% Supervisor internals.
 
--spec init(pid(), ranch:ref(), pos_integer(), module(), module()) -> no_return().
-init(Parent, Ref, Id, Transport, Protocol) ->
+-spec init(pid(), ranch:ref(), pos_integer(), module(), any(), module(), module()) -> no_return().
+init(Parent, Ref, Id, Transport, TransOpts, Protocol, Logger) ->
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, Id, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),
-	TransOpts = ranch_server:get_transport_options(Ref),
 	ConnType = maps:get(connection_type, TransOpts, worker),
 	Shutdown = maps:get(shutdown, TransOpts, 5000),
 	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
-	Logger = maps:get(logger, TransOpts, logger),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
 	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
@@ -166,8 +164,11 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{set_max_conns, MaxConns2} ->
 			loop(State#state{max_conns=MaxConns2},
 				CurConns, NbChildren, Sleepers);
+		%% Upgrade the transport options.
+		{set_transport_options, TransOpts} ->
+			set_transport_options(State, CurConns, NbChildren, Sleepers, TransOpts);
 		%% Upgrade the protocol options.
-		{set_opts, Opts2} ->
+		{set_protocol_options, Opts2} ->
 			loop(State#state{opts=Opts2},
 				CurConns, NbChildren, Sleepers);
 		{'EXIT', Parent, Reason} ->
@@ -249,6 +250,20 @@ handshake(State=#state{ref=Ref, transport=Transport, handshake_timeout=Handshake
 			To ! self(),
 			loop(State, CurConns, NbChildren, Sleepers)
 	end.
+
+set_transport_options(State=#state{max_conns=MaxConns0}, CurConns, NbChildren, Sleepers0, TransOpts) ->
+	MaxConns1 = maps:get(max_connections, TransOpts, 1024),
+	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
+	Shutdown = maps:get(shutdown, TransOpts, 5000),
+	Sleepers1 = case MaxConns1 > MaxConns0 of
+		true ->
+			_ = [To ! self() || To <- Sleepers0],
+			[];
+		false ->
+			Sleepers0
+	end,
+	loop(State#state{max_conns=MaxConns1, handshake_timeout=HandshakeTimeout, shutdown=Shutdown},
+		CurConns, NbChildren, Sleepers1).
 
 -spec terminate(#state{}, any(), non_neg_integer()) -> no_return().
 terminate(#state{shutdown=brutal_kill}, Reason, _) ->
