@@ -1,0 +1,69 @@
+== Connection draining
+
+Stopping a Ranch listener via `ranch:stop_listener/1` will invariably kill
+all connection processes the listener hosts. However, you may want to stop
+a listener in a graceful fashion, ie by not accepting any new connections,
+but allowing the existing connection processes to exit by themselves instead
+of being killed.
+
+For this purpose, you should first suspend the listeners you wish to
+stop gracefully, and then wait for its connection count to drop to
+zero.
+
+.Draining a single listener
+
+[source,erlang]
+----
+ok = ranch:suspend_listener(Ref),
+ok = ranch:wait_for_connections(Ref, '==', 0),
+ok = ranch:stop_listener(Ref).
+----
+
+If you want to drain more than just one listener, it may be important to first suspend
+them all before beginning to wait for their connection counts to reach zero. Otherwise,
+the not yet suspended listeners will still be accepting connections while you wait for
+the suspended ones to be drained.
+
+.Draining multiple listeners
+
+[source,erlang]
+----
+lists:foreach(
+	fun (Ref) ->
+		ok = ranch:suspend_listener(Ref)
+	end,
+	Refs
+),
+lists:foreach(
+	fun (Ref) ->
+		ok = ranch:wait_for_connections(Ref, '==', 0),
+		ok = ranch:stop_listener(Ref)
+	end,
+	Refs
+).
+----
+
+If you have long-running connection processes hosted by the listener you want to stop
+gracefully, draining may take a long time, possibly forever. If you just want to give
+the connection processes a chance to finish, but are not willing to wait for infinity,
+the waiting part could be handled in a separate process.
+
+.Draining a listener with a timeout
+
+[source,erlang]
+----
+ok = ranch:suspend_listener(Ref),
+{DrainPid, DrainRef} = spawn_monitor(
+	fun () ->
+		ok = ranch:wait_for_connections(Ref, '==', 0)
+	end
+),
+receive
+	{'DOWN', DrainRef, process, DrainPid, _} ->
+		ok
+after DrainTimeout ->
+	exit(DrainPid, kill),
+	ok
+end,
+ok = ranch:stop_listener(Ref).
+----

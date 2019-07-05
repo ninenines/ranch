@@ -21,6 +21,8 @@ include::parsers.asciidoc[Writing parsers]
 
 include::ssl_auth.asciidoc[SSL client authentication]
 
+include::connection_draining.asciidoc[Connection draining]
+
 = Advanced
 
 include::internals.asciidoc[Internals]
