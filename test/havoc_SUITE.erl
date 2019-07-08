@@ -46,28 +46,54 @@ havoc_tcp(_) ->
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{},
 		echo_protocol, []),
-	Port1 = ranch:get_port(Name),
 	%% Establish a hundred connections.
-	_ = [begin
-		{ok, Socket} = gen_tcp:connect("localhost", Port1, [{active, false}]),
-		Socket
-	end || _ <- lists:seq(1, 100)],
-	%% Log process info of process about to be killed.
-	LogFun = fun
-		(Pid) when is_pid(Pid) ->
-			logger:info("~p~n", [erlang:process_info(Pid)]);
-		(Port) when is_port(Port) ->
-			logger:info("~p~n", [erlang:port_info(Port)])
-	end,
-	%% Don't kill faster than ranch_sup can handle.
-	KillInterval = 1000 * application:get_env(ranch, ranch_sup_period, 5),
+	ok = do_connect(100, ranch_tcp, ranch:get_port(Name), 1000),
+	%% Set restart frequency of ranch_sup.
+	do_set_sup_frequencies([ranch_sup], 999999, 1),
 	%% Run Havoc.
-	havoc:on([{avg_wait, KillInterval}, {deviation, 0}, {applications, [ranch]},
-		supervisor, {prekill_callback, LogFun}]),
+	havoc:on([{avg_wait, 100}, {deviation, 0}, {applications, [ranch]},
+		{supervisors, [ranch_sup]}, supervisor, {prekill_callback, fun do_log/1}]),
 	timer:sleep(10000),
 	havoc:off(),
 	timer:sleep(1000),
 	%% Confirm we can still connect.
-	Port2 = ranch:get_port(Name),
-	{ok, _} = gen_tcp:connect("localhost", Port2, [{active, false}]),
+	ok = do_connect(1, ranch_tcp, ranch:get_port(Name), 1000),
 	ok = ranch:stop_listener(Name).
+
+havoc_ssl(_) ->
+	doc("Start a SSL listener, establish a hundred connections, "
+		"run havoc, confirm we can still connect."),
+	%% Start a TCP listener.
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, ct_helper:get_certs_from_ets(),
+		echo_protocol, []),
+	%% Establish a hundred connections.
+	ok = do_connect(100, ranch_ssl, ranch:get_port(Name), 1000),
+	%% Set restart frequencies of ranch_sup and ssl_sup.
+	do_set_sup_frequencies([ranch_sup, ssl_sup], 999999, 1),
+	%% Run Havoc.
+	havoc:on([{avg_wait, 100}, {deviation, 0}, {applications, [ranch]}, {otp_applications, [ssl]},
+		{supervisors, [ssl_sup]}, supervisor, {prekill_callback, fun do_log/1}]),
+	timer:sleep(10000),
+	havoc:off(),
+	timer:sleep(1000),
+	%% Confirm we can still connect.
+	ok = do_connect(1, ranch_ssl, ranch:get_port(Name), 1000),
+	ok = ranch:stop_listener(Name).
+
+do_set_sup_frequencies(Sups, Intensity, Period) ->
+	StateFun = fun (S) -> setelement(7, setelement(6, S, Intensity), Period) end,
+	_ = [sys:replace_state(Sup, StateFun) || Sup <- Sups],
+	ok.
+
+do_connect(0, _, _, _) ->
+	ok;
+do_connect(N, Transport, Port, Timeout) ->
+	{ok, _} = Transport:connect("localhost", Port, [{active, false}], Timeout),
+	do_connect(N - 1, Transport, Port, Timeout).
+
+do_log(Pid) when is_pid(Pid) ->
+	logger:info("p~n", [erlang:process_info(Pid)]);
+do_log(Port) when is_port(Port) ->
+	logger:info("~p~n", [erlang:port_info(Port)]).
