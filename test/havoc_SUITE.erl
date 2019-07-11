@@ -94,6 +94,6 @@ do_connect(N, Transport, Port, Timeout) ->
 	do_connect(N - 1, Transport, Port, Timeout).
 
 do_log(Pid) when is_pid(Pid) ->
-	logger:info("p~n", [erlang:process_info(Pid)]);
+	logger:info("~p~n", [erlang:process_info(Pid)]);
 do_log(Port) when is_port(Port) ->
 	logger:info("~p~n", [erlang:port_info(Port)]).
