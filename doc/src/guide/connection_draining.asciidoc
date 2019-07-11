@@ -6,7 +6,7 @@ a listener in a graceful fashion, ie by not accepting any new connections,
 but allowing the existing connection processes to exit by themselves instead
 of being killed.
 
-For this purpose, you should first suspend the listeners you wish to
+For this purpose, you should first suspend the listener you wish to
 stop gracefully, and then wait for its connection count to drop to
 zero.
 
@@ -66,4 +66,33 @@ after DrainTimeout ->
 	ok
 end,
 ok = ranch:stop_listener(Ref).
+----
+
+To drain listeners automatically as part of your application shutdown routine,
+use the `prep_stop/1` function of your application module.
+
+.Draining listeners automatically on application shutdown
+
+[source,erlang]
+----
+-module(my_app).
+
+-behavior(application).
+
+-export([start/2]).
+-export([prep_stop/1]).
+-export([stop/1]).
+
+start(_StartType, _StartArgs) ->
+	{ok, _} = ranch:start_listener(my_listener, ranch_tcp, #{}, my_protocol, []),
+	my_app_sup:start_link().
+
+prep_stop(State) ->
+	ok = ranch:suspend_listener(my_listener),
+	ok = ranch:wait_for_connections(my_listener, '==', 0),
+	ok = ranch:stop_listener(my_listener),
+	State.
+
+stop(_State) ->
+	ok.
 ----
