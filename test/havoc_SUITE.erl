@@ -82,6 +82,30 @@ havoc_ssl(_) ->
 	ok = do_connect(1, ranch_ssl, ranch:get_port(Name), 1000),
 	ok = ranch:stop_listener(Name).
 
+havoc_embedded(_) ->
+	doc("Start an embedded TCP listener, establish a hundred connections, "
+		"run havoc, confirm we can still connect."),
+	%% Start embedded listener.
+	Name = name(),
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, _} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{}, echo_protocol, []),
+	%% Establish a hundred connections.
+	ok = do_connect(100, ranch_tcp, ranch:get_port(Name), 1000),
+	%% Set restart frequency of ranch_sup and embedded_sup.
+	do_set_sup_frequencies([ranch_sup, SupPid], 999999, 1),
+	%% Run havoc.
+	havoc:on([{avg_wait, 100}, {deviation, 0}, {applications, [ranch]},
+		{supervisors, [SupPid]}, supervisor, {prekill_callback, fun do_log/1}]),
+	timer:sleep(10000),
+	havoc:off(),
+	timer:sleep(1000),
+	%% Confirm we can still connect.
+	ok = do_connect(1, ranch_tcp, ranch:get_port(Name), 1000),
+	ok = embedded_sup:stop_listener(SupPid, Name),
+	embedded_sup:stop(SupPid),
+	ok.
+
 do_set_sup_frequencies(Sups, Intensity, Period) ->
 	StateFun = fun (S) -> setelement(7, setelement(6, S, Intensity), Period) end,
 	_ = [sys:replace_state(Sup, StateFun) || Sup <- Sups],
