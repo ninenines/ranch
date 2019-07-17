@@ -315,12 +315,17 @@ get_protocol_options(Ref) ->
 set_protocol_options(Ref, Opts) ->
 	ranch_server:set_protocol_options(Ref, Opts).
 
--spec info() -> [{any(), [{atom(), any()}]}].
+-spec info() -> #{ref() := #{atom() := term()}}.
 info() ->
-	[{Ref, listener_info(Ref, Pid)}
-		|| {Ref, Pid} <- ranch_server:get_listener_sups()].
+	lists:foldl(
+		fun ({Ref, Pid}, Acc) ->
+			Acc#{Ref => listener_info(Ref, Pid)}
+		end,
+		#{},
+		ranch_server:get_listener_sups()
+	).
 
--spec info(ref()) -> [{atom(), any()}].
+-spec info(ref()) -> #{atom() := term()}.
 info(Ref) ->
 	Pid = ranch_server:get_listener_sup(Ref),
 	listener_info(Ref, Pid).
@@ -337,19 +342,19 @@ listener_info(Ref, Pid) ->
 	MaxConns = get_max_connections(Ref),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	ProtoOpts = get_protocol_options(Ref),
-	[
-		{pid, Pid},
-		{status, Status},
-		{ip, IP},
-		{port, Port},
-		{max_connections, MaxConns},
-		{active_connections, get_connections(Ref, active)},
-		{all_connections, get_connections(Ref, all)},
-		{transport, Transport},
-		{transport_options, TransOpts},
-		{protocol, Protocol},
-		{protocol_options, ProtoOpts}
-	].
+	#{
+		pid => Pid,
+		status => Status,
+		ip => IP,
+		port => Port,
+		max_connections => MaxConns,
+		active_connections => get_connections(Ref, active),
+		all_connections => get_connections(Ref, all),
+		transport => Transport,
+		transport_options => TransOpts,
+		protocol => Protocol,
+		protocol_options => ProtoOpts
+	}.
 
 -spec procs(ref(), acceptors | connections) -> [pid()].
 procs(Ref, Type) ->
