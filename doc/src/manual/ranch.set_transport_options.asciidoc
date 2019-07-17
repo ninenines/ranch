@@ -26,6 +26,7 @@ Changes to the following options will take effect...
 ** `num_listen_sockets`
 ** `socket_opts`
 * only when the entire listener is restarted:
+** `connection_type`
 ** `num_conns_sups`
 ** `logger`
 
