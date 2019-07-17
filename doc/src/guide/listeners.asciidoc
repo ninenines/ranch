@@ -362,20 +362,6 @@ Ranch allows you to change the transport options of a listener with
 the `ranch:set_transport_options/2` function, for example to change the
 number of acceptors or to make it listen on a different port.
 
-Changes to the following options will take effect...
-
-* immediately:
-** `max_connections`
-** `handshake_timeout`
-** `shutdown`
-* only after the listener has been suspended and resumed:
-** `num_acceptors`
-** `num_listen_sockets`
-** `socket_opts`
-* only when the entire listener is restarted:
-** `num_conns_sups`
-** `logger`
-
 .Changing the transport options
 
 [source,erlang]
