@@ -8,10 +8,10 @@ ranch:info - Overview of Ranch listeners
 
 [source,erlang]
 ----
-info() -> [{Ref, Info}]
+info() -> #{Ref := Info}
 info(Ref) -> Info
 
-Info :: [{Key :: atom(), Value :: any()}]
+Info :: #{Key :: atom() := Value :: any()}
 ----
 
 Overview of Ranch listeners.
@@ -31,7 +31,6 @@ pid:: Pid of the listener's top-level supervisor.
 status:: Listener status, either running or suspended.
 ip:: Interface Ranch listens on.
 port:: Port number Ranch listens on.
-num_acceptors:: Number of acceptor processes.
 max_connections:: Maximum number of connections per connection supervisor.
 active_connections:: Number of active connections.
 all_connections:: Number of connections, including those removed from the count.
@@ -40,8 +39,10 @@ transport_options:: Transport options.
 protocol:: Protocol module.
 protocol_options:: Protocol options.
 
-// @todo I mistakenly removed the num_acceptors key,
-// it should be added back.
+== Changelog
+
+* *2.0*: The listener info is now returned as a map.
+* *2.0*: The `num_acceptors` key has been removed.
 
 == Examples
 

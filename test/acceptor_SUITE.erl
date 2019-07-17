@@ -137,47 +137,41 @@ misc_info(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
 	receive after 250 -> ok end,
 	%% Confirm the info returned by Ranch is correct.
-	[
-		{{misc_info, act}, [
-			{pid, Pid2},
-			{status, _},
-			{ip, _},
-			{port, Port2},
-			{max_connections, infinity}, %% Option was modified.
-			{active_connections, 0},
-			{all_connections, 0},
-			{transport, ranch_tcp},
-			{transport_options, #{num_acceptors := 2}},
-			{protocol, active_echo_protocol},
-			{protocol_options, {}}
-		]},
-		{{misc_info, ssl}, [
-			{pid, Pid3},
-			{status, _},
-			{ip, _},
-			{port, Port3},
-			{max_connections, 1024},
-			{active_connections, 0},
-			{all_connections, 0},
-			{transport, ranch_ssl},
-			{transport_options, #{num_acceptors := 3, socket_opts := Opts}},
-			{protocol, echo_protocol},
-			{protocol_options, [{}]}
-		]},
-		{{misc_info, tcp}, [
-			{pid, Pid1},
-			{status, _},
-			{ip, _},
-			{port, Port1},
-			{max_connections, 1024},
-			{active_connections, 2},
-			{all_connections, 5},
-			{transport, ranch_tcp},
-			{transport_options, #{num_acceptors := 1}},
-			{protocol, remove_conn_and_wait_protocol},
-			{protocol_options, [{remove, false, 2500}]} %% Option was modified.
-		]}
-	] = do_get_listener_info(misc_info),
+	#{
+		{misc_info, act} := #{
+			pid := Pid2,
+			port := Port2,
+			max_connections := infinity, %% Option was modified.
+			active_connections := 0,
+			all_connections := 0,
+			transport := ranch_tcp,
+			transport_options := #{num_acceptors := 2},
+			protocol := active_echo_protocol,
+			protocol_options := {}
+		},
+		{misc_info, ssl} := #{
+			pid := Pid3,
+			port := Port3,
+			max_connections := 1024,
+			active_connections := 0,
+			all_connections := 0,
+			transport := ranch_ssl,
+			transport_options := #{num_acceptors := 3, socket_opts := Opts},
+			protocol := echo_protocol,
+			protocol_options := [{}]
+		},
+		{misc_info, tcp} := #{
+			pid := Pid1,
+			port := Port1,
+			max_connections := 1024,
+			active_connections := 2,
+			all_connections := 5,
+			transport := ranch_tcp,
+			transport_options := #{num_acceptors := 1},
+			protocol := remove_conn_and_wait_protocol,
+			protocol_options := [{remove, false, 2500}] %% Option was modified.
+		}
+	} = ranch:info(),
 	%% Get acceptors.
 	[_] = ranch:procs({misc_info, tcp}, acceptors),
 	[_, _] = ranch:procs({misc_info, act}, acceptors),
@@ -224,47 +218,41 @@ misc_info_embedded(_) ->
 	{ok, _} = gen_tcp:connect("localhost", Port1, [binary, {active, false}, {packet, raw}]),
 	receive after 250 -> ok end,
 	%% Confirm the info returned by Ranch is correct.
-	[
-		{{misc_info_embedded, act}, [
-			{pid, Pid2},
-			{status, _},
-			{ip, _},
-			{port, Port2},
-			{max_connections, infinity}, %% Option was modified.
-			{active_connections, 0},
-			{all_connections, 0},
-			{transport, ranch_tcp},
-			{transport_options, #{num_acceptors := 2}},
-			{protocol, active_echo_protocol},
-			{protocol_options, {}}
-		]},
-		{{misc_info_embedded, ssl}, [
-			{pid, Pid3},
-			{status, _},
-			{ip, _},
-			{port, Port3},
-			{max_connections, 1024},
-			{active_connections, 0},
-			{all_connections, 0},
-			{transport, ranch_ssl},
-			{transport_options, #{num_acceptors := 3, socket_opts := Opts}},
-			{protocol, echo_protocol},
-			{protocol_options, [{}]}
-		]},
-		{{misc_info_embedded, tcp}, [
-			{pid, Pid1},
-			{status, _},
-			{ip, _},
-			{port, Port1},
-			{max_connections, 1024},
-			{active_connections, 2},
-			{all_connections, 5},
-			{transport, ranch_tcp},
-			{transport_options, #{num_acceptors := 1}},
-			{protocol, remove_conn_and_wait_protocol},
-			{protocol_options, [{remove, false, 2500}]} %% Option was modified.
-		]}
-	] = do_get_listener_info(misc_info_embedded),
+	#{
+		{misc_info_embedded, act} := #{
+			pid := Pid2,
+			port := Port2,
+			max_connections := infinity, %% Option was modified.
+			active_connections := 0,
+			all_connections := 0,
+			transport := ranch_tcp,
+			transport_options := #{num_acceptors := 2},
+			protocol := active_echo_protocol,
+			protocol_options := {}
+		},
+		{misc_info_embedded, ssl} := #{
+			pid := Pid3,
+			port := Port3,
+			max_connections := 1024,
+			active_connections := 0,
+			all_connections := 0,
+			transport := ranch_ssl,
+			transport_options := #{num_acceptors := 3, socket_opts := Opts},
+			protocol := echo_protocol,
+			protocol_options := [{}]
+		},
+		{misc_info_embedded, tcp} := #{
+			pid := Pid1,
+			port := Port1,
+			max_connections := 1024,
+			active_connections := 2,
+			all_connections := 5,
+			transport := ranch_tcp,
+			transport_options := #{num_acceptors := 1},
+			protocol := remove_conn_and_wait_protocol,
+			protocol_options := [{remove, false, 2500}] %% Option was modified.
+		}
+	} = ranch:info(),
 	%% Get acceptors.
 	[_] = ranch:procs({misc_info_embedded, tcp}, acceptors),
 	[_, _] = ranch:procs({misc_info_embedded, act}, acceptors),
@@ -276,23 +264,18 @@ misc_info_embedded(_) ->
 	%% Stop embedded tcp listener and ensure it is gone.
 	ok = embedded_sup:stop_listener(SupPid, {misc_info_embedded, tcp}),
 	timer:sleep(500),
-	[{{misc_info_embedded, act}, _}, {{misc_info_embedded, ssl}, _}] =
-		do_get_listener_info(misc_info_embedded),
+	false = maps:is_key({misc_info_embedded, tcp}, ranch:info()),
 	%% Stop embedded act listener and ensure it is gone.
 	ok = embedded_sup:stop_listener(SupPid, {misc_info_embedded, act}),
 	timer:sleep(500),
-	[{{misc_info_embedded, ssl}, _}] =
-		do_get_listener_info(misc_info_embedded),
+	false = maps:is_key({misc_info_embedded, act}, ranch:info()),
 	%% Stop embedded ssl listener and ensure it is gone.
 	ok = embedded_sup:stop_listener(SupPid, {misc_info_embedded, ssl}),
 	timer:sleep(500),
-	[] = do_get_listener_info(misc_info_embedded),
+	false = maps:is_key({misc_info_embedded, ssl}, ranch:info()),
 	%% Stop embedded supervisor.
 	embedded_sup:stop(SupPid),
 	ok.
-
-do_get_listener_info(ListenerGroup) ->
-	lists:sort([L || L={{G, _}, _} <- ranch:info(), G=:=ListenerGroup]).
 
 misc_opts_logger(_) ->
 	doc("Confirm that messages are sent via the configured logger module."),
