@@ -2,7 +2,7 @@
 
 PROJECT = ranch
 PROJECT_DESCRIPTION = Socket acceptor pool for TCP protocols.
-PROJECT_VERSION = 1.7.1
+PROJECT_VERSION = 2.0.0-rc.1
 PROJECT_REGISTERED = ranch_server
 
 # Options.
@@ -58,3 +58,23 @@ DIALYZER_OPTS += --src -r test
 ci-setup:: $(DEPS_DIR)/ct_helper
 	$(gen_verbose) cp ~/.kerl/builds/$(CI_OTP_RELEASE)/otp_src_git/lib/ssl/test/erl_make_certs.erl deps/ct_helper/src/ || true
 	$(gen_verbose) $(MAKE) -C $(DEPS_DIR)/ct_helper clean app
+
+# Prepare for the release.
+
+prepare_tag:
+	$(verbose) echo -n "Most recent tag:            "
+	$(verbose) git tag | tail -n1
+	$(verbose) git verify-tag `git tag | tail -n1`
+	$(verbose) echo -n "MAKEFILE: "
+	$(verbose) grep -m1 PROJECT_VERSION Makefile
+	$(verbose) echo -n "APP:                 "
+	$(verbose) grep -m1 vsn ebin/$(PROJECT).app | sed 's/	//g'
+	$(verbose) echo
+	$(verbose) echo "Links in the README:"
+	$(verbose) grep http.*:// README.asciidoc
+	$(verbose) echo
+	$(verbose) echo "Titles in most recent CHANGELOG:"
+	$(verbose) for f in `ls -rv doc/src/guide/migrating_from_*.asciidoc | head -n1`; do \
+		echo $$f:; \
+		grep == $$f; \
+	done
