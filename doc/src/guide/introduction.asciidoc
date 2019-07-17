@@ -13,9 +13,9 @@ with socket programming and TCP protocols.
 
 === Supported platforms
 
-Ranch is tested and supported on Linux, FreeBSD, OSX and Windows.
+Ranch is tested and supported on Linux, FreeBSD, macOS and Windows.
 
-Ranch is developed for Erlang/OTP 19+.
+Ranch is developed for Erlang/OTP 21+.
 
 Ranch may be compiled on earlier Erlang versions with small source code
 modifications but there is no guarantee that it will work as expected.

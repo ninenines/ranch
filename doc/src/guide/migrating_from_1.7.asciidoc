@@ -1,14 +1,134 @@
 [appendix]
-== Changes since Ranch 1.7
+== Migrating from Ranch 1.7 to Ranch 2.0
 
-The following patch versions were released since Ranch 1.7:
+Ranch 2.0 adds support for multiple connection supervisors.
 
-=== Ranch 1.7.1
+Ranch 1.x had a bottleneck because it used only a single
+connection supervisor. This was more evident when many
+connections were dropped at once as the supervisor couldn't
+keep up and failed to accept new connections while cleaning
+up the old ones. Ranch 2.0 behaves much better in this scenario
+by default. Multiple connection supervisors also helps with
+concurrently accepting new connections.
 
-This release fixes an issue with the PROXY protocol where
-the wrong CRC32 algorithm was used and would cause checksum
-verification to fail.
+Ranch 2.0 also adds experimental support for opening more
+than one listening socket on a single port.
 
-Because the plain `crc32` checksum is not supported by the
-PROXY protocol, the configuration value when building PROXY
-headers has been changed to `crc32c`.
+Starting with Ranch 2.0 we are also providing a Prometheus
+collector as a separate project as well as a Grafana
+dashboard.
+
+Ranch 2.0 is compatible with Erlang/OTP 21.0 onward. Support
+for Erlang/OTP 19 and 20 has been removed.
+
+=== Features added
+
+* The `num_conns_sup` option has been added. It allows
+  configuring the number of connection supervisors. It
+  now defaults to `num_accceptors`. The old behavior can
+  be obtained by setting this value to 1.
+
+* The `logger` option is no longer experimental. It now
+  defaults to `logger` instead of `error_logger`.
+
+* UNIX domain sockets are now supported.
+
+* The active N socket option is now supported. It requires
+  Erlang/OTP 21.3 or above for TLS, however.
+
+* Embedded listeners are now failing in a predictable
+  manner when `ranch_server` goes down. It is no longer
+  necessary to embed `ranch_sup` and the recommendation
+  is now to just start Ranch normally when using embedded
+  listeners.
+
+=== Experimental features added
+
+* The experimental `num_listen_sockets` option has been
+  added. It allows opening more than one listening socket
+  per listener. It can only be used alongside the Linux
+  `SO_REUSEPORT` socket option or equivalent. It allows
+  working around a bottleneck in the kernel and maximizes
+  resource usage, leading to increased rates for accepting
+  new connections.
+
+=== Features removed
+
+* The `socket` option was removed. A more viable solution
+  is to define a custom transport module that returns a fresh
+  socket when `Transport:listen/1` is called.
+
+=== Changed behaviors
+
+* The callback function `Transport:listen/1` and its
+  implementations in `ranch_tcp` and `ranch_ssl` have changed
+  to accept a map of transport options instead of only
+  socket options.
+
+* The callback function `Transport:messages/0` return value
+  now include the tag used for passive messages.
+
+* The `Socket` argument was removed from `Protocol:start_link/3`.
+  The socket must now be obtained by calling `ranch:handshake/1,2`.
+
+=== Changed functions
+
+* The `NumAcceptors` argument was removed from `ranch:start_listener/5``
+  and `ranch:child_spec/5` and moved to the transport options.
+
+* Ranch options can no longer be passed along with socket options
+  as a proplist. The only forms allowed are now the `ranch:opts()`
+  map or only socket options as-is. Individual transport options
+  are now validated as well. The `ranch:opts()` map must
+  be used when socket options also use a map. This applies to the
+  `ranch:start_listener/5`, `ranch:child_spec/5` and
+  `ranch:set_transport_options/2` functions.
+
+* The function `ranch:info/1,2` now returns a map containing
+  each listener's information rather than a list of key/values.
+  The key `num_acceptors` was removed as it can be found in the
+  transport options.
+
+* The function `ranch:set_transport_options/2` no longer requires
+  the listener to be suspended. Which options apply immediately,
+  on suspend/resume or on restart has been documented. Some work
+  has also been done to make these option changes more predictable.
+
+=== Removed functions
+
+* The function `ranch:accept_ack/1` has been removed in favor
+  of `ranch:handshake/1,2`.
+
+=== Bugs fixed
+
+* Repeatedly calling `ranch:remove_connection/1` from a connection
+  process would crash the respective connection supervisor. This has
+  now been fixed.
+
+* When a connection process was failing to start, the socket was
+  not closed and this lead to leaking sockets. This is now corrected.
+
+=== Other changes
+
+* Connection draining has now been documented in the guide
+  following user feedback and discussions.
+
+* Ranch is now tested against `havoc`, a chaos monkey style
+  testing tool. Currently includes three scenarios: normal
+  TCP and TLS listeners and embedded TCP listener. This new
+  test suite helped uncover a misplaced `monitor/2` call
+  added during the development of Ranch 2.0.
+
+* The supervisor for acceptors and the parent supervisor for
+  connection supervisors now have an adaptive restart
+  intensity limit set to `1 + ceil(math:log2(NumChildren))`
+  to allow room for errors when they have many children.
+
+* Ranch now uses stricter compiler options. Missing function
+  specs were added to internal modules.
+
+* Ranch now calls `ssl:handshake/1,2,3` instead of
+  `ssl:ssl_accept/1,2`.
+
+* The `ranch_ssl:ssl_opt()` type has been updated to conform
+  with Erlang/OTP 22.0.
