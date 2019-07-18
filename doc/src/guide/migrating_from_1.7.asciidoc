@@ -23,7 +23,7 @@ for Erlang/OTP 19 and 20 has been removed.
 
 === Features added
 
-* The `num_conns_sup` option has been added. It allows
+* The `num_conns_sups` option has been added. It allows
   configuring the number of connection supervisors. It
   now defaults to `num_accceptors`. The old behavior can
   be obtained by setting this value to 1.
@@ -73,7 +73,7 @@ for Erlang/OTP 19 and 20 has been removed.
 
 === Changed functions
 
-* The `NumAcceptors` argument was removed from `ranch:start_listener/5``
+* The `NumAcceptors` argument was removed from `ranch:start_listener/5`
   and `ranch:child_spec/5` and moved to the transport options.
 
 * Ranch options can no longer be passed along with socket options
