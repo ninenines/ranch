@@ -12,7 +12,8 @@
 
 start(_Type, _Args) ->
 	{ok, _} = ranch:start_listener(tcp_echo,
-		ranch_tcp, [{port, 5555}], echo_protocol, []),
+		ranch_tcp, #{socket_opts => [{port, 5555}]},
+		echo_protocol, []),
 	tcp_echo_sup:start_link().
 
 stop(_State) ->
