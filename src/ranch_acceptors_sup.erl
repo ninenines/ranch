@@ -28,10 +28,6 @@ init([Ref, Transport, Logger]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
-	%% We temporarily put the logger in the process dictionary
-	%% so that it can be used from ranch:filter_options. The
-	%% interface as it currently is does not allow passing it
-	%% down otherwise.
 	LSockets = start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts, Logger),
 	Procs = [begin
 		LSocketId = (AcceptorId rem NumListenSockets) + 1,
