@@ -147,8 +147,12 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		%% Remove a connection from the count of connections.
 		{remove_connection, Ref, Pid} ->
 			case put(Pid, removed) of
-				active ->
+				active when Sleepers =:= [] ->
 					loop(State, CurConns - 1, NbChildren, Sleepers);
+				active ->
+					[To|Sleepers2] = Sleepers,
+					To ! self(),
+					loop(State, CurConns - 1, NbChildren, Sleepers2);
 				removed ->
 					loop(State, CurConns, NbChildren, Sleepers);
 				undefined ->

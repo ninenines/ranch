@@ -40,6 +40,7 @@ groups() ->
 		tcp_max_connections_and_beyond,
 		tcp_max_connections_infinity,
 		tcp_remove_connections,
+		tcp_remove_connections_acceptor_wakeup,
 		tcp_set_max_connections,
 		tcp_set_max_connections_clean,
 		tcp_getopts_capability,
@@ -972,6 +973,24 @@ tcp_remove_connections(_) ->
 	ok = connect_loop(Port, 10, 0),
 	receive after 250 -> ok end,
 	0 = ranch_server:count_connections(Name),
+	ok = ranch:stop_listener(Name).
+
+tcp_remove_connections_acceptor_wakeup(_) ->
+	doc("Ensure that removed connections wake up acceptors."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 1, num_acceptors => 1},
+		remove_conn_and_wait_protocol, [{remove, true, infinity}]),
+	Port = ranch:get_port(Name),
+	ConnectOptions = [binary, {active, false}],
+	Localhost = "localhost",
+	{ok, Socket1} = gen_tcp:connect(Localhost, Port, ConnectOptions),
+	{ok, Socket2} = gen_tcp:connect(Localhost, Port, ConnectOptions),
+	{ok, Socket3} = gen_tcp:connect(Localhost, Port, ConnectOptions),
+	ok = gen_tcp:send(Socket3, <<"bye">>),
+	true = maps:get(all_connections, ranch:info(Name)) >= 2,
+	ok = gen_tcp:send(Socket1, <<"bye">>),
+	ok = gen_tcp:send(Socket2, <<"bye">>),
 	ok = ranch:stop_listener(Name).
 
 tcp_set_max_connections(_) ->
