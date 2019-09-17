@@ -22,6 +22,9 @@
 -export([child_spec/5]).
 -export([handshake/1]).
 -export([handshake/2]).
+-export([handshake_continue/1]).
+-export([handshake_continue/2]).
+-export([handshake_cancel/1]).
 -export([recv_proxy_header/2]).
 -export([remove_connection/1]).
 -export([get_status/1]).
@@ -197,28 +200,61 @@ child_spec(Ref, Transport, TransOpts0, Protocol, ProtoOpts) ->
 		Ref, Transport, TransOpts, Protocol, ProtoOpts
 	]}, type => supervisor}.
 
--spec handshake(ref()) -> {ok, ranch_transport:socket()}.
+-spec handshake(ref()) -> {ok, ranch_transport:socket()} | {continue, any()}.
 handshake(Ref) ->
-	handshake(Ref, []).
+	handshake1(Ref, undefined).
 
--spec handshake(ref(), any()) -> {ok, ranch_transport:socket()}.
+-spec handshake(ref(), any()) -> {ok, ranch_transport:socket()} | {continue, any()}.
 handshake(Ref, Opts) ->
-	receive {handshake, Ref, Transport, CSocket, HandshakeTimeout} ->
-		case Transport:handshake(CSocket, Opts, HandshakeTimeout) of
-			OK = {ok, _} ->
-				OK;
-			%% Garbage was most likely sent to the socket, don't error out.
-			{error, {tls_alert, _}} ->
-				ok = Transport:close(CSocket),
-				exit(normal);
-			%% Socket most likely stopped responding, don't error out.
-			{error, Reason} when Reason =:= timeout; Reason =:= closed ->
-				ok = Transport:close(CSocket),
-				exit(normal);
-			{error, Reason} ->
-				ok = Transport:close(CSocket),
-				error(Reason)
-		end
+	handshake1(Ref, {opts, Opts}).
+
+handshake1(Ref, Opts) ->
+	receive {handshake, Ref, Transport, CSocket, Timeout} ->
+		Handshake = handshake_transport(Transport, handshake, CSocket, Opts, Timeout),
+		handshake_result(Handshake, Ref, Transport, CSocket, Timeout)
+	end.
+
+-spec handshake_continue(ref()) -> {ok, ranch_transport:socket()}.
+handshake_continue(Ref) ->
+	handshake_continue1(Ref, undefined).
+
+-spec handshake_continue(ref(), any()) -> {ok, ranch_transport:socket()}.
+handshake_continue(Ref, Opts) ->
+	handshake_continue1(Ref, {opts, Opts}).
+
+handshake_continue1(Ref, Opts) ->
+	receive {handshake_continue, Ref, Transport, CSocket, Timeout} ->
+		Handshake = handshake_transport(Transport, handshake_continue, CSocket, Opts, Timeout),
+		handshake_result(Handshake, Ref, Transport, CSocket, Timeout)
+	end.
+
+handshake_transport(Transport, Fun, CSocket, undefined, Timeout) ->
+	Transport:Fun(CSocket, Timeout);
+handshake_transport(Transport, Fun, CSocket, {opts, Opts}, Timeout) ->
+	Transport:Fun(CSocket, Opts, Timeout).
+
+handshake_result(Result, Ref, Transport, CSocket, Timeout) ->
+	case Result of
+		OK = {ok, _} ->
+			OK;
+		{ok, CSocket2, Info} ->
+			self() ! {handshake_continue, Ref, Transport, CSocket2, Timeout},
+			{continue, Info};
+		{error, {tls_alert, _}} ->
+			ok = Transport:close(CSocket),
+			exit(normal);
+		{error, Reason} when Reason =:= timeout; Reason =:= closed ->
+			ok = Transport:close(CSocket),
+			exit(normal);
+		{error, Reason} ->
+			ok = Transport:close(CSocket),
+			error(Reason)
+	end.
+
+-spec handshake_cancel(ref()) -> ok.
+handshake_cancel(Ref) ->
+	receive {handshake_continue, Ref, Transport, CSocket, _} ->
+		Transport:handshake_cancel(CSocket)
 	end.
 
 %% Unlike handshake/2 this function always return errors because

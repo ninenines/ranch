@@ -239,8 +239,8 @@ with the name of the listener as the only argument.
 [source,erlang]
 ranch:remove_connection(Ref).
 
-As seen in the chapter covering protocols, this pid is received as the
-first argument of the protocol's `start_link/4` callback.
+As seen in the chapter covering protocols, this reference is received
+as the first argument of the protocol's `start_link/3` callback.
 
 You can modify the `max_connections` value on a running listener by
 using the `ranch:set_max_connections/2` function, with the name of the

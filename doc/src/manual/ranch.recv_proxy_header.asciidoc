@@ -51,7 +51,7 @@ the error.
 .Receive the PROXY protocol header
 [source,erlang]
 ----
-start_link(Ref, _, Transport, Opts) ->
+start_link(Ref, Transport, Opts) ->
     Pid = proc_lib:spawn_link(?MODULE, init,
         [Ref, Transport, Opts]),
     {ok, Pid}.

@@ -30,7 +30,11 @@
 -callback listen(ranch:transport_opts(any())) -> {ok, socket()} | {error, atom()}.
 -callback accept(socket(), timeout())
 	-> {ok, socket()} | {error, closed | timeout | atom()}.
--callback handshake(socket(), opts(), timeout()) -> {ok, socket()} | {error, any()}.
+-callback handshake(socket(), timeout()) -> {ok, socket()} | {ok, socket(), any()} | {error, any()}.
+-callback handshake(socket(), opts(), timeout()) -> {ok, socket()} | {ok, socket(), any()} | {error, any()}.
+-callback handshake_continue(socket(), timeout()) -> {ok, socket()} | {error, any()}.
+-callback handshake_continue(socket(), opts(), timeout()) -> {ok, socket()} | {error, any()}.
+-callback handshake_cancel(socket()) -> ok.
 -callback connect(string(), inet:port_number(), opts())
 	-> {ok, socket()} | {error, atom()}.
 -callback connect(string(), inet:port_number(), opts(), timeout())

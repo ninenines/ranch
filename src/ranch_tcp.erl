@@ -21,7 +21,11 @@
 -export([listen/1]).
 -export([disallowed_listen_options/0]).
 -export([accept/2]).
+-export([handshake/2]).
 -export([handshake/3]).
+-export([handshake_continue/2]).
+-export([handshake_continue/3]).
+-export([handshake_cancel/1]).
 -export([connect/3]).
 -export([connect/4]).
 -export([recv/3]).
@@ -105,9 +109,25 @@ disallowed_listen_options() ->
 accept(LSocket, Timeout) ->
 	gen_tcp:accept(LSocket, Timeout).
 
+-spec handshake(inet:socket(), timeout()) -> {ok, inet:socket()}.
+handshake(CSocket, Timeout) ->
+	handshake(CSocket, [], Timeout).
+
 -spec handshake(inet:socket(), opts(), timeout()) -> {ok, inet:socket()}.
 handshake(CSocket, _, _) ->
 	{ok, CSocket}.
+
+-spec handshake_continue(inet:socket(), timeout()) -> no_return().
+handshake_continue(CSocket, Timeout) ->
+	handshake_continue(CSocket, [], Timeout).
+
+-spec handshake_continue(inet:socket(), opts(), timeout()) -> no_return().
+handshake_continue(_, _, _) ->
+	error(not_supported).
+
+-spec handshake_cancel(inet:socket()) -> no_return().
+handshake_cancel(_) ->
+	error(not_supported).
 
 %% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),

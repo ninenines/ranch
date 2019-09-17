@@ -80,9 +80,17 @@ Get one or more statistic options for the socket.
 [source,erlang]
 ----
 handshake(Socket0  :: socket(),
-          SockOpts :: any(),
           Timeout  :: timeout())
-    -> {ok, Socket}
+    -> {ok, Socket :: socket()}
+     | {ok, Socket :: socket(), Info :: any()}
+     | {error, any()}
+
+handshake(Socket0  :: socket(),
+          SockOpts :: opts(),
+          Timeout  :: timeout())
+    -> {ok, Socket :: socket()}
+     | {ok, Socket :: socket(), Info :: any()}
+     | {error, any()}
 ----
 
 Perform the transport-level handshake.
@@ -92,10 +100,50 @@ before performing any socket operation. It allows
 transports that require extra initialization to perform
 their task and return a socket that is ready to use.
 
+If the handshake is completed by this call, the function will
+return `{ok, Socket}`. However, some transports (notably,
+`ranch_ssl` if `{handshake, hello}` is specified in the socket
+options) may pause the handshake at a certain point and return
+`{ok, Socket, Info}` instead, in order to allow for
+additional decisions to be made before resuming the handshake
+with `handshake_continue/3` or cancelling it with
+`handshake_cancel/1`.
+
 This function may also be used to upgrade a connection
 from a transport to another depending on the capabilities
 of the transports. For example a `ranch_tcp` socket may
 be upgraded to a `ranch_ssl` one using this function.
+
+=== handshake_continue
+
+[source,erlang]
+----
+handshake_continue(Socket0  :: socket(),
+                   Timeout  :: timeout())
+    -> {ok, Socket :: socket()}
+     | {error, any()}
+
+handshake_continue(Socket0  :: socket(),
+                   SockOpts :: opts(),
+                   Timeout  :: timeout())
+    -> {ok, Socket :: socket()}
+     | {error, any()}
+----
+
+Resume the paused transport-level handshake and return a socket
+that is ready to use.
+
+This function will be called by connection processes
+to resume a paused handshake.
+
+=== handshake_cancel
+
+[source,erlang]
+----
+handshake_cancel(Socket :: socket()) -> ok
+----
+
+Cancel the paused transport-level handshake.
 
 === listen
 

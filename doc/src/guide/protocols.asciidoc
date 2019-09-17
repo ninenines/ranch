@@ -6,7 +6,7 @@ protocol logic executed in this process.
 === Writing a protocol handler
 
 All protocol handlers must implement the `ranch_protocol` behavior
-which defines a single callback, `start_link/4`. This callback is
+which defines a single callback, `start_link/3`. This callback is
 responsible for spawning a new process for handling the connection.
 It receives four arguments: the name of the listener, the socket, the
 transport handler being used and the protocol options defined in

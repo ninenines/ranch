@@ -26,6 +26,8 @@ Suspend/resume:
 Connections:
 
 * link:man:ranch:handshake(3)[ranch:handshake(3)] - Perform the transport handshake
+* link:man:ranch:handshake_continue(3)[ranch:handshake_continue(3)] - Resume the paused transport handshake
+* link:man:ranch:handshake_cancel(3)[ranch:handshake_cancel(3)] - Cancel the paused transport handshake
 * link:man:ranch:recv_proxy_header(3)[ranch:recv_proxy_header(3)] - Receive the PROXY protocol header
 * link:man:ranch:remove_connection(3)[ranch:remove_connection(3)] - Remove connection from the count
 

@@ -8,12 +8,13 @@ ranch:handshake - Perform the transport handshake
 
 [source,erlang]
 ----
-handshake(Ref)       -> handshake(Ref, [])
-handshake(Ref, Opts) -> {ok, Socket}
+handshake(Ref)       -> {ok, Socket} | {continue, Info}
+handshake(Ref, Opts) -> {ok, Socket} | {continue, Info}
 
 Ref    :: ranch:ref()
 Opts   :: any()
 Socket :: any()
+Info   :: any()
 ----
 
 Perform the transport handshake.
@@ -38,12 +39,23 @@ Allowed options depend on the transport module.
 
 == Return value
 
-An `ok` tuple is returned containing the socket for the connection.
+An `ok` tuple is returned containing the socket for the connection
+by default.
+
+Depending on configuration, a `continue` tuple can otherwise
+be returned when the handshake operation is paused. It contains
+data provided by the transport that can be used to inform further
+decisions before resuming the handshake, for example to provide
+new transport options. The handshake can be resumed using
+link:man:ranch:handshake_continue(3)[ranch:handshake_continue(3)]
+or canceled using
+link:man:ranch:handshake_cancel(3)[ranch:handshake_cancel(3)].
 
 This function will trigger an exception when an error occurs.
 
 == Changelog
 
+* *2.0*: The `continue` tuple can now be returned.
 * *1.6*: Function introduced. Replaces `ranch:accept_ack/1`.
 
 == Examples
@@ -51,7 +63,7 @@ This function will trigger an exception when an error occurs.
 .Initialize the connection process
 [source,erlang]
 ----
-start_link(Ref, _, Transport, Opts) ->
+start_link(Ref, Transport, Opts) ->
     Pid = proc_lib:spawn_link(?MODULE, init,
         [Ref, Transport, Opts]),
     {ok, Pid}.
@@ -65,6 +77,8 @@ init(Ref, Transport, Opts) ->
 == See also
 
 link:man:ranch:start_listener(3)[ranch:start_listener(3)],
+link:man:ranch:handshake_continue(3)[ranch:handshake_continue(3)],
+link:man:ranch:handshake_cancel(3)[ranch:handshake_cancel(3)],
 link:man:ranch:recv_proxy_header(3)[ranch:recv_proxy_header(3)],
 link:man:ranch:remove_connection(3)[ranch:remove_connection(3)],
 link:man:ranch(3)[ranch(3)]

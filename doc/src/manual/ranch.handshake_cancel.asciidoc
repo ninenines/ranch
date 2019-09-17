@@ -1,0 +1,55 @@
+= ranch:handshake_cancel(3)
+
+== Name
+
+ranch:handshake_cancel - Cancel the paused transport handshake
+
+== Description
+
+[source,erlang]
+----
+handshake_cancel(Ref :: ranch:ref()) -> ok
+----
+
+Cancel the paused transport handshake.
+
+This function may be called by the protocol process
+to cancel a paused handshake.
+
+== Arguments
+
+Ref::
+
+The listener name.
++
+Allowed options depend on the transport module.
+
+== Return value
+
+The return value depends on the transport module.
+
+== Changelog
+
+* *2.0*: Function introduced.
+
+== Examples
+
+.Cancel a paused transport handshake
+[source,erlang]
+----
+start_link(Ref, Transport, Opts) ->
+    Pid = proc_lib:spawn_link(?MODULE, init,
+        [Ref, Transport, Opts]),
+    {ok, Pid}.
+
+init(Ref, Transport, Opts) ->
+    {continue, _Info} = ranch:handshake(Ref),
+    ranch:handshake_cancel(Ref),
+    exit(handshake_cancelled).
+----
+
+== See also
+
+link:man:ranch:handshake(3)[ranch:handshake(3)],
+link:man:ranch:handshake_continue(3)[ranch:handshake_continue(3)],
+link:man:ranch(3)[ranch(3)]
