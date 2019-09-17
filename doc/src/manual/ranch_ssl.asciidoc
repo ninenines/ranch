@@ -54,6 +54,7 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {dhfile, file:filename()}
           | {eccs, [atom()]}
           | {fail_if_no_peer_cert, boolean()}
+          | {handshake, hello | full}
           | {hibernate_after, timeout()}
           | {honor_cipher_order, boolean()}
           | {honor_ecc_order, boolean()}
@@ -155,6 +156,15 @@ fail_if_no_peer_cert (false)::
 
 Whether to refuse the connection if the client sends an
 empty certificate.
+
+handshake (full)::
+
+If `hello` is specified for this option, the handshake is
+paused after receiving the client hello message. The handshake
+can then be resumed via `handshake_continue/3`, or cancelled
+via `handshake_cancel/1`.
++
+This option cannot be given to `ranch:handshake/1,2`.
 
 hibernate_after (undefined)::
 

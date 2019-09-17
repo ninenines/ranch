@@ -56,6 +56,7 @@ groups() ->
 		ssl_echo,
 		ssl_local_echo,
 		ssl_graceful,
+		ssl_handshake,
 		ssl_sni_echo,
 		ssl_sni_fail,
 		ssl_upgrade_from_tcp,
@@ -528,6 +529,35 @@ ssl_echo(_) ->
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_handshake(_) ->
+	doc("Ensure that multi-step handshake works with SSL transport."),
+	Name = name(),
+	{CaCert1, Cert1, Key1} = ct_helper:make_certs(),
+	{CaCert2, Cert2, Key2} = ct_helper:make_certs(),
+	Opts1 = [{cert, Cert1}, {key, Key1}, {cacerts, [CaCert1]}, {verify, verify_peer}],
+	Opts2 = [{cert, Cert2}, {key, Key2}, {cacerts, [CaCert2]}, {verify, verify_peer}],
+	DefaultOpts = ct_helper:get_certs_from_ets(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, [{handshake, hello}|DefaultOpts],
+		handshake_protocol, #{"ranch1" => Opts1, "ranch2" => Opts2}),
+	Port = ranch:get_port(Name),
+	{ok, Socket1} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw},
+		{server_name_indication, "ranch1"}], 5000),
+	{ok, Cert1} = ssl:peercert(Socket1),
+	ok = ssl:send(Socket1, <<"SSL Ranch is working!">>),
+	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket1, 21, 1000),
+	{ok, Socket2} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw},
+		{server_name_indication, "ranch2"}], 5000),
+	{ok, Cert2} = ssl:peercert(Socket2),
+	ok = ssl:send(Socket2, <<"SSL Ranch is working!">>),
+	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket2, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket1, 0, 1000),
+	{error, closed} = ssl:recv(Socket2, 0, 1000),
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.

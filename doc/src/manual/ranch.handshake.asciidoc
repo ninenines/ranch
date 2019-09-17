@@ -8,12 +8,13 @@ ranch:handshake - Perform the transport handshake
 
 [source,erlang]
 ----
-handshake(Ref)       -> handshake(Ref, [])
-handshake(Ref, Opts) -> {ok, Socket}
+handshake(Ref)       -> {ok, Socket} | {continue, Info}
+handshake(Ref, Opts) -> {ok, Socket} | {continue, Info}
 
 Ref    :: ranch:ref()
 Opts   :: any()
 Socket :: any()
+Info   :: any()
 ----
 
 Perform the transport handshake.
@@ -38,7 +39,14 @@ Allowed options depend on the transport module.
 
 == Return value
 
-An `ok` tuple is returned containing the socket for the connection.
+An `ok` tuple is returned containing the socket for the connection
+if the handshake operation is completed by this call.
+
+A `continue` tuple is returned containing extra information
+provided by the transport if the the handshake operation was paused,
+allowing for additional decisions to be made. The handshake can then
+be resumed with `handshake_continue/1,2`, or cancelled with
+`handshake_cancel/1`.
 
 This function will trigger an exception when an error occurs.
 
@@ -64,6 +72,8 @@ init(Ref, Transport, Opts) ->
 
 == See also
 
+link:man:ranch:handshake_continue(3)[ranch:handshake_continue(3)]
+link:man:ranch:handshake_cancel(3)[ranch:handshake_cancel(3)]
 link:man:ranch:start_listener(3)[ranch:start_listener(3)],
 link:man:ranch:recv_proxy_header(3)[ranch:recv_proxy_header(3)],
 link:man:ranch:remove_connection(3)[ranch:remove_connection(3)],

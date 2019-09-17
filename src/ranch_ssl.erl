@@ -21,7 +21,11 @@
 -export([listen/1]).
 -export([disallowed_listen_options/0]).
 -export([accept/2]).
+-export([handshake/2]).
 -export([handshake/3]).
+-export([handshake_continue/2]).
+-export([handshake_continue/3]).
+-export([handshake_cancel/1]).
 -export([connect/3]).
 -export([connect/4]).
 -export([recv/3]).
@@ -56,6 +60,7 @@
 	%% @todo Update when ssl exports named_curve().
 	| {eccs, [atom()]}
 	| {fail_if_no_peer_cert, boolean()}
+	| {handshake, hello | full}
 	| {hibernate_after, timeout()}
 	| {honor_cipher_order, boolean()}
 	| {honor_ecc_order, boolean()}
@@ -138,15 +143,41 @@ disallowed_listen_options() ->
 accept(LSocket, Timeout) ->
 	ssl:transport_accept(LSocket, Timeout).
 
+-spec handshake(inet:socket() | ssl:sslsocket(), timeout())
+	-> {ok, ssl:sslsocket()} | {ok, ssl:sslsocket(), ssl:protocol_extensions()} | {error, any()}.
+handshake(CSocket, Timeout) ->
+	handshake(CSocket, [], Timeout).
+
 -spec handshake(inet:socket() | ssl:sslsocket(), opts(), timeout())
-	-> {ok, ssl:sslsocket()} | {error, any()}.
+	-> {ok, ssl:sslsocket()} | {ok, ssl:sslsocket(), ssl:protocol_extensions()} | {error, any()}.
 handshake(CSocket, Opts, Timeout) ->
 	case ssl:handshake(CSocket, Opts, Timeout) of
-		{ok, NewSocket} ->
-			{ok, NewSocket};
+		OK = {ok, _} ->
+			OK;
+		OK = {ok, _, _} ->
+			OK;
 		Error = {error, _} ->
 			Error
 	end.
+
+-spec handshake_continue(ssl:sslsocket(), timeout())
+	-> {ok, ssl:sslsocket()} | {error, any()}.
+handshake_continue(CSocket, Timeout) ->
+	handshake_continue(CSocket, [], Timeout).
+
+-spec handshake_continue(ssl:sslsocket(), [ssl:tls_server_option()], timeout())
+	-> {ok, ssl:sslsocket()} | {error, any()}.
+handshake_continue(CSocket, Opts, Timeout) ->
+	case ssl:handshake_continue(CSocket, Opts, Timeout) of
+		OK = {ok, _} ->
+			OK;
+		Error = {error, _} ->
+			Error
+	end.
+
+-spec handshake_cancel(ssl:sslsocket()) -> any().
+handshake_cancel(CSocket) ->
+	ssl:handshake_cancel(CSocket).
 
 %% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),

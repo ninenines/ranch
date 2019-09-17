@@ -1,0 +1,67 @@
+= ranch:handshake_continue(3)
+
+== Name
+
+ranch:handshake_continue - Resume the paused transport handshake
+
+== Description
+
+[source,erlang]
+----
+handshake_continue(Ref)       -> {ok, Socket}
+handshake_continue(Ref, Opts) -> {ok, Socket}
+
+Ref    :: ranch:ref()
+Opts   :: any()
+Socket :: any()
+----
+
+Resume the paused transport handshake.
+
+This function must be called by the protocol process in order
+to resume a paused handshake.
+
+== Arguments
+
+Ref::
+
+The listener name.
+
+Opts::
+
+Transport handshake options.
++
+Allowed options depend on the transport module.
+
+== Return value
+
+An `ok` tuple is returned containing the socket for the connection.
+
+This function will trigger an exception when an error occurs.
+
+== Changelog
+
+* *2.0*: Function introduced.
+
+== Examples
+
+.Perform a handshake in multiple steps
+[source,erlang]
+----
+start_link(Ref, _, Transport, Opts) ->
+    Pid = proc_lib:spawn_link(?MODULE, init,
+        [Ref, Transport, Opts]),
+    {ok, Pid}.
+
+init(Ref, Transport, Opts) ->
+    {continue, _Info} = ranch:handshake(Ref),
+    {ok, Socket} = ranch:handshake_continue(Ref),
+    loop(#state{ref=Ref, socket=Socket,
+        transport=Transport, opts=Opts}).
+----
+
+== See also
+
+link:man:ranch:handshake(3)[ranch:handshake(3)]
+link:man:ranch:handshake_cancel(3)[ranch:handshake_cancel(3)]
+link:man:ranch(3)[ranch(3)]
