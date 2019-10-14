@@ -128,7 +128,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 					To ! self(),
 					ranch:log(error,
 						"Ranch listener ~p connection process start failure; "
-						"~p:start_link/4 returned: ~999999p~n",
+						"~p:start_link/3 returned: ~999999p~n",
 						[Ref, Protocol, Ret], Logger),
 					Transport:close(Socket),
 					loop(State, CurConns, NbChildren, Sleepers)
@@ -136,7 +136,7 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 				To ! self(),
 				ranch:log(error,
 					"Ranch listener ~p connection process start failure; "
-					"~p:start_link/4 crashed with reason: ~p:~999999p~n",
+					"~p:start_link/3 crashed with reason: ~p:~999999p~n",
 					[Ref, Protocol, Class, Reason], Logger),
 				Transport:close(Socket),
 				loop(State, CurConns, NbChildren, Sleepers)
@@ -348,5 +348,5 @@ report_error(_, _, _, _, {shutdown, _}) ->
 report_error(Logger, Ref, Protocol, Pid, Reason) ->
 	ranch:log(error,
 		"Ranch listener ~p had connection process started with "
-		"~p:start_link/4 at ~p exit with reason: ~999999p~n",
+		"~p:start_link/3 at ~p exit with reason: ~999999p~n",
 		[Ref, Protocol, Pid, Reason], Logger).
