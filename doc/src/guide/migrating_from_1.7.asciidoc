@@ -42,6 +42,11 @@ for Erlang/OTP 19 and 20 has been removed.
   is now to just start Ranch normally when using embedded
   listeners.
 
+* Two steps handshake is now supported. This allows
+  obtaining TLS extensions and updating options before
+  resuming the handshake. The handshake can also be
+  canceled.
+
 === Experimental features added
 
 * The experimental `num_listen_sockets` option has been
@@ -70,6 +75,13 @@ for Erlang/OTP 19 and 20 has been removed.
 
 * The `Socket` argument was removed from `Protocol:start_link/3`.
   The socket must now be obtained by calling `ranch:handshake/1,2`.
+
+=== Added functions
+
+* The functions `ranch:handshake_continue/1,2` and
+  `ranch:handshake_cancel/1` can be used to perform
+  a two steps handshake. These functions may not be
+  supported by all transports.
 
 === Changed functions
 
@@ -100,6 +112,9 @@ for Erlang/OTP 19 and 20 has been removed.
   of `ranch:handshake/1,2`.
 
 === Bugs fixed
+
+* Calling `ranch:remove_connection/1` will now resume a sleeping
+  acceptor process when applicable.
 
 * Repeatedly calling `ranch:remove_connection/1` from a connection
   process would crash the respective connection supervisor. This has
