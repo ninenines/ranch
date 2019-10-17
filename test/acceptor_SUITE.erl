@@ -319,7 +319,7 @@ misc_set_transport_options(_) ->
 		num_acceptors => 2, shutdown => 1001, socket_opts => [{send_timeout, 5002}]}),
 	ConnsSups = [ConnsSup || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
 	_ = [begin
-		{State, _, _, _} = sys:get_state(ConnsSup),
+		{State, _, _, _, _} = sys:get_state(ConnsSup),
 		20 = element(10, State),
 		5001 = element(9, State),
 		1001 = element(5, State)
