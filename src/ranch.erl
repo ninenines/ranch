@@ -363,8 +363,18 @@ info() ->
 
 -spec info(ref()) -> #{atom() := term()}.
 info(Ref) ->
-	Pid = ranch_server:get_listener_sup(Ref),
-	listener_info(Ref, Pid).
+	try [{Ref, Info}
+		|| {Ref, {ok, Info}} <- [{Ref, safe_listener_info(Ref, Pid)}
+			|| {Ref, Pid} <- ranch_server:get_listener_sups()]]
+	catch _:_ -> []
+	end.
+
+%% Safe wrapper for listener_info/2.
+%% That function crashes if the process it's working with has died. 
+safe_listener_info(Ref, Pid) ->
+	try {ok, listener_info(Ref, Pid)}
+	catch Class:Reason -> {error, Class, Reason}
+	end.
 
 listener_info(Ref, Pid) ->
 	[_, Transport, _, Protocol, _] = ranch_server:get_listener_start_args(Ref),
