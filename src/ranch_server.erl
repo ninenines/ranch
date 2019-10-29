@@ -118,7 +118,10 @@ get_listener_sup(Ref) ->
 
 -spec get_listener_sups() -> [{ranch:ref(), pid()}].
 get_listener_sups() ->
-	[{Ref, Pid} || [Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})].
+	ets:safe_fixtable(?TAB, true),
+	Result = [{Ref, Pid} || [Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})],
+	ets:safe_fixtable(?TAB, false),
+	Result.
 
 -spec set_addr(ranch:ref(), {inet:ip_address(), inet:port_number()} |
 	{local, binary()} | {undefined, undefined}) -> ok.
