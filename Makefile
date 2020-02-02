@@ -69,6 +69,8 @@ prepare_tag:
 	$(verbose) grep -m1 PROJECT_VERSION Makefile
 	$(verbose) echo -n "APP:                 "
 	$(verbose) grep -m1 vsn ebin/$(PROJECT).app | sed 's/	//g'
+	$(verbose) echo -n "APPUP:               "
+	$(verbose) grep -m1 {\" ebin/$(PROJECT).appup
 	$(verbose) echo
 	$(verbose) echo "Links in the README:"
 	$(verbose) grep http.*:// README.asciidoc

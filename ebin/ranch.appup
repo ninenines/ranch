@@ -1,0 +1,43 @@
+%% @todo Remove the ending .* before release, we do not
+%% want to support upgrades from/to release candidates.
+
+{"2.0.0-rc.2",
+	[{<<"2\\.0\\.[0-9]+.*">>, [
+		{load_module, ranch},
+		{load_module, ranch_acceptor},
+		{load_module, ranch_acceptors_sup},
+		{load_module, ranch_app},
+		{load_module, ranch_conns_sup},
+		{load_module, ranch_conns_sup_sup},
+		{load_module, ranch_crc32c},
+		{load_module, ranch_embedded_sup},
+		{load_module, ranch_listener_sup},
+		{load_module, ranch_protocol},
+		{load_module, ranch_proxy_header},
+		{load_module, ranch_server},
+		{load_module, ranch_server_proxy},
+		{load_module, ranch_ssl},
+		{load_module, ranch_sup},
+		{load_module, ranch_tcp},
+		{load_module, ranch_transport}
+	]}],
+	[{<<"2\\.0\\.[0-9]+.*">>, [
+		{load_module, ranch},
+		{load_module, ranch_acceptor},
+		{load_module, ranch_acceptors_sup},
+		{load_module, ranch_app},
+		{load_module, ranch_conns_sup},
+		{load_module, ranch_conns_sup_sup},
+		{load_module, ranch_crc32c},
+		{load_module, ranch_embedded_sup},
+		{load_module, ranch_listener_sup},
+		{load_module, ranch_protocol},
+		{load_module, ranch_proxy_header},
+		{load_module, ranch_server},
+		{load_module, ranch_server_proxy},
+		{load_module, ranch_ssl},
+		{load_module, ranch_sup},
+		{load_module, ranch_tcp},
+		{load_module, ranch_transport}
+	]}]
+}.

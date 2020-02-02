@@ -14,7 +14,7 @@
 -export([terminate/3]).
 -export([code_change/4]).
 
--define(TIMEOUT, 5000).
+-define(TIMEOUT, 30000).
 
 -record(state, {socket, transport}).
 
