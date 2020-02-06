@@ -111,11 +111,14 @@ do_build_relup(Example, CommitOrTag) ->
 	%% We need Ranch to be fetched first in order to copy the current appup
 	%% and optionally update its version when we are not on a tag.
 	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " deps")]),
-	ct:log("~s~n", [os:cmd("cp " ++ Dir ++ "/../../ebin/ranch.appup "
-		++ Dir ++ "/deps/ranch/ebin/")]),
+	ct:log("~s~n", [os:cmd("cp " ++ Dir ++ "/../../src/ranch.appup "
+		++ Dir ++ "/deps/ranch/src/")]),
 	case CommitOrTag of
 		tag -> ok;
 		commit ->
+			%% Force the rebuild of Ranch.
+			ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ "/deps/ranch clean")]),
+			%% Update the Ranch version so that the upgrade can be applied.
 			ProjectVersion = os:cmd("grep \"PROJECT_VERSION = \" " ++ Dir ++ "/deps/ranch/Makefile"),
 			ct:log(ProjectVersion),
 			["PROJECT_VERSION = " ++ Vsn0|_] = string:lexemes(ProjectVersion, "\n"),
@@ -129,7 +132,7 @@ do_build_relup(Example, CommitOrTag) ->
 			%% The version in the appup must be the same as PROJECT_VERSION.
 			ct:log("~s~n", [os:cmd(
 				"sed -i.bak s/\"" ++ Vsn0 ++ "\"/\"" ++ Vsn ++ "\"/ "
-					++ Dir ++ "/deps/ranch/ebin/ranch.appup"
+					++ Dir ++ "/deps/ranch/src/ranch.appup"
 			)])
 	end,
 	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " relup")]).
