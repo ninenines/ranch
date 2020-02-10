@@ -60,13 +60,20 @@ do_get_paths(Example0) ->
 	Log = Dir ++ "/_rel/" ++ Example ++ "_example/log/erlang.log.1",
 	{Dir, Rel, Log}.
 
-do_compile_and_start(Example, Config) ->
+do_compile_and_start(Example) ->
 	Make = do_find_make_cmd(),
 	{Dir, Rel, _} = do_get_paths(Example),
 	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " distclean")]),
 	%% TERM=dumb disables relx coloring.
 	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " TERM=dumb")]),
-	%% @todo Should move the "1" tarball in the correct directory to avoid a warning on downgrade?
+	%% For some reason the release has ExampleStr.boot
+	%% while the downgrade expects start.boot?
+	ExampleStr = atom_to_list(Example),
+	ct:log("~s~n", [os:cmd("cp "
+		++ Dir ++ "/_rel/" ++ ExampleStr
+			++ "_example/releases/1/" ++ ExampleStr ++ "_example.boot "
+		++ Dir ++ "/_rel/" ++ ExampleStr
+			++ "_example/releases/1/start.boot")]),
 	ct:log("~s~n", [os:cmd(Rel ++ " stop")]),
 	ct:log("~s~n", [os:cmd(Rel ++ " start")]),
 	timer:sleep(2000),
@@ -156,13 +163,13 @@ do_downgrade(Example) ->
 
 %% Tests.
 
-upgrade_ranch_one_conn(Config) ->
+upgrade_ranch_one_conn(_) ->
 	Example = tcp_echo,
 	Port = 5555,
 	try
 		%% Build and start the example release using the previous Ranch version.
 		CommitOrTag = do_use_ranch_previous(Example),
-		do_compile_and_start(Example, Config),
+		do_compile_and_start(Example),
 		%% Establish a connection and check that it works.
 		{ok, S} = gen_tcp:connect("localhost", Port, [{active, false}, binary]),
 		ok = gen_tcp:send(S, "Hello!"),
