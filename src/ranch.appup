@@ -3,6 +3,7 @@
 
 {"2.0.0-rc.2",
 	[{<<"2\\.0\\.[0-9]+.*">>, [
+		{apply, {ranch, stop_all_acceptors, []}},
 		{load_module, ranch},
 		{load_module, ranch_acceptor},
 		{update, ranch_acceptors_sup, supervisor},
@@ -19,9 +20,11 @@
 		{load_module, ranch_ssl},
 		{update, ranch_sup, supervisor},
 		{load_module, ranch_tcp},
-		{load_module, ranch_transport}
+		{load_module, ranch_transport},
+		{apply, {ranch, restart_all_acceptors, []}}
 	]}],
 	[{<<"2\\.0\\.[0-9]+.*">>, [
+		{apply, {ranch, stop_all_acceptors, []}},
 		{load_module, ranch},
 		{load_module, ranch_acceptor},
 		{update, ranch_acceptors_sup, supervisor},
@@ -38,6 +41,7 @@
 		{load_module, ranch_ssl},
 		{update, ranch_sup, supervisor},
 		{load_module, ranch_tcp},
-		{load_module, ranch_transport}
+		{load_module, ranch_transport},
+		{apply, {ranch, restart_all_acceptors, []}}
 	]}]
 }.

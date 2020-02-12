@@ -19,6 +19,8 @@
 -export([stop_listener/1]).
 -export([suspend_listener/1]).
 -export([resume_listener/1]).
+-export([stop_all_acceptors/0]).
+-export([restart_all_acceptors/0]).
 -export([child_spec/5]).
 -export([handshake/1]).
 -export([handshake/2]).
@@ -191,6 +193,31 @@ maybe_resumed({ok, _, _}) ->
 	ok;
 maybe_resumed(Res) ->
 	Res.
+
+-spec stop_all_acceptors() -> ok.
+stop_all_acceptors() ->
+	_ = [ok = do_acceptors(Pid, terminate_child)
+		|| {_, Pid} <- ranch_server:get_listener_sups()],
+	ok.
+
+-spec restart_all_acceptors() -> ok.
+restart_all_acceptors() ->
+	_ = [ok = do_acceptors(Pid, restart_child)
+		|| {_, Pid} <- ranch_server:get_listener_sups()],
+	ok.
+
+do_acceptors(ListenerSup, F) ->
+	ListenerChildren = supervisor:which_children(ListenerSup),
+	case lists:keyfind(ranch_acceptors_sup, 1, ListenerChildren) of
+		{_, AcceptorsSup, _, _} when is_pid(AcceptorsSup) ->
+			AcceptorChildren = supervisor:which_children(AcceptorsSup),
+			%% @todo What about errors?
+			_ = [supervisor:F(AcceptorsSup, AcceptorId)
+				|| {AcceptorId, _, _, _} <- AcceptorChildren],
+			ok;
+		{_, Atom, _, _} ->
+			{error, Atom}
+	end.
 
 -spec child_spec(ref(), module(), opts(), module(), any())
 	-> supervisor:child_spec().
