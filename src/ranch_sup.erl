@@ -32,8 +32,6 @@ init([]) ->
 		{ok, Value2} -> Value2;
 		undefined -> 5
 	end,
-	ranch_server = ets:new(ranch_server, [
-		ordered_set, public, named_table]),
 	Procs = [
 		#{id => ranch_server, start => {ranch_server, start_link, []}}
 	],
