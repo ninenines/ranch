@@ -28,7 +28,14 @@ init([Ref, Transport, Logger]) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
-	LSockets = start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts, Logger),
+	LSockets = case get(lsockets) of
+		undefined ->
+			LSockets1 = start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts, Logger),
+			put(lsockets, LSockets1),
+			LSockets1;
+		LSockets1 ->
+			LSockets1
+	end,
 	Procs = [begin
 		LSocketId = (AcceptorId rem NumListenSockets) + 1,
 		{_, LSocket} = lists:keyfind(LSocketId, 1, LSockets),
