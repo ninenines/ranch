@@ -164,6 +164,14 @@ do_downgrade(Example) ->
 %% Tests.
 
 upgrade_ranch_one_conn(_) ->
+	case os:type() of
+		{win32, nt} ->
+			{skip, "This test suite is not currently supported on Windows."};
+		_ ->
+			do_upgrade_ranch_one_conn()
+	end.
+
+do_upgrade_ranch_one_conn() ->
 	Example = tcp_echo,
 	Port = 5555,
 	try
