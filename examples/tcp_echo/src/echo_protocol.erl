@@ -15,7 +15,7 @@ init(Ref, Transport, _Opts = []) ->
 	loop(Socket, Transport).
 
 loop(Socket, Transport) ->
-	case Transport:recv(Socket, 0, 30000) of
+	case Transport:recv(Socket, 0, 60000) of
 		{ok, Data} when Data =/= <<4>> ->
 			Transport:send(Socket, Data),
 			loop(Socket, Transport);
