@@ -2,7 +2,7 @@
 
 PROJECT = ranch
 PROJECT_DESCRIPTION = Socket acceptor pool for TCP protocols.
-PROJECT_VERSION = 2.0.0-rc.2
+PROJECT_VERSION = 2.0.0-rc.3
 PROJECT_REGISTERED = ranch_server
 
 # Options.
@@ -70,7 +70,7 @@ prepare_tag:
 	$(verbose) echo -n "APP:                 "
 	$(verbose) grep -m1 vsn ebin/$(PROJECT).app | sed 's/	//g'
 	$(verbose) echo -n "APPUP:               "
-	$(verbose) grep -m1 {\" ebin/$(PROJECT).appup
+	$(verbose) grep -m1 {\" src/$(PROJECT).appup
 	$(verbose) echo
 	$(verbose) echo "Links in the README:"
 	$(verbose) grep http.*:// README.asciidoc
