@@ -10,6 +10,11 @@ matter to you. Generic benchmarks found on the web may or may not
 be of use to you, you can never know until you benchmark your own
 system.
 
+A third party dive into the internals of Ranch is available should
+you be interested: https://baozi.technology/ranch-under-the-hood/[Ranch: what's under the hood?]
+We make no claims with regard to its freshness or accuracy but this
+is a nice document to read along this section.
+
 === Architecture
 
 Ranch is an OTP application.
