@@ -12,7 +12,7 @@
 %% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
--module(havoc_SUITE).
+-module(stampede_SUITE).
 -compile(export_all).
 -compile(nowarn_export_all).
 
@@ -26,21 +26,23 @@ all() ->
 
 init_per_suite(Config) ->
 	{ok, _} = application:ensure_all_started(ranch),
-	ok = application:start(havoc),
+	ok = application:start(stampede),
 	%% Enable logging of progress reports.
 	%% They will only be available in the HTML reports by default.
-	ok = logger:set_primary_config(level, info),
+	ok = logger:set_primary_config(level, none),
+	ok = logger:set_module_level(?MODULE, info),
+	ok = logger:set_application_level(stampede, error),
 	Config.
 
 end_per_suite(_) ->
-	ok = application:stop(havoc),
+	ok = application:stop(stampede),
 	ok = application:stop(ranch).
 
 %% Tests.
 
-havoc_tcp(_) ->
+stampede_tcp(_) ->
 	doc("Start a TCP listener, establish a hundred connections, "
-		"run havoc, confirm we can still connect."),
+		"run stampede, confirm we can still connect."),
 	%% Start a TCP listener.
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name,
@@ -50,19 +52,20 @@ havoc_tcp(_) ->
 	ok = do_connect(100, ranch_tcp, ranch:get_port(Name), 1000),
 	%% Set restart frequency of ranch_sup.
 	do_set_sup_frequencies([ranch_sup], 999999, 1),
-	%% Run Havoc.
-	havoc:on([{avg_wait, 100}, {deviation, 0}, {applications, [ranch]},
-		{supervisors, [ranch_sup]}, supervisor, {prekill_callback, fun do_log/1}]),
+	%% Run stampede.
+	{ok, _} = stampede:start_herd(ranch_stampede, {application, ranch},
+		#{interval => {100, 100}, before_kill => fun do_log/1}),
+	ok = stampede:activate(ranch_stampede),
 	timer:sleep(10000),
-	havoc:off(),
+	ok = stampede:stop_herd(ranch_stampede),
 	timer:sleep(1000),
 	%% Confirm we can still connect.
 	ok = do_connect(1, ranch_tcp, ranch:get_port(Name), 1000),
 	ok = ranch:stop_listener(Name).
 
-havoc_ssl(_) ->
+stampede_ssl(_) ->
 	doc("Start a SSL listener, establish a hundred connections, "
-		"run havoc, confirm we can still connect."),
+		"run stampede, confirm we can still connect."),
 	%% Start a TCP listener.
 	Name = name(),
 	{ok, _} = ranch:start_listener(Name,
@@ -72,19 +75,24 @@ havoc_ssl(_) ->
 	ok = do_connect(100, ranch_ssl, ranch:get_port(Name), 1000),
 	%% Set restart frequencies of ranch_sup and ssl_sup.
 	do_set_sup_frequencies([ranch_sup, ssl_sup], 999999, 1),
-	%% Run Havoc.
-	havoc:on([{avg_wait, 100}, {deviation, 0}, {applications, [ranch]}, {otp_applications, [ssl]},
-		{supervisors, [ssl_sup]}, supervisor, {prekill_callback, fun do_log/1}]),
+	%% Run stampede.
+	{ok, _} = stampede:start_herd(ranch_stampede, {application, ranch},
+		#{interval => {100, 100}, before_kill => fun do_log/1}),
+	{ok, _} = stampede:start_herd(ssl_stampede, {application, ssl},
+		#{interval => {100, 100}, before_kill => fun do_log/1}),
+	ok = stampede:activate(ranch_stampede),
+	ok = stampede:activate(ssl_stampede),
 	timer:sleep(10000),
-	havoc:off(),
+	ok = stampede:stop_herd(ssl_stampede),
+	ok = stampede:stop_herd(ranch_stampede),
 	timer:sleep(1000),
 	%% Confirm we can still connect.
 	ok = do_connect(1, ranch_ssl, ranch:get_port(Name), 1000),
 	ok = ranch:stop_listener(Name).
 
-havoc_embedded(_) ->
+stampede_embedded(_) ->
 	doc("Start an embedded TCP listener, establish a hundred connections, "
-		"run havoc, confirm we can still connect."),
+		"run stampede, confirm we can still connect."),
 	%% Start embedded listener.
 	Name = name(),
 	{ok, SupPid} = embedded_sup:start_link(),
@@ -94,11 +102,16 @@ havoc_embedded(_) ->
 	ok = do_connect(100, ranch_tcp, ranch:get_port(Name), 1000),
 	%% Set restart frequency of ranch_sup and embedded_sup.
 	do_set_sup_frequencies([ranch_sup, SupPid], 999999, 1),
-	%% Run havoc.
-	havoc:on([{avg_wait, 100}, {deviation, 0}, {applications, [ranch]},
-		{supervisors, [SupPid]}, supervisor, {prekill_callback, fun do_log/1}]),
+	%% Run stampede.
+	{ok, _} = stampede:start_herd(ranch_stampede, {application, ranch},
+		#{interval => {100, 100}, before_kill => fun do_log/1}),
+	{ok, _} = stampede:start_herd(embedded_stampede, {supervisor, SupPid},
+		#{interval => {100, 100}, before_kill => fun do_log/1}),
+	ok = stampede:activate(ranch_stampede),
+	ok = stampede:activate(embedded_stampede),
 	timer:sleep(10000),
-	havoc:off(),
+	ok = stampede:stop_herd(ranch_stampede),
+	ok = stampede:stop_herd(embedded_stampede),
 	timer:sleep(1000),
 	%% Confirm we can still connect.
 	ok = do_connect(1, ranch_tcp, ranch:get_port(Name), 1000),
@@ -118,6 +131,8 @@ do_connect(N, Transport, Port, Timeout) ->
 	do_connect(N - 1, Transport, Port, Timeout).
 
 do_log(Pid) when is_pid(Pid) ->
-	logger:info("~p~n", [erlang:process_info(Pid)]);
+	ct:log(info, "~p: ~p~n", [Pid, erlang:process_info(Pid)]),
+	true;
 do_log(Port) when is_port(Port) ->
-	logger:info("~p~n", [erlang:port_info(Port)]).
+	ct:log(info, "~p: ~p~n", [Port, erlang:port_info(Port)]),
+	true.

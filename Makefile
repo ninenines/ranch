@@ -16,9 +16,9 @@ LOCAL_DEPS = ssl
 
 DOC_DEPS = asciideck
 
-TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper havoc
+TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper stampede
 dep_ct_helper = git https://github.com/ninenines/ct_helper master
-dep_havoc = git https://github.com/ankhers/havoc master
+dep_stampede = git https://github.com/juhlig/stampede 0.5.0
 
 # CI configuration.
 
@@ -37,7 +37,7 @@ include erlang.mk
 # Don't run the havoc test suite by default.
 
 ifndef FULL
-CT_SUITES := $(filter-out havoc,$(CT_SUITES))
+CT_SUITES := $(filter-out stampede,$(CT_SUITES))
 endif
 
 # Compile options.
