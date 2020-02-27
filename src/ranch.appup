@@ -8,7 +8,9 @@
 		{load_module, ranch_acceptor},
 		{update, ranch_acceptors_sup, supervisor},
 		{load_module, ranch_app},
-		{update, ranch_conns_sup, supervisor},
+		%% "{advanced, []}" must be used for ranch_conns_sup,
+		%% see below.
+		{update, ranch_conns_sup, {advanced, []}},
 		{update, ranch_conns_sup_sup, supervisor},
 		{load_module, ranch_crc32c},
 		{update, ranch_embedded_sup, supervisor},
@@ -29,7 +31,15 @@
 		{load_module, ranch_acceptor},
 		{update, ranch_acceptors_sup, supervisor},
 		{load_module, ranch_app},
-		{update, ranch_conns_sup, supervisor},
+		%% ranch_conns_sup is a custom supervisor (special process),
+		%% not an OTP supervisor.
+		%% "{advanced, []}" must be used for the update to achieve the
+		%% desired order of update steps, namely calling system_code_change
+		%% on the old version of the module to revert changes made during
+		%% upgrade, and then loading the new version of the module. If we
+		%% were using "supervisor" instead, the new version would be loaded
+		%% first, and then system_code_change would be called on that one.
+		{update, ranch_conns_sup, {advanced, []}},
 		{update, ranch_conns_sup_sup, supervisor},
 		{load_module, ranch_crc32c},
 		{update, ranch_embedded_sup, supervisor},
