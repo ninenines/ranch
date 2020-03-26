@@ -601,7 +601,10 @@ ssl_sni_echo(_) ->
 		ranch_ssl, [{sni_hosts, [{"localhost", Opts}]}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	%% We stick to TLS 1.2 because there seems to be a bug in OTP-23.0rc2
+	%% that leads to a malformed_handshake_data error.
+	{ok, Socket} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),
@@ -618,7 +621,10 @@ ssl_sni_fail(_) ->
 		ranch_ssl, [{sni_hosts, [{"pouet", Opts}]}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{error, _} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	%% We stick to TLS 1.2 because there seems to be a bug in OTP-23.0rc2
+	%% that leads to a malformed_handshake_data error.
+	{error, _} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}, {versions, ['tlsv1.2']}]),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
