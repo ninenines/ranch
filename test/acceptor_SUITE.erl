@@ -76,7 +76,8 @@ groups() ->
 		misc_info_embedded,
 		misc_opts_logger,
 		misc_set_transport_options,
-		misc_wait_for_connections
+		misc_wait_for_connections,
+		misc_multiple_ips_in_listen_opts
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -403,6 +404,24 @@ do_expect_waiter(WaiterPid) ->
 					timeout
 			end
 	end.
+
+misc_multiple_ips_in_listen_opts(_) ->
+	case do_os_supports_local_sockets() of
+		true ->
+			do_misc_multiple_ips_in_listen_opts();
+		false ->
+			{skip, "No local socket support."}
+	end.
+
+do_misc_multiple_ips_in_listen_opts() ->
+	doc("Ensure that a listener uses the expected ip option if multiple are given."),
+	Name = name(),
+	SockFile1 = do_tempname(),
+	SockFile2 = do_tempname(),
+	Opts = [{ip, {local, SockFile1}}, {ip, {local, SockFile2}}],
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{socket_opts => Opts}, echo_protocol, []),
+	{local, SockFile2} = ranch:get_addr(Name),
+	ok = ranch:stop_listener(Name).
 
 %% ssl.
 
@@ -1586,4 +1605,4 @@ do_os_supports_local_sockets() ->
 	end.
 
 do_tempname() ->
-	lists:droplast(os:cmd("mktemp -u")).
+	list_to_binary(lists:droplast(os:cmd("mktemp -u"))).
