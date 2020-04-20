@@ -43,6 +43,7 @@
 -export([sockname/1]).
 -export([shutdown/2]).
 -export([close/1]).
+-export([cleanup/1]).
 
 -type opt() :: {backlog, non_neg_integer()}
 	| {buffer, non_neg_integer()}
@@ -86,21 +87,13 @@ messages() -> {tcp, tcp_closed, tcp_error, tcp_passive}.
 
 -spec listen(ranch:transport_opts(opts())) -> {ok, inet:socket()} | {error, atom()}.
 listen(TransOpts) ->
+	ok = cleanup(TransOpts),
 	Logger = maps:get(logger, TransOpts, logger),
 	SocketOpts0 = maps:get(socket_opts, TransOpts, []),
 	SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
 	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
 	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
 	SocketOpts4 = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
-	%% In case of a local socket, we remove the socket file first.
-	%% It is possible to have multiple ip tuples in the socket options,
-	%% and the last one will be used (undocumented).
-	_ = case lists:keyfind(ip, 1, lists:reverse(SocketOpts0)) of
-		{ip, {local, SockFile}} ->
-			file:delete(SockFile);
-		_ ->
-			ok
-	end,
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
@@ -271,3 +264,15 @@ shutdown(Socket, How) ->
 -spec close(inet:socket()) -> ok.
 close(Socket) ->
 	gen_tcp:close(Socket).
+
+-spec cleanup(ranch:transport_opts(opts())) -> ok.
+cleanup(#{socket_opts:=SocketOpts}) ->
+	case lists:keyfind(ip, 1, lists:reverse(SocketOpts)) of
+		{ip, {local, SockFile}} ->
+			_ = file:delete(SockFile),
+			ok;
+		_ ->
+			ok
+	end;
+cleanup(_) ->
+	ok.

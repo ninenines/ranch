@@ -66,6 +66,7 @@
 -callback shutdown(socket(), read | write | read_write)
 	-> ok | {error, atom()}.
 -callback close(socket()) -> ok.
+-callback cleanup(ranch:transport_opts(any())) -> ok.
 
 %% A fallback for transports that don't have a native sendfile implementation.
 %% Note that the ordering of arguments is different from file:sendfile/5 and

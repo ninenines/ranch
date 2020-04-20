@@ -77,7 +77,7 @@ groups() ->
 		misc_opts_logger,
 		misc_set_transport_options,
 		misc_wait_for_connections,
-		misc_multiple_ips_in_listen_opts
+		misc_multiple_ip_local_socket_opts
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -405,15 +405,15 @@ do_expect_waiter(WaiterPid) ->
 			end
 	end.
 
-misc_multiple_ips_in_listen_opts(_) ->
+misc_multiple_ip_local_socket_opts(_) ->
 	case do_os_supports_local_sockets() of
 		true ->
-			do_misc_multiple_ips_in_listen_opts();
+			do_misc_multiple_ip_local_socket_opts();
 		false ->
 			{skip, "No local socket support."}
 	end.
 
-do_misc_multiple_ips_in_listen_opts() ->
+do_misc_multiple_ip_local_socket_opts() ->
 	doc("Ensure that a listener uses the expected ip option if multiple are given."),
 	Name = name(),
 	SockFile1 = do_tempname(),
@@ -421,7 +421,14 @@ do_misc_multiple_ips_in_listen_opts() ->
 	Opts = [{ip, {local, SockFile1}}, {ip, {local, SockFile2}}],
 	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{socket_opts => Opts}, echo_protocol, []),
 	{local, SockFile2} = ranch:get_addr(Name),
-	ok = ranch:stop_listener(Name).
+	%% Make sure the socket file from the ignored ip option
+	%% has not been created.
+	{error, enoent} = file:read_file_info(SockFile1),
+	ok = ranch:stop_listener(Name),
+	%% Make sure the socket file from the accepted ip option
+	%% is removed.
+	{error, enoent} = file:read_file_info(SockFile2),
+	ok.
 
 %% ssl.
 
@@ -607,6 +614,8 @@ do_ssl_local_echo() ->
 		{error, closed} = ssl:recv(Socket, 0, 1000),
 		%% Make sure the listener stopped.
 		{'EXIT', _} = begin catch ranch:get_port(Name) end,
+		%% Make sure the socket file is removed.
+		{error, enoent} = file:read_file_info(SockFile),
 		ok
 	after
 		file:delete(SockFile)
@@ -900,6 +909,8 @@ do_tcp_local_echo() ->
 		{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 		%% Make sure the listener stopped.
 		{'EXIT', _} = begin catch ranch:get_port(Name) end,
+		%% Make sure the socket file is removed.
+		{error, enoent} = file:read_file_info(SockFile),
 		ok
 	after
 		file:delete(SockFile)
