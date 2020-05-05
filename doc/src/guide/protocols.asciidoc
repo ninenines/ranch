@@ -8,7 +8,7 @@ protocol logic executed in this process.
 All protocol handlers must implement the `ranch_protocol` behavior
 which defines a single callback, `start_link/3`. This callback is
 responsible for spawning a new process for handling the connection.
-It receives four arguments: the name of the listener, the socket, the
+It receives three arguments: the name of the listener, the
 transport handler being used and the protocol options defined in
 the call to `ranch:start_listener/5`. This callback must
 return `{ok, Pid}`, with `Pid` the pid of the new process.
