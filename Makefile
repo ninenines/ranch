@@ -20,6 +20,11 @@ TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper stampede
 dep_ct_helper = git https://github.com/ninenines/ct_helper master
 dep_stampede = git https://github.com/juhlig/stampede 0.5.0
 
+# Concuerror tests.
+
+# CONCUERROR_OPTS = -v 7 -k
+CONCUERROR_TESTS = ranch_concuerror:start_stop ranch_concuerror:info
+
 # CI configuration.
 
 dep_ci.erlang.mk = git https://github.com/ninenines/ci.erlang.mk master
