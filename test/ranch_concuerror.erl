@@ -27,9 +27,10 @@
 %% Convenience functions.
 
 do_start() ->
-	{ok, SupPid} = ranch_app:start(temporary, []),
+	{ok, SupPid} = ranch_app:start(normal, []),
 	SupPid.
 
+-spec do_stop(pid()) -> no_return().
 do_stop(SupPid) ->
 	exit(SupPid, shutdown),
 	%% We make sure that SupPid terminated before the test ends,
@@ -39,6 +40,7 @@ do_stop(SupPid) ->
 
 %% Tests.
 
+-spec start_stop() -> no_return().
 start_stop() ->
 	%% Start a listener then stop it.
 	SupPid = do_start(),
@@ -68,6 +70,7 @@ start_stop() ->
 %	ok = ranch:stop_listener(?FUNCTION_NAME),
 %	do_stop(SupPid).
 
+-spec info() -> no_return().
 info() ->
 	%% Ensure we can call ranch:info/1 after starting a listener.
 	SupPid = do_start(),

@@ -61,7 +61,7 @@ messages() -> {erlang, erlang_closed, erlang_error, erlang_passive}.
 listen(_TransOpts) ->
 	{ok, make_ref()}.
 
--spec accept(reference(), timeout()) -> {ok, reference()}.
+-spec accept(reference(), timeout()) -> no_return(). % {ok, reference()}.
 accept(_LSocket, _Timeout) ->
 	receive after infinity -> {ok, make_ref()} end.
 
