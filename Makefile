@@ -1,36 +1,20 @@
 # See LICENSE for licensing information.
 
 PROJECT = ranch
-PROJECT_DESCRIPTION = Socket acceptor pool for TCP protocols.
-PROJECT_VERSION = 2.0.0-rc.3
-PROJECT_REGISTERED = ranch_server
+PROJECT_DESCRIPTION = debug gen_tcp_socket.
+PROJECT_VERSION = 0.0.1
 
 # Options.
 
 CT_OPTS += -pa test -ct_hooks ranch_ct_hook [] # -boot start_sasl
 PLT_APPS = crypto public_key tools
 
-# Dependencies.
-
-LOCAL_DEPS = ssl
-
-DOC_DEPS = asciideck
-
-TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper stampede
-dep_ct_helper = git https://github.com/ninenines/ct_helper master
-dep_stampede = git https://github.com/juhlig/stampede 0.5.0
-
-# Concuerror tests.
-
-# CONCUERROR_OPTS = -v 7 -k
-CONCUERROR_TESTS = ranch_concuerror:start_stop ranch_concuerror:info
-
 # CI configuration.
 
 dep_ci.erlang.mk = git https://github.com/ninenines/ci.erlang.mk master
 DEP_EARLY_PLUGINS = ci.erlang.mk
 
-AUTO_CI_OTP ?= OTP-21+
+AUTO_CI_OTP ?= OTP-23+
 AUTO_CI_HIPE ?= OTP-LATEST
 # AUTO_CI_ERLLVM ?= OTP-LATEST
 AUTO_CI_WINDOWS ?= OTP-21+
@@ -39,20 +23,9 @@ AUTO_CI_WINDOWS ?= OTP-21+
 
 include erlang.mk
 
-# Don't run the havoc test suite by default.
-
-ifndef FULL
-CT_SUITES := $(filter-out stampede,$(CT_SUITES))
-endif
-
 # Compile options.
 
-ERLC_OPTS += +warn_missing_spec +warn_untyped_record
 TEST_ERLC_OPTS += +'{parse_transform, eunit_autoexport}'
-
-# Dialyze the tests.
-
-DIALYZER_OPTS += --src -r test
 
 # Use erl_make_certs from the tested release during CI
 # and ensure that ct_helper is always recompiled.
