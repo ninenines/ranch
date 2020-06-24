@@ -9,6 +9,9 @@ PROJECT_VERSION = 0.0.1
 CT_OPTS += -pa test -ct_hooks ranch_ct_hook [] # -boot start_sasl
 PLT_APPS = crypto public_key tools
 
+TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper
+dep_ct_helper = git https://github.com/ninenines/ct_helper master
+
 # CI configuration.
 
 dep_ci.erlang.mk = git https://github.com/ninenines/ci.erlang.mk master
