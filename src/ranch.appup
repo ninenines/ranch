@@ -9,10 +9,7 @@
 %% module then call system_code_change; and when downgrading,
 %% call system_code_change and then load the module.
 
-%% @todo Remove the ending .* before release, we do not
-%% want to support upgrades from/to release candidates.
-
-{"2.0.0-rc.3",
+{"2.0.0",
 	[{<<"2\\.0\\.[0-9]+.*">>, [
 		{apply, {ranch, stop_all_acceptors, []}},
 		{load_module, ranch},
