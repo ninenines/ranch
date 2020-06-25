@@ -8,9 +8,10 @@ all() ->
 	[socket_test].
 
 socket_test(_) ->
+	_ = process_flag(trap_exit, true),
 	{ok, S} = gen_tcp:listen(0, [{inet_backend, socket}, {packet, raw}, binary, {active, false}]),
 	{ok, {_, Port}} = inet:sockname(S),
-	spawn_link(
+	P = spawn_link(
 		fun () ->
 			{ok, C} = gen_tcp:connect("localhost", Port, [{packet, raw}, binary, {active, false}]),
 			ok = gen_tcp:send(C, <<"foo">>),
