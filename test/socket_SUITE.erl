@@ -13,17 +13,8 @@ socket_test(_) ->
 	{ok, {_, Port}} = inet:sockname(S),
 	spawn_link(
 		fun () ->
-			{ok, _} = gen_tcp:connect("localhost", Port, []),
-%			ok = gen_tcp:send(C, <<"foo">>),
-%			{ok, <<"bar">>} = gen_tcp:recv(C, 0, 1000),
-%			gen_tcp:close(C),
-			ok
+			{ok, _} = gen_tcp:connect("localhost", Port, [])
 		end
 	),
-	{ok, C} = gen_tcp:accept(S),
-%	{error, timeout} = gen_tcp:accept(S, 1000),
-%	{ok, <<"foo">>} = gen_tcp:recv(C, 0, 1000),
-%	ok = gen_tcp:send(C, <<"bar">>),
-%	ok = gen_tcp:close(C),
-%	ok = gen_tcp:close(S),
+	{ok, _} = gen_tcp:accept(S),
 	ok.
