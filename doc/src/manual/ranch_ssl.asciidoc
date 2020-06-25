@@ -323,7 +323,7 @@ The options `sni_fun` and `sni_hosts` are mutually exclusive.
 
 == Changelog
 
-* *2.0*: The `ssl_opt()` type was updated for OTP-22.0.
+* *2.0*: The `ssl_opt()` type was updated for OTP-23.0.
 
 == See also
 
