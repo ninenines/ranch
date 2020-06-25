@@ -487,8 +487,7 @@ socket_close(Socket) ->
 socket_cancel(Socket, SelectInfo) ->
     case socket:cancel(Socket, SelectInfo) of
         ok -> ok;
-        {error, closed} -> ok;
-	{error, einval} -> ok
+        {error, closed} -> ok
     end.
 
 %%% ========================================================================
