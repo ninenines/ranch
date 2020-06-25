@@ -68,8 +68,8 @@ ci-setup:: $(DEPS_DIR)/ct_helper
 
 prepare_tag:
 	$(verbose) echo -n "Most recent tag:            "
-	$(verbose) git tag | tail -n1
-	$(verbose) git verify-tag `git tag | tail -n1`
+	$(verbose) git tag --sort=creatordate | tail -n1
+	$(verbose) git verify-tag `git tag --sort=creatordate | tail -n1`
 	$(verbose) echo -n "MAKEFILE: "
 	$(verbose) grep -m1 PROJECT_VERSION Makefile
 	$(verbose) echo -n "APP:                 "
