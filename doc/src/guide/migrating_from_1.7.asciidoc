@@ -14,14 +14,22 @@ concurrently accepting new connections.
 Ranch 2.0 also adds experimental support for opening more
 than one listening socket on a single port.
 
-Starting with Ranch 2.0 we are also providing a Prometheus
-collector as a separate project as well as a Grafana
-dashboard.
+Starting with Ranch 2.0 we are also providing a
+https://github.com/juhlig/prometheus_ranch[Prometheus collector]
+as a separate project as well as a
+https://github.com/juhlig/prometheus_ranch/blob/master/dashboards/ranch-dashboard.json[Grafana dashboard].
 
 Ranch 2.0 is compatible with Erlang/OTP 21.0 onward. Support
 for Erlang/OTP 19 and 20 has been removed.
 
 === Features added
+
+* Ranch now comes with a `ranch.appup` file necessary for
+  performing release upgrades. A test suite has been added
+  to confirm release upgrades work from one tag to the next.
+  Numerous fixes were made that will also improve error recovery.
+  Release upgrades will only be supported from Ranch 2.0
+  onward.
 
 * The `num_conns_sups` option has been added. It allows
   configuring the number of connection supervisors. It
@@ -71,7 +79,7 @@ for Erlang/OTP 19 and 20 has been removed.
   socket options.
 
 * The callback function `Transport:messages/0` return value
-  now include the tag used for passive messages.
+  now includes the tag used for passive messages.
 
 * The `Socket` argument was removed from `Protocol:start_link/3`.
   The socket must now be obtained by calling `ranch:handshake/1,2`.
@@ -128,11 +136,17 @@ for Erlang/OTP 19 and 20 has been removed.
 * Connection draining has now been documented in the guide
   following user feedback and discussions.
 
-* Ranch is now tested against `havoc`, a chaos monkey style
+* Ranch is now tested against https://concuerror.com/[Concuerror],
+  a model checking tool for debugging, testing and verifying
+  concurrent Erlang programs. Two tests have been added in this
+  release and more will follow in the future.
+
+* Ranch is now tested against `stampede`, a chaos monkey style
   testing tool. Currently includes three scenarios: normal
   TCP and TLS listeners and embedded TCP listener. This new
   test suite helped uncover a misplaced `monitor/2` call
-  added during the development of Ranch 2.0.
+  added during the development of Ranch 2.0 (we were using a
+  similar tool, `havoc`, at the time of finding that issue).
 
 * The supervisor for acceptors and the parent supervisor for
   connection supervisors now have an adaptive restart
