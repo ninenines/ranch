@@ -47,6 +47,7 @@
 -export([cleanup/1]).
 
 -type ssl_opt() :: {alpn_preferred_protocols, [binary()]}
+	| {anti_replay, '10k' | '100k' | {integer(), integer(), integer()}}
 	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
 	| {cacertfile, file:filename()}
 	| {cacerts, [public_key:der_encoded()]}
@@ -59,18 +60,19 @@
 	| {depth, integer()}
 	| {dh, binary()}
 	| {dhfile, file:filename()}
-	%% @todo Update when ssl exports named_curve().
-	| {eccs, [atom()]}
+	| {eccs, [ssl:named_curve()]}
 	| {fail_if_no_peer_cert, boolean()}
 	| {handshake, hello | full}
 	| {hibernate_after, timeout()}
 	| {honor_cipher_order, boolean()}
 	| {honor_ecc_order, boolean()}
 	| {key, ssl:key()}
+	| {key_update_at, pos_integer()}
 	| {keyfile, file:filename()}
 	| {log_alert, boolean()}
 	| {log_level, logger:level()}
 	| {max_handshake_size, integer()}
+	| {middlebox_comp_mode, boolean()}
 	| {next_protocols_advertised, [binary()]}
 	| {padding_check, boolean()}
 	| {partial_chain, fun()}
@@ -80,11 +82,12 @@
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
+	| {session_tickets, disabled | stateful | stateless}
 	| {signature_algs, [{ssl:hash(), ssl:sign_algo()}]}
-	%% @todo Update when ssl exports sign_scheme().
-	| {signature_algs_cert, [atom()]}
+	| {signature_algs_cert, [ssl:sign_scheme()]}
 	| {sni_fun, fun()}
 	| {sni_hosts, [{string(), ssl_opt()}]}
+	| {supported_groups, [ssl:group()]}
 	| {user_lookup_fun, {fun(), any()}}
 	| {verify, verify_none | verify_peer}
 	| {verify_fun, {fun(), any()}}
