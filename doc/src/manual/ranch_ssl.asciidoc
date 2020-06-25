@@ -40,6 +40,7 @@ List of listen options.
 [source,erlang]
 ----
 ssl_opt() = {alpn_preferred_protocols, [binary()]}
+          | {anti_replay, '10k' | '100k' | {integer(), integer(), integer()}}
           | {beast_mitigation, one_n_minus_one | zero_n | disabled}
           | {cacertfile, file:filename()}
           | {cacerts, [public_key:der_encoded()]}
@@ -52,17 +53,19 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {depth, integer()}
           | {dh, binary()}
           | {dhfile, file:filename()}
-          | {eccs, [atom()]}
+          | {eccs, [ssl:named_curve()]}
           | {fail_if_no_peer_cert, boolean()}
           | {handshake, hello | full}
           | {hibernate_after, timeout()}
           | {honor_cipher_order, boolean()}
           | {honor_ecc_order, boolean()}
           | {key, ssl:key()}
+          | {key_update_at, pos_integer()}
           | {keyfile, file:filename()}
           | {log_alert, boolean()}
           | {log_level, logger:level()}
           | {max_handshake_size, integer()}
+          | {middlebox_comp_mode, boolean()}
           | {next_protocols_advertised, [binary()]}
           | {padding_check, boolean()}
           | {partial_chain, fun()}
@@ -72,10 +75,12 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {reuse_session, fun()}
           | {reuse_sessions, boolean()}
           | {secure_renegotiate, boolean()}
+          | {session_tickets, disabled | stateful | stateless}
           | {signature_algs, [{ssl:hash(), ssl:sign_algo()}]}
-          | {signature_algs_cert, [atom()]}
+          | {signature_algs_cert, [ssl:sign_scheme()]}
           | {sni_fun, fun()}
           | {sni_hosts, [{string(), ssl_opt()}]}
+          | {supported_groups, [ssl:group()]}
           | {user_lookup_fun, {fun(), any()}}
           | {verify, verify_none | verify_peer}
           | {verify_fun, {fun(), any()}}
@@ -94,6 +99,11 @@ alpn_preferred_protocols::
 
 Perform Application-Layer Protocol Negotiation
 with the given list of preferred protocols.
+
+anti_replay::
+
+Configures the server's built-in anti replay feature based on
+Bloom filters.
 
 beast_mitigation (one_n_minus_one)::
 
@@ -185,6 +195,11 @@ key::
 
 DER encoded user private key.
 
+key_update_at::
+
+Configures the maximum amount of bytes that can be sent on a
+TLS 1.3 connection before an automatic key update is performed.
+
 keyfile::
 
 Path to the PEM encoded private key file, if different from
@@ -202,6 +217,11 @@ max_handshake_size (256*1024)::
 
 Used to limit the size of valid TLS handshake packets to
 avoid DoS attacks.
+
+middlebox_comp_mode (true)::
+
+Configures the middlebox compatibility mode on a TLS 1.3
+connection.
 
 next_protocols_advertised::
 
@@ -243,6 +263,10 @@ secure_renegotiate (false)::
 Whether to reject renegotiation attempts that do not conform
 to RFC5746.
 
+session_tickets::
+
+Configures the session ticket functionality.
+
 signature_algs::
 
 The TLS signature algorithm extension may be used, from TLS 1.2,
@@ -264,6 +288,13 @@ sni_hosts::
 
 Options to apply for the host that matches what the client
 requested with Server Name Indication.
+
+supported_groups([x25519, x448, secp256r1, secp384r1])::
+
+TLS 1.3 introduces the `supported_groups` extension that is
+used for negotiating the Diffie-Hellman parameters in a
+TLS 1.3 handshake. Both client and server can specify a list
+of parameters that they are willing to use.
 
 user_lookup_fun::
 

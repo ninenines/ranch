@@ -160,4 +160,4 @@ for Erlang/OTP 19 and 20 has been removed.
   `ssl:ssl_accept/1,2`.
 
 * The `ranch_ssl:ssl_opt()` type has been updated to conform
-  with Erlang/OTP 22.0.
+  with Erlang/OTP 23.0.
