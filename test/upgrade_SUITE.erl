@@ -52,10 +52,24 @@ do_find_make_cmd() ->
 
 %% Manipulate the release.
 
+do_copy(Example0) ->
+	Example = atom_to_list(Example0),
+	{ok, CWD} = file:get_cwd(),
+	_ = do_exec_log("cp -R " ++ CWD ++ "/../../examples/" ++ Example ++ " " ++ CWD),
+	Dir = CWD ++ "/" ++ Example,
+	_ = do_exec_log("sed -i.bak s/\"include \\.\\.\\/\\.\\.\\/erlang.mk\"/\"include ..\\/..\\/..\\/erlang.mk\"/ " ++ Dir ++ "/Makefile"),
+	ok.
+
+do_remove(Example0) ->
+	Example = atom_to_list(Example0),
+	{ok, CWD} = file:get_cwd(),
+	_ = do_exec_log("rm -rf " ++ CWD ++ "/" ++ Example),
+	ok.
+
 do_get_paths(Example0) ->
 	Example = atom_to_list(Example0),
 	{ok, CWD} = file:get_cwd(),
-	Dir = CWD ++ "/../../examples/" ++ Example,
+	Dir = CWD ++ "/" ++ Example,
 	Rel = Dir ++ "/_rel/" ++ Example ++ "_example/bin/" ++ Example ++ "_example",
 	Log = Dir ++ "/_rel/" ++ Example ++ "_example/log/erlang.log.1",
 	{Dir, Rel, Log}.
@@ -63,37 +77,36 @@ do_get_paths(Example0) ->
 do_compile_and_start(Example) ->
 	Make = do_find_make_cmd(),
 	{Dir, Rel, _} = do_get_paths(Example),
-	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " distclean")]),
+	_ = do_exec_log(Make ++ " -C " ++ Dir ++ " distclean"),
 	%% TERM=dumb disables relx coloring.
-	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " TERM=dumb")]),
+	_ = do_exec_log(Make ++ " -C " ++ Dir ++ " TERM=dumb"),
 	%% For some reason the release has ExampleStr.boot
 	%% while the downgrade expects start.boot?
 	ExampleStr = atom_to_list(Example),
-	ct:log("~s~n", [os:cmd("cp "
+	_ = do_exec_log("cp "
 		++ Dir ++ "/_rel/" ++ ExampleStr
 			++ "_example/releases/1/" ++ ExampleStr ++ "_example.boot "
 		++ Dir ++ "/_rel/" ++ ExampleStr
-			++ "_example/releases/1/start.boot")]),
-	ct:log("~s~n", [os:cmd(Rel ++ " stop")]),
-	ct:log("~s~n", [os:cmd(Rel ++ " start")]),
+			++ "_example/releases/1/start.boot"),
+	_ = do_exec_log(Rel ++ " stop"),
+	_ = do_exec_log(Rel ++ " start"),
 	timer:sleep(2000),
-	ct:log("~s~n", [os:cmd(Rel ++ " eval 'application:info()'")]).
+	_ = do_exec_log(Rel ++ " eval 'application:info()'"),
+	ok.
 
 do_stop(Example) ->
 	{Dir, Rel, Log} = do_get_paths(Example),
-	ct:log("~s~n", [os:cmd("sed -i.bak s/\"2\"/\"1\"/ " ++ Dir ++ "/relx.config")]),
-	ct:log("~s~n", [os:cmd(Rel ++ " stop")]),
+	_ = do_exec_log("sed -i.bak s/\"2\"/\"1\"/ " ++ Dir ++ "/relx.config"),
+	_ = do_exec_log(Rel ++ " stop"),
 	ct:log("~s~n", [element(2, file:read_file(Log))]).
 
 %% When we are on a tag (git describe --exact-match succeeds),
 %% we use the tag before that as a starting point. Otherwise
 %% we use the most recent tag.
 do_use_ranch_previous(Example) ->
-	TagsOutput = os:cmd("git tag | tr - \\~ | sort -V | tr \\~ -"),
-	ct:log("~s~n", [TagsOutput]),
+	TagsOutput = do_exec_log("git tag | tr - \\~ | sort -V | tr \\~ -"),
 	Tags = string:lexemes(TagsOutput, "\n"),
-	DescribeOutput = os:cmd("git describe --exact-match"),
-	ct:log("~s~n", [DescribeOutput]),
+	DescribeOutput = do_exec_log("git describe --exact-match"),
 	{CommitOrTag, Prev} = case DescribeOutput of
 		"fatal: no tag exactly matches " ++ _ -> {commit, hd(lists:reverse(Tags))};
 		_ -> {tag, hd(tl(lists:reverse(Tags)))}
@@ -104,62 +117,68 @@ do_use_ranch_previous(Example) ->
 %% Replace the current Ranch commit with the one given as argument.
 do_use_ranch_commit(Example, Commit) ->
 	{Dir, _, _} = do_get_paths(Example),
-	ct:log("~s~n", [os:cmd(
+	_ = do_exec_log(
 		"sed -i.bak s/\"dep_ranch_commit = .*\"/\"dep_ranch_commit = "
 		++ Commit ++ "\"/ " ++ Dir ++ "/Makefile"
-	)]).
+	),
+	ok.
 
 %% Remove Ranch and rebuild, this time generating a relup.
 do_build_relup(Example, CommitOrTag) ->
 	Make = do_find_make_cmd(),
 	{Dir, _, _} = do_get_paths(Example),
-	ct:log("~s~n", [os:cmd("rm -rf " ++ Dir ++ "/deps/ranch")]),
-	ct:log("~s~n", [os:cmd("sed -i.bak s/\"1\"/\"2\"/ " ++ Dir ++ "/relx.config")]),
+	_ = do_exec_log("rm -rf " ++ Dir ++ "/deps/ranch/*"),
+	_ = do_exec_log("sed -i.bak s/\"1\"/\"2\"/ " ++ Dir ++ "/relx.config"),
 	%% We need Ranch to be fetched first in order to copy the current appup
 	%% and optionally update its version when we are not on a tag.
-	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " deps")]),
-	ct:log("~s~n", [os:cmd("cp " ++ Dir ++ "/../../src/ranch.appup "
-		++ Dir ++ "/deps/ranch/src/")]),
-	case CommitOrTag of
+	_ = do_exec_log("cp -R "
+		++ Dir ++ "/../../../Makefile "
+		++ Dir ++ "/../../../erlang.mk "
+		++ Dir ++ "/../../../src "
+		++ Dir ++ "/deps/ranch/"),
+	_ = do_exec_log(Make ++ " -C " ++ Dir ++ " deps"),
+	_ = case CommitOrTag of
 		tag -> ok;
 		commit ->
 			%% Force the rebuild of Ranch.
-			ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ "/deps/ranch clean")]),
+			_ = do_exec_log(Make ++ " -C " ++ Dir ++ "/deps/ranch clean"),
 			%% Update the Ranch version so that the upgrade can be applied.
-			ProjectVersion = os:cmd("grep \"PROJECT_VERSION = \" " ++ Dir ++ "/deps/ranch/Makefile"),
-			ct:log(ProjectVersion),
+			ProjectVersion = do_exec_log("grep \"PROJECT_VERSION = \" " ++ Dir ++ "/deps/ranch/Makefile"),
 			["PROJECT_VERSION = " ++ Vsn0|_] = string:lexemes(ProjectVersion, "\n"),
 			[A, B|Tail] = string:lexemes(Vsn0, "."),
 			Vsn = binary_to_list(iolist_to_binary([A, $., B, ".9", lists:join($., Tail)])),
 			ct:log("Changing Ranch version from ~s to ~s~n", [Vsn0, Vsn]),
-			ct:log("~s~n", [os:cmd(
+			_ = do_exec_log(
 				"sed -i.bak s/\"PROJECT_VERSION = .*\"/\"PROJECT_VERSION = " ++ Vsn ++ "\"/ "
 					++ Dir ++ "/deps/ranch/Makefile"
-			)]),
+			),
 			%% The version in the appup must be the same as PROJECT_VERSION.
-			ct:log("~s~n", [os:cmd(
+			_ = do_exec_log(
 				"sed -i.bak s/\"" ++ Vsn0 ++ "\"/\"" ++ Vsn ++ "\"/ "
 					++ Dir ++ "/deps/ranch/src/ranch.appup"
-			)])
+			)
 	end,
-	ct:log("~s~n", [os:cmd(Make ++ " -C " ++ Dir ++ " relup")]).
+	_ = do_exec_log(Make ++ " -C " ++ Dir ++ " relup"),
+	ok.
 
 %% Copy the tarball in the correct location and upgrade.
 do_upgrade(Example) ->
 	ExampleStr = atom_to_list(Example),
 	{Dir, Rel, _} = do_get_paths(Example),
-	ct:log("~s~n", [os:cmd("cp "
+	_ = do_exec_log("cp "
 		++ Dir ++ "/_rel/" ++ ExampleStr
 			++ "_example/" ++ ExampleStr ++ "_example-2.tar.gz "
 		++ Dir ++ "/_rel/" ++ ExampleStr
-			++ "_example/releases/2/" ++ ExampleStr ++ "_example.tar.gz")]),
-	ct:log("~s~n", [os:cmd(Rel ++ " upgrade \"2\"")]),
-	ct:log("~s~n", [os:cmd(Rel ++ " eval 'application:info()'")]).
+			++ "_example/releases/2/" ++ ExampleStr ++ "_example.tar.gz"),
+	_ = do_exec_log(Rel ++ " upgrade \"2\""),
+	_ = do_exec_log(Rel ++ " eval 'application:info()'"),
+	ok.
 
 do_downgrade(Example) ->
 	{_, Rel, _} = do_get_paths(Example),
-	ct:log("~s~n", [os:cmd(Rel ++ " downgrade \"1\"")]),
-	ct:log("~s~n", [os:cmd(Rel ++ " eval 'application:info()'")]).
+	_ = do_exec_log(Rel ++ " downgrade \"1\""),
+	_ = do_exec_log(Rel ++ " eval 'application:info()'"),
+	ok.
 
 %% Tests.
 
@@ -175,6 +194,8 @@ do_upgrade_ranch_one_conn() ->
 	Example = tcp_echo,
 	Port = 5555,
 	try
+		%% Copy the example.
+		do_copy(Example),
 		%% Build and start the example release using the previous Ranch version.
 		CommitOrTag = do_use_ranch_previous(Example),
 		do_compile_and_start(Example),
@@ -183,7 +204,6 @@ do_upgrade_ranch_one_conn() ->
 		ok = gen_tcp:send(S, "Hello!"),
 		{ok, <<"Hello!">>} = gen_tcp:recv(S, 0, 1000),
 		%% Update Ranch to master then build a release upgrade.
-		do_use_ranch_commit(Example, "master"),
 		do_build_relup(Example, CommitOrTag),
 		%% Perform the upgrade, then check that our connection is still up.
 		do_upgrade(Example),
@@ -199,7 +219,14 @@ do_upgrade_ranch_one_conn() ->
 		{ok, _} = gen_tcp:connect("localhost", Port, [{active, false}, binary]),
 		ok
 	after
-		do_stop(tcp_echo)
+		do_stop(tcp_echo),
+		do_remove(Example)
 	end.
 
 %% @todo upgrade_ranch_max_conn
+
+do_exec_log(Cmd) ->
+	ct:log("Command: ~s~n", [Cmd]),
+	Out=os:cmd(Cmd),
+	ct:log("Output:~n~n~s~n", [Out]),
+	Out.
