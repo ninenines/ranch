@@ -79,7 +79,7 @@ cleanup_listener_opts(Ref) ->
 	%% cases when calling stop_listener followed by get_connections_sup,
 	%% we could end up with the pid still being returned, when we
 	%% expected a crash (because the listener was stopped).
-	%% Deleting it explictly here removes any possible confusion.
+	%% Deleting it explicitly here removes any possible confusion.
 	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
 	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	%% Ditto for the listener supervisor.
