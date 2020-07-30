@@ -17,7 +17,7 @@
 ERLANG_MK_FILENAME := $(realpath $(lastword $(MAKEFILE_LIST)))
 export ERLANG_MK_FILENAME
 
-ERLANG_MK_VERSION = 2020.03.05-18-g4ad50cd
+ERLANG_MK_VERSION = 2020.03.05-22-geb3e4b0
 ERLANG_MK_WITHOUT = 
 
 # Make 3.81 and 3.82 are deprecated.
@@ -5567,7 +5567,7 @@ endef
 ERL_TEST_FILES = $(call core_find,$(TEST_DIR)/,*.erl)
 $(ERLANG_MK_TMP)/$(PROJECT).last-testdir-build: $(ERL_TEST_FILES) $(MAKEFILE_LIST)
 	$(eval FILES_TO_COMPILE := $(if $(filter $(MAKEFILE_LIST),$?),$(filter $(ERL_TEST_FILES),$^),$?))
-	$(if $(strip $(FILES_TO_COMPILE)),$(call compile_test_erl,$(FILES_TO_COMPILE)); touch $@)
+	$(if $(strip $(FILES_TO_COMPILE)),$(call compile_test_erl,$(FILES_TO_COMPILE)) && touch $@)
 endif
 
 test-build:: IS_TEST=1
@@ -6565,7 +6565,7 @@ endif
 
 $(ERLANG_MK_TMP)/Concuerror/bin/concuerror: | $(ERLANG_MK_TMP)
 	$(verbose) git clone https://github.com/parapluu/Concuerror $(ERLANG_MK_TMP)/Concuerror
-	$(verbose) make -C $(ERLANG_MK_TMP)/Concuerror
+	$(verbose) $(MAKE) -C $(ERLANG_MK_TMP)/Concuerror
 
 $(CONCUERROR_LOGS_DIR):
 	$(verbose) mkdir -p $(CONCUERROR_LOGS_DIR)
@@ -7731,6 +7731,7 @@ $(ERLANG_MK_RECURSIVE_SHELL_DEPS_LIST): | $(ERLANG_MK_TMP)
 ifeq ($(IS_APP)$(IS_DEP),)
 	$(verbose) rm -f $(ERLANG_MK_RECURSIVE_TMP_LIST)
 endif
+	$(verbose) touch $(ERLANG_MK_RECURSIVE_TMP_LIST)
 	$(verbose) set -e; for dep in $^ ; do \
 		if ! grep -qs ^$$dep$$ $(ERLANG_MK_RECURSIVE_TMP_LIST); then \
 			echo $$dep >> $(ERLANG_MK_RECURSIVE_TMP_LIST); \
