@@ -200,7 +200,7 @@ overloaded and ensuring all the connections are handled optimally.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, [{port, 5555}, {max_connections, 100}],
+	ranch_tcp, #{socket_opts => [{port, 5555}], max_connections => 100},
 	echo_protocol, []
 ).
 
@@ -210,7 +210,7 @@ You can disable this limit by setting its value to the atom `infinity`.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, [{port, 5555}, {max_connections, infinity}],
+	ranch_tcp, #{socket_opts => [{port, 5555}], max_connections => infinity},
 	echo_protocol, []
 ).
 
