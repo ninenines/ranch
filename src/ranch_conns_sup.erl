@@ -34,6 +34,7 @@
 -record(state, {
 	parent = undefined :: pid(),
 	ref :: ranch:ref(),
+	id :: pos_integer(),
 	conn_type :: conn_type(),
 	shutdown :: shutdown(),
 	transport = undefined :: module(),
@@ -41,6 +42,7 @@
 	opts :: any(),
 	handshake_timeout :: timeout(),
 	max_conns = undefined :: ranch:max_conns(),
+	stats_counters_ref :: counters:counters_ref(),
 	logger = undefined :: module()
 }).
 
@@ -108,21 +110,25 @@ init(Parent, Ref, Id, Transport, TransOpts, Protocol, Logger) ->
 	Shutdown = maps:get(shutdown, TransOpts, 5000),
 	HandshakeTimeout = maps:get(handshake_timeout, TransOpts, 5000),
 	ProtoOpts = ranch_server:get_protocol_options(Ref),
+	StatsCounters = ranch_server:get_stats_counters(Ref),
 	ok = proc_lib:init_ack(Parent, {ok, self()}),
-	loop(#state{parent=Parent, ref=Ref, conn_type=ConnType,
+	loop(#state{parent=Parent, ref=Ref, id=Id, conn_type=ConnType,
 		shutdown=Shutdown, transport=Transport, protocol=Protocol,
-		opts=ProtoOpts, handshake_timeout=HandshakeTimeout,
+		opts=ProtoOpts, stats_counters_ref=StatsCounters,
+		handshake_timeout=HandshakeTimeout,
 		max_conns=MaxConns, logger=Logger}, 0, 0, []).
 
-loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
-		transport=Transport, protocol=Protocol, opts=Opts,
+loop(State=#state{parent=Parent, ref=Ref, id=Id, conn_type=ConnType,
+		transport=Transport, protocol=Protocol, opts=Opts, stats_counters_ref=StatsCounters,
 		max_conns=MaxConns, logger=Logger}, CurConns, NbChildren, Sleepers) ->
 	receive
 		{?MODULE, start_protocol, To, Socket} ->
 			try Protocol:start_link(Ref, Transport, Opts) of
 				{ok, Pid} ->
+					inc_accept(StatsCounters, Id, 1),
 					handshake(State, CurConns, NbChildren, Sleepers, To, Socket, Pid, Pid);
 				{ok, SupPid, ProtocolPid} when ConnType =:= supervisor ->
+					inc_accept(StatsCounters, Id, 1),
 					handshake(State, CurConns, NbChildren, Sleepers, To, Socket, SupPid, ProtocolPid);
 				Ret ->
 					To ! self(),
@@ -180,9 +186,11 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{'EXIT', Pid, Reason} when Sleepers =:= [] ->
 			case erase(Pid) of
 				active ->
+					inc_terminate(StatsCounters, Id, 1),
 					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns - 1, NbChildren - 1, Sleepers);
 				removed ->
+					inc_terminate(StatsCounters, Id, 1),
 					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns, NbChildren - 1, Sleepers);
 				undefined ->
@@ -192,14 +200,17 @@ loop(State=#state{parent=Parent, ref=Ref, conn_type=ConnType,
 		{'EXIT', Pid, Reason} ->
 			case erase(Pid) of
 				active when CurConns > MaxConns ->
+					inc_terminate(StatsCounters, Id, 1),
 					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns - 1, NbChildren - 1, Sleepers);
 				active ->
+					inc_terminate(StatsCounters, Id, 1),
 					report_error(Logger, Ref, Protocol, Pid, Reason),
 					[To|Sleepers2] = Sleepers,
 					To ! self(),
 					loop(State, CurConns - 1, NbChildren - 1, Sleepers2);
 				removed ->
+					inc_terminate(StatsCounters, Id, 1),
 					report_error(Logger, Ref, Protocol, Pid, Reason),
 					loop(State, CurConns, NbChildren - 1, Sleepers);
 				undefined ->
@@ -270,12 +281,15 @@ set_transport_options(State=#state{max_conns=MaxConns0}, CurConns, NbChildren, S
 		CurConns, NbChildren, Sleepers1).
 
 -spec terminate(#state{}, any(), non_neg_integer()) -> no_return().
-terminate(#state{shutdown=brutal_kill}, Reason, _) ->
+terminate(#state{shutdown=brutal_kill, id=Id,
+		stats_counters_ref=StatsCounters}, Reason, NbChildren) ->
 	kill_children(get_keys(active)),
 	kill_children(get_keys(removed)),
+	inc_terminate(StatsCounters, Id, NbChildren),
 	exit(Reason);
 %% Attempt to gracefully shutdown all children.
-terminate(#state{shutdown=Shutdown}, Reason, NbChildren) ->
+terminate(#state{shutdown=Shutdown, id=Id,
+		stats_counters_ref=StatsCounters}, Reason, NbChildren) ->
 	shutdown_children(get_keys(active)),
 	shutdown_children(get_keys(removed)),
 	_ = if
@@ -285,7 +299,16 @@ terminate(#state{shutdown=Shutdown}, Reason, NbChildren) ->
 			erlang:send_after(Shutdown, self(), kill)
 	end,
 	wait_children(NbChildren),
+	inc_terminate(StatsCounters, Id, NbChildren),
 	exit(Reason).
+
+inc_accept(StatsCounters, Id, N) ->
+	%% Accepts are counted in the odd indexes.
+	counters:add(StatsCounters, 2*Id-1, N).
+
+inc_terminate(StatsCounters, Id, N) ->
+	%% Terminates are counted in the even indexes.
+	counters:add(StatsCounters, 2*Id, N).
 
 %% Kill all children and then exit. We unlink first to avoid
 %% getting a message for each child getting killed.
@@ -334,6 +357,25 @@ system_terminate(Reason, _, _, {State, _, NbChildren, _}) ->
 	terminate(State, Reason, NbChildren).
 
 -spec system_code_change(any(), _, _, _) -> {ok, any()}.
+system_code_change({#state{parent=Parent, ref=Ref, conn_type=ConnType,
+		shutdown=Shutdown, transport=Transport, protocol=Protocol,
+		opts=Opts, handshake_timeout=HandshakeTimeout,
+		max_conns=MaxConns, logger=Logger}, CurConns, NbChildren,
+		Sleepers}, _, {down, _}, _) ->
+	{ok, {{state, Parent, Ref, ConnType, Shutdown, Transport, Protocol,
+		Opts, HandshakeTimeout, MaxConns, Logger}, CurConns, NbChildren,
+		Sleepers}};
+system_code_change({{state, Parent, Ref, ConnType, Shutdown, Transport, Protocol,
+		Opts, HandshakeTimeout, MaxConns, Logger}, CurConns, NbChildren,
+		Sleepers}, _, _, _) ->
+	Self = self(),
+	[Id] = [Id || {Id, Pid} <- ranch_server:get_connections_sups(Ref), Pid=:=Self],
+	StatsCounters = ranch_server:get_stats_counters(Ref),
+	{ok, {#state{parent=Parent, ref=Ref, id=Id, conn_type=ConnType, shutdown=Shutdown,
+		transport=Transport, protocol=Protocol, opts=Opts,
+		handshake_timeout=HandshakeTimeout, max_conns=MaxConns,
+		stats_counters_ref=StatsCounters,
+		logger=Logger}, CurConns, NbChildren, Sleepers}};
 system_code_change(Misc, _, _, _) ->
 	{ok, Misc}.
 

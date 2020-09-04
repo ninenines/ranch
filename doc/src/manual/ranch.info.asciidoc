@@ -38,9 +38,18 @@ transport:: Transport module.
 transport_options:: Transport options.
 protocol:: Protocol module.
 protocol_options:: Protocol options.
+metrics:: Listener metrics.
+
+== Metrics
+
+Listener metrics are provided as a map, with the following keys:
+
+{conns_sup, Index, accept}:: Number of accepted connections, per connection supervisor.
+{conns_sup, Index, terminate}:: Number of terminated connection processes, per connection supervisor.
 
 == Changelog
 
+* *2.1*: Added accept/terminate metrics to the output of `ranch:info/0,1`.
 * *2.0*: The listener info is now returned as a map.
 * *2.0*: The `num_acceptors` key has been removed.
 

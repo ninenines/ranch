@@ -420,7 +420,8 @@ listener_info(Ref, Pid) ->
 		transport => Transport,
 		transport_options => TransOpts,
 		protocol => Protocol,
-		protocol_options => ProtoOpts
+		protocol_options => ProtoOpts,
+		metrics => metrics(Ref)
 	}.
 
 -spec procs(ref(), acceptors | connections) -> [pid()].
@@ -446,6 +447,23 @@ procs1(ListenerSup, connections) ->
 		supervisor:which_children(SupSupPid)
 	),
 	lists:flatten(Conns).
+
+-spec metrics(ref()) -> #{}.
+metrics(Ref) ->
+	Counters = ranch_server:get_stats_counters(Ref),
+	CounterInfo = counters:info(Counters),
+	NumCounters = maps:get(size, CounterInfo),
+	NumConnsSups = NumCounters div 2,
+	lists:foldl(
+		fun (Id, Acc) ->
+			Acc#{
+				{conns_sup, Id, accept} => counters:get(Counters, 2*Id-1),
+				{conns_sup, Id, terminate} => counters:get(Counters, 2*Id)
+			}
+		end,
+		#{},
+		lists:seq(1, NumConnsSups)
+	).
 
 -spec wait_for_connections
 	(ref(), '>' | '>=' | '==' | '=<', non_neg_integer()) -> ok;

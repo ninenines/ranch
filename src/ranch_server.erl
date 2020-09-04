@@ -32,6 +32,8 @@
 -export([get_addr/1]).
 -export([set_max_connections/2]).
 -export([get_max_connections/1]).
+-export([set_stats_counters/2]).
+-export([get_stats_counters/1]).
 -export([set_transport_options/2]).
 -export([get_transport_options/1]).
 -export([set_protocol_options/2]).
@@ -79,6 +81,7 @@ cleanup_listener_opts(Ref) ->
 	%% expected a crash (because the listener was stopped).
 	%% Deleting it explictly here removes any possible confusion.
 	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
+	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	%% Ditto for the listener supervisor.
 	_ = ets:delete(?TAB, {listener_sup, Ref}),
 	ok.
@@ -86,6 +89,7 @@ cleanup_listener_opts(Ref) ->
 -spec cleanup_connections_sups(ranch:ref()) -> ok.
 cleanup_connections_sups(Ref) ->
 	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
+	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	ok.
 
 -spec set_connections_sup(ranch:ref(), non_neg_integer(), pid()) -> ok.
@@ -138,6 +142,14 @@ set_max_connections(Ref, MaxConnections) ->
 -spec get_max_connections(ranch:ref()) -> ranch:max_conns().
 get_max_connections(Ref) ->
 	ets:lookup_element(?TAB, {max_conns, Ref}, 2).
+
+-spec set_stats_counters(ranch:ref(), counters:counters_ref()) -> ok.
+set_stats_counters(Ref, Counters) ->
+	gen_server:call(?MODULE, {set_stats_counters, Ref, Counters}).
+
+-spec get_stats_counters(ranch:ref()) -> counters:counters_ref().
+get_stats_counters(Ref) ->
+	ets:lookup_element(?TAB, {stats_counters, Ref}, 2).
 
 -spec set_transport_options(ranch:ref(), any()) -> ok.
 set_transport_options(Ref, TransOpts) ->
@@ -198,6 +210,9 @@ handle_call({set_max_conns, Ref, MaxConns}, _, State) ->
 	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),
 	_ = [ConnsSup ! {set_max_conns, MaxConns} || {_, ConnsSup} <- get_connections_sups(Ref)],
 	{reply, ok, State};
+handle_call({set_stats_counters, Ref, Counters}, _, State) ->
+	ets:insert(?TAB, {{stats_counters, Ref}, Counters}),
+	{reply, ok, State};
 handle_call({set_trans_opts, Ref, Opts}, _, State) ->
 	ets:insert(?TAB, {{trans_opts, Ref}, Opts}),
 	{reply, ok, State};
@@ -237,6 +252,9 @@ terminate(_Reason, _State) ->
 	ok.
 
 -spec code_change(term() | {down, term()}, #state{}, term()) -> {ok, term()}.
+code_change({down, _}, State, _Extra) ->
+	true = ets:match_delete(?TAB, {{stats_counters, '_'}, '_'}),
+	{ok, State};
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
