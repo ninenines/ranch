@@ -32,6 +32,8 @@ init({Ref, Transport, Protocol, Logger}) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumConnsSups = maps:get(num_conns_sups, TransOpts, NumAcceptors),
+	StatsCounters = counters:new(2*NumConnsSups, []),
+	ok = ranch_server:set_stats_counters(Ref, StatsCounters),
 	ChildSpecs = [#{
 		id => {ranch_conns_sup, N},
 		start => {ranch_conns_sup, start_link, [Ref, N, Transport, TransOpts, Protocol, Logger]},

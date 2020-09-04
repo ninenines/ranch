@@ -75,6 +75,7 @@ groups() ->
 		misc_repeated_remove,
 		misc_info,
 		misc_info_embedded,
+		misc_metrics,
 		misc_opts_logger,
 		misc_set_transport_options,
 		misc_wait_for_connections,
@@ -281,6 +282,48 @@ misc_info_embedded(_) ->
 	embedded_sup:stop(SupPid),
 	ok.
 
+misc_metrics(_) ->
+	doc("Confirm accept/terminate metrics are correct."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{},
+		notify_and_wait_protocol, #{pid => self()}),
+	Port = ranch:get_port(Name),
+	%% Start 10 connections.
+	ok = connect_loop(Port, 10, 0),
+	{10, ConnPids1} = receive_loop(connected, 400),
+	#{metrics := Metrics1} = ranch:info(Name),
+	{10, 0} = do_accumulate_metrics(Metrics1),
+	%% Start 10 more connections.
+	ok = connect_loop(Port, 10, 0),
+	{10, ConnPids2} = receive_loop(connected, 400),
+	#{metrics := Metrics2} = ranch:info(Name),
+	{20, 0} = do_accumulate_metrics(Metrics2),
+	%% Terminate 10 connections.
+	ok = terminate_loop(stop, ConnPids2),
+	timer:sleep(100),
+	#{metrics := Metrics3} = ranch:info(Name),
+	{20, 10} = do_accumulate_metrics(Metrics3),
+	%% Terminate 10 more connections.
+	ok = terminate_loop(stop, ConnPids1),
+	timer:sleep(100),
+	#{metrics := Metrics4} = ranch:info(Name),
+	{20, 20} = do_accumulate_metrics(Metrics4),
+	ok = ranch:stop_listener(Name),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+do_accumulate_metrics(Metrics) ->
+	maps:fold(
+		fun
+			({conns_sup, _, accept}, N, {Accepts, Terminates}) ->
+				{Accepts+N, Terminates};
+			({conns_sup, _, terminate}, N, {Accepts, Terminates}) ->
+				{Accepts, Terminates+N}
+		end,
+		{0, 0},
+		Metrics
+	).
+
 misc_opts_logger(_) ->
 	doc("Confirm that messages are sent via the configured logger module."),
 	register(misc_opts_logger, self()),
@@ -322,9 +365,9 @@ misc_set_transport_options(_) ->
 	ConnsSups = [ConnsSup || {_, ConnsSup} <- ranch_server:get_connections_sups(Name)],
 	_ = [begin
 		{State, _, _, _} = sys:get_state(ConnsSup),
-		20 = element(10, State),
-		5001 = element(9, State),
-		1001 = element(5, State)
+		20 = element(11, State),
+		5001 = element(10, State),
+		1001 = element(6, State)
 	end || ConnsSup <- ConnsSups],
 	ok = ranch:suspend_listener(Name),
 	ok = ranch:resume_listener(Name),
