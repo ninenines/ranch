@@ -55,7 +55,17 @@
 -type opts() :: any() | transport_opts(any()).
 -export_type([opts/0]).
 
+-type alarm(Type, Callback) :: #{
+	type := Type,
+	callback := Callback,
+	treshold := non_neg_integer(),
+	cooldown := non_neg_integer()
+}.
+
+-type alarm_num_connections() :: alarm(num_connections, fun((ref(), term(), pid(), [pid()]) -> any())).
+
 -type transport_opts(SocketOpts) :: #{
+	alarms => #{term() => alarm_num_connections()},
 	connection_type => worker | supervisor,
 	handshake_timeout => timeout(),
 	logger => module(),
@@ -123,6 +133,16 @@ validate_transport_opt(max_connections, infinity, _) ->
 	true;
 validate_transport_opt(max_connections, Value, _) ->
 	is_integer(Value) andalso Value >= 0;
+validate_transport_opt(alarms, Alarms, _) ->
+	maps:fold(
+		fun
+			(_, Opts, true) ->
+				validate_alarm(Opts);
+			(_, _, false) ->
+				false
+		end,
+		true,
+		Alarms);
 validate_transport_opt(logger, Value, _) ->
 	is_atom(Value);
 validate_transport_opt(num_acceptors, Value, _) ->
@@ -143,6 +163,14 @@ validate_transport_opt(shutdown, Value, _) ->
 validate_transport_opt(socket_opts, _, _) ->
 	true;
 validate_transport_opt(_, _, _) ->
+	false.
+
+validate_alarm(#{type := num_connections, treshold := Treshold,
+		callback := Callback, cooldown := Cooldown}) ->
+	is_integer(Treshold) andalso Treshold >= 0
+	andalso is_integer(Cooldown) andalso Cooldown >= 0
+	andalso is_function(Callback, 4);
+validate_alarm(_) ->
 	false.
 
 maybe_started({error, {{shutdown,

@@ -328,6 +328,67 @@ processes.
     echo_protocol, []
 ).
 
+=== Setting connection count alarms
+
+The `alarms` transport options allows you to configure alarms
+which will be triggered when the number of connections under a connection
+supervisor reaches or exceeds the defined treshold.
+
+The `alarms` transport option takes a map with alarm names as keys and alarm
+options as values.
+
+Any term is allowed as an alarm name.
+
+Alarm options, defining the alarm behavior, are again a map with the following
+keys, all of which are mandatory:
+
+`type`::
+The alarm type. Currently, `num_connections` is the only allowed type.
+
+`treshold`::
+The alarm treshold. When the number of connections under a connection
+supervisor reaches or exceeds this value, the alarm will trigger and
+call the function given in the `callback` key.
+
+`callback`::
+The alarm function, that is, the function which will be called when the
+alarm is triggered. Its arguments are the listener name, the alarm
+name, the Pid of the triggering connection supervisor, and the Pids of
+all the connection processes under that supervisor.
+
+`cooldown`::
+The minimum time to elapse before the alarm can trigger again, in
+milliseconds.
+
+.Setting an alarm to log warnings when the number of connections exceed 100
+
+[source,erlang]
+----
+Alarms = #{
+    my_alarm => #{
+        type => num_connections,
+        treshold => 100,
+        callback => fun(Ref, Name, ConnSup, ConnPids]) ->
+            logger:warning("Warning (~s): "
+                    "Supervisor ~s of listener ~s "
+                    "has ~b connections",
+                [Name, Ref, ConnSup, length(ConnPids)])
+        end,
+        cooldown => 5000
+    }
+},
+{ok, _} = ranch:start_listener(tcp_echo,
+    ranch_tcp, #{alarms => Alarms, socket_opts => [{port, 5555}]},
+    echo_protocol, []
+).
+----
+
+In the example code, an alarm named `my_alarm` is defined, which will
+call the given function when the number of connections under a
+connection supervisor reaches or exceeds 100. When the number of
+connections is still (or again) above 100 after 5 seconds, the
+alarm will trigger again.
+
 === When running out of file descriptors
 
 Operating systems have limits on the number of sockets
