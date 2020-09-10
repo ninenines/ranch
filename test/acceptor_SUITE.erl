@@ -109,7 +109,8 @@ groups() ->
 		misc_post_listen_callback_error,
 		misc_set_transport_options,
 		misc_wait_for_connections,
-		misc_multiple_ip_local_socket_opts
+		misc_multiple_ip_local_socket_opts,
+		misc_connection_alarms
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -575,6 +576,79 @@ do_misc_multiple_ip_local_socket_opts() ->
 	%% is removed.
 	{error, enoent} = file:read_file_info(SockFile2),
 	ok.
+
+misc_connection_alarms(_) ->
+	doc("Ensure that connection alarms work."),
+	Name = name(),
+
+	Self = self(),
+	TransOpts0 = #{num_conns_sups => 1},
+	AlarmCallback = fun (Ref, AlarmName, _, ActiveConns) ->
+		Self ! {connection_alarm, {Ref, AlarmName, length(ActiveConns)}}
+	end,
+	Alarms0 = #{
+		test1 => {num_connections, AlarmOpts1 = #{treshold => 2, cooldown => 0, callback => AlarmCallback}},
+		test2 => {num_connections, AlarmOpts2 = #{treshold => 3, cooldown => 0, callback => AlarmCallback}}
+	},
+	ConnectOpts = [binary, {active, false}, {packet, raw}],
+
+	{ok, _} = ranch:start_listener(Name, ranch_tcp,
+		TransOpts0#{alarms => Alarms0}, notify_and_wait_protocol, #{pid => self()}),
+	Port = ranch:get_port(Name),
+
+	{ok, _} = gen_tcp:connect("localhost", Port, ConnectOpts),
+	{1, [Conn1]} = receive_loop(connected, 100),
+	#{test1 := undefined, test2 := undefined} = do_recv_connection_alarms(Name, 100),
+
+	{ok, _} = gen_tcp:connect("localhost", Port, ConnectOpts),
+	{1, [Conn2]} = receive_loop(connected, 100),
+	#{test1 := 2, test2 := undefined} = do_recv_connection_alarms(Name, 100),
+
+	{ok, _} = gen_tcp:connect("localhost", Port, ConnectOpts),
+	{1, [Conn3]} = receive_loop(connected, 100),
+	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 100),
+
+	Alarms1 = #{
+		test1 => {num_connections, AlarmOpts1#{cooldown => 100}},
+		test2 => {num_connections, AlarmOpts2#{cooldown => 100}}
+	},
+	ok = ranch:set_transport_options(Name, TransOpts0#{alarms => Alarms1}),
+	ok = do_flush_connection_alarms(Name),
+	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 100),
+	ok = do_flush_connection_alarms(Name),
+	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 100),
+
+	Conn3 ! stop,
+	timer:sleep(100),
+	ok = do_flush_connection_alarms(Name),
+	#{test1 := 2, test2 := undefined} = do_recv_connection_alarms(Name, 100),
+
+	Conn2 ! stop,
+	timer:sleep(100),
+	ok = do_flush_connection_alarms(Name),
+	#{test1 := undefined, test2 := undefined} = do_recv_connection_alarms(Name, 100),
+
+	Conn1 ! stop,
+
+	ok = ranch:stop_listener(Name),
+	ok.
+
+do_recv_connection_alarms(Name, Timeout) ->
+	do_recv_connection_alarms(Name, Timeout, #{test1 => undefined, test2 => undefined}).
+
+do_recv_connection_alarms(Name, Timeout, Acc) ->
+	receive {connection_alarm, {Name, AlarmName, N}} ->
+		do_recv_connection_alarms(Name, Timeout, Acc#{AlarmName => N})
+	after Timeout ->
+		Acc
+	end.
+
+do_flush_connection_alarms(Name) ->
+	receive {connection_alarm, {Name, _, _}} ->
+		do_flush_connection_alarms(Name)
+	after 0 ->
+		ok
+	end.
 
 %% ssl.
 
