@@ -23,8 +23,8 @@
 all() ->
 	[{group, tcp}, {group, ssl}].
 
-suite() ->
-	[{timetrap, {seconds, 60}}].
+%suite() ->
+%	[{timetrap, {seconds, 60}}].
 
 groups() ->
 	Tests = [
