@@ -15,6 +15,11 @@ set_transport_options(Ref       :: ranch:ref(),
 
 Set the transport options.
 
+The complete set of transport options is replaced. To update a subset of the
+transport options, it is recommended to get the current transport options using
+link:man:ranch:get_transport_options(3)[ranch:get_transport_options(3)], update
+them and then set them back using this function.
+
 Changes to the following options will take effect...
 
 * immediately:
@@ -60,6 +65,21 @@ transport options contain invalid values.
 [source,erlang]
 ----
 Ref = example,
+
+ok = ranch:suspend_listener(Ref),
+ok = ranch:set_transport_options(Ref, TransOpts),
+ok = ranch:resume_listener(Ref).
+----
+
+.Update the listener TCP port within the `socket_opts` transport option
+[source,erlang]
+----
+Ref = example,
+
+TransOpts0 = ranch:get_transport_options(Ref),
+#{socket_opts = SocketOpts0} = TransOpts0,
+SocketOpts = [{port, 12345}|proplists:delete(port, SocketOpts0)],
+TransOpts = TransOpts0#{socket_opts = SocketOpts},
 
 ok = ranch:suspend_listener(Ref),
 ok = ranch:set_transport_options(Ref, TransOpts),
