@@ -26,7 +26,8 @@ start_link(Ref, Transport, Logger) ->
 
 -spec init([term()]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([Ref, Transport, Logger]) ->
-	TransOpts = ranch_server:get_transport_options(Ref),
+	TransOptsTemp = ranch_server:get_transport_options(Ref),
+	TransOpts = strip_usupported_options(TransOptsTemp),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
 	LSockets = case get(lsockets) of
@@ -100,3 +101,20 @@ format_error(reuseport_local) ->
 	"num_listen_sockets must be set to 1 for local sockets";
 format_error(Reason) ->
 	inet:format_error(Reason).
+
+-spec strip_usupported_options(ranch:transport_opts(ranch_ssl:opts())) -> ranch:transport_opts(ranch_ssl:opts()).
+strip_usupported_options(#{socket_opts := SockOpts} = AllOpts) ->
+	case lists:keyfind(versions, 1, SockOpts) of
+		{versions, ['tlsv1.3']} ->
+			Intermediate1 = lists:keydelete(secure_renegotiate, 1, SockOpts),
+			Intermediate2 = lists:keydelete(reuse_sessions, 1, Intermediate1),
+			Intermediate3 = lists:keydelete(next_protocols_advertised, 1, Intermediate2),
+			NewSockOpts = lists:keydelete(alpn_preferred_protocols, 1, Intermediate3),
+			NewTransOpts = maps:update(socket_opts, NewSockOpts, AllOpts),
+			NewTransOpts;
+		_ ->
+			AllOpts
+	end;
+strip_usupported_options(AllOpts) ->
+	AllOpts.
+
