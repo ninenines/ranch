@@ -31,7 +31,7 @@ init(_, _) ->
 		{_, {ok, "9.0"++_}} ->
 			ok;
 		{{win32, nt}, {ok, "9."++_}} ->
-			application:set_env(ssl, internal_active_n, 1);
+			application:set_env(ssl, internal_active_n, 2);
 		_ ->
 			ok
 	end,
