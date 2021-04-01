@@ -117,7 +117,8 @@ listen(TransOpts) ->
 	case lists:keymember(cert, 1, SocketOpts)
 			orelse lists:keymember(certfile, 1, SocketOpts)
 			orelse lists:keymember(sni_fun, 1, SocketOpts)
-			orelse lists:keymember(sni_hosts, 1, SocketOpts) of
+			orelse lists:keymember(sni_hosts, 1, SocketOpts)
+			orelse lists:keymember(user_lookup_fun, 1, SocketOpts) of
 		true ->
 			Logger = maps:get(logger, TransOpts, logger),
 			do_listen(SocketOpts, Logger);

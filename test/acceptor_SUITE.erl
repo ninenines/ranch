@@ -61,6 +61,8 @@ groups() ->
 		ssl_handshake,
 		ssl_sni_echo,
 		ssl_sni_fail,
+		ssl_tls_psk,
+		ssl_tls_psk_fail,
 		ssl_upgrade_from_tcp,
 		ssl_getopts_capability,
 		ssl_getstat_capability,
@@ -701,6 +703,49 @@ ssl_sni_fail(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
+
+ssl_tls_psk(_) ->
+	doc("Ensure that TLS-PSK works without certificate"),
+	Name = name(),
+	Ciphers = [#{cipher => aes_256_gcm, key_exchange => psk, mac => aead, prf => sha384}],
+	LookupFun = {fun psk_lookup_helper/3, <<"shared_secret">>},
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, [{protocol, tls}, {handshake, full}, {ciphers, Ciphers},
+					{user_lookup_fun, LookupFun}],
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}, {versions, ['tlsv1.2']},
+		 {ciphers, Ciphers}, {user_lookup_fun, LookupFun}]),
+	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
+	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_tls_psk_fail(_) ->
+	doc("Ensure that TLS-PSK filed for different shared keys"),
+	Name = name(),
+	Ciphers = [#{cipher => aes_256_gcm, key_exchange => psk, mac => aead, prf => sha384}],
+	ServerLookupFun = {fun psk_lookup_helper/3, <<"server_secret">>},
+	ClientLookupFun = {fun psk_lookup_helper/3, <<"client_secret">>},
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, [{protocol, tls}, {handshake, full}, {ciphers, Ciphers},
+					{user_lookup_fun, ServerLookupFun}],
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{error, _} = ssl:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}, {versions, ['tlsv1.2']},
+		 {ciphers, Ciphers}, {user_lookup_fun, ClientLookupFun}]),
+	ok = ranch:stop_listener(Name),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+psk_lookup_helper(psk, _PskIdentity, UserState) ->
+	{ok, UserState}.
 
 ssl_upgrade_from_tcp(_) ->
 	doc("Ensure a TCP socket can be upgraded to SSL"),
