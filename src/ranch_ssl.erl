@@ -130,7 +130,7 @@ do_listen(SocketOpts0, Logger) ->
 	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
 	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
 	SocketOpts4 = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
-	SocketOpts = strip_usupported_options(SocketOpts4),
+	SocketOpts = strip_unsupported_options(SocketOpts4),
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
@@ -298,17 +298,19 @@ cleanup(#{socket_opts:=SocketOpts}) ->
 cleanup(_) ->
 	ok.
 
--spec strip_usupported_options(opts()) -> opts().
-strip_usupported_options(SocketOpts) ->
-    case lists:keyfind(versions, 1, SocketOpts) of
-        {versions, ['tlsv1.3']} ->
-            Intermediate1 = lists:keydelete(secure_renegotiate, 1, SocketOpts),
-            Intermediate2 = lists:keydelete(reuse_sessions, 1, Intermediate1),
-            Intermediate3 = lists:keydelete(next_protocols_advertised, 1, Intermediate2),
-            lists:keydelete(alpn_preferred_protocols, 1, Intermediate3);
-        _ ->
+-spec strip_unsupported_options(opts()) -> opts().
+strip_unsupported_options(SocketOpts) ->
+    Versions1 = lists:keyfind(versions, 1, SocketOpts),
+    Versions2 = lists:keyfind(protocol_versions, 1, SocketOpts),
+    if
+        (Versions1 == {versions, ['tlsv1.3']}) or (Versions2 == {protocol_versions, ['tlsv1.3']}) ->
+            NewSocketOpts = lists:filter(fun({X, _}) ->
+                    (X /= secure_renegotiate) and (X /= reuse_sessions) and (X /= next_protocols_advertised) and (X /= alpn_preferred_protocols);
+                (_) ->
+                    true
+                end, SocketOpts),
+            NewSocketOpts;
+        true ->
             SocketOpts
-    end;
-strip_usupported_options(SocketOpts) ->
-    SocketOpts.
+    end.
 
