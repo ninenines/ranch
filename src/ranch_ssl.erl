@@ -309,6 +309,11 @@ strip_unsupported_options(SocketOpts) ->
                 (_) ->
                     true
                 end, SocketOpts),
+            if
+                NewSocketOpts /= SocketOpts ->
+                    error_logger:warning_msg("~p~n dropping options unsupported by TLS1.3-only ssl sockets: " ++
+                    "secure_renegotiate, reuse_sessions, next_protocols_advertised and/or alpn_preferred_protocols from ~p~n", [?MODULE, SocketOpts])
+            end,
             NewSocketOpts;
         true ->
             SocketOpts
