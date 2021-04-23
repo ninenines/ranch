@@ -1,14 +1,15 @@
 [appendix]
-== Changes since Ranch 1.7
+== Migrating from Ranch 1.7 to 1.8
 
-The following patch versions were released since Ranch 1.7:
+Ranch 1.8 is a compatibility update for Erlang/OTP 24.
 
-=== Ranch 1.7.1
+Ranch 1.8 is compatible with Erlang/OTP 21.0 onward. Support
+for Erlang/OTP 19 and 20 has been removed.
 
-This release fixes an issue with the PROXY protocol where
-the wrong CRC32 algorithm was used and would cause checksum
-verification to fail.
+=== Bugs fixed
 
-Because the plain `crc32` checksum is not supported by the
-PROXY protocol, the configuration value when building PROXY
-headers has been changed to `crc32c`.
+* An issue with the PROXY protocol was fixed in Ranch 1.7.1.
+  The wrong CRC32 algorithm was used and would cause
+  checksum verification to fail when used. The configuration
+  value when building PROXY headers has been changed to
+  `crc32c` to reflect the correct algorithm.
