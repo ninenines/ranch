@@ -29,6 +29,20 @@ AUTO_CI_HIPE ?= OTP-LATEST
 # AUTO_CI_ERLLVM ?= OTP-LATEST
 AUTO_CI_WINDOWS ?= OTP-21+
 
+# Hex configuration.
+
+define HEX_TARBALL_EXTRA_METADATA
+#{
+	licenses => [<<"ISC">>],
+	links => #{
+		<<"User guide">> => <<"https://ninenines.eu/docs/en/ranch/1.8/guide/">>,
+		<<"Function reference">> => <<"https://ninenines.eu/docs/en/ranch/1.8/manual/">>,
+		<<"GitHub">> => <<"https://github.com/ninenines/ranch">>,
+		<<"Sponsor">> => <<"https://github.com/sponsors/essen">>
+	}
+}
+endef
+
 # Standard targets.
 
 include erlang.mk
@@ -50,3 +64,22 @@ DIALYZER_OPTS += --src -r test
 ci-setup:: $(DEPS_DIR)/ct_helper
 	$(gen_verbose) cp ~/.kerl/builds/$(CI_OTP_RELEASE)/otp_src_git/lib/ssl/test/erl_make_certs.erl deps/ct_helper/src/ || true
 	$(gen_verbose) $(MAKE) -C $(DEPS_DIR)/ct_helper clean app
+
+# Prepare for the release.
+
+prepare_tag:
+	$(verbose) $(warning Hex metadata: $(HEX_TARBALL_EXTRA_METADATA))
+	$(verbose) echo
+	$(verbose) echo -n "Most recent tag:            "
+	$(verbose) git tag --sort taggerdate | tail -n1
+	$(verbose) git verify-tag `git tag --sort taggerdate | tail -n1`
+	$(verbose) echo -n "MAKEFILE: "
+	$(verbose) grep -m1 PROJECT_VERSION Makefile
+	$(verbose) echo -n "APP:                 "
+	$(verbose) grep -m1 vsn ebin/$(PROJECT).app | sed 's/	//g'
+	$(verbose) echo -n "GUIDE:  "
+	$(verbose) grep -h dep_$(PROJECT)_commit doc/src/guide/*.asciidoc || true
+	$(verbose) echo
+	$(verbose) echo "Dependencies:"
+	$(verbose) grep ^DEPS Makefile || echo "DEPS ="
+	$(verbose) grep ^dep_ Makefile || true
