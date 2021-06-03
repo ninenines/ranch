@@ -70,27 +70,29 @@ this call return as soon as data was read, regardless of its size.
 Active mode requires you to inform the socket that you want to receive
 data as a message and to write the code to actually receive it.
 
-There are two kinds of active modes: `{active, once}` and
-`{active, true}`. The first will send a single message before going
-back to passive mode; the second will send messages indefinitely.
-We recommend not using the `{active, true}` mode as it could quickly
-flood your process mailbox. It's better to keep the data in the socket
-and read it only when required.
+There are three kinds of active modes: `{active, once}`, `{active, N}`
+and `{active, true}`. The first will send a single message before going
+back to passive mode; the second will send `N` messages followed by
+a `Passive` message when switching back to passive mode; the third
+will send messages indefinitely. We recommend not using the `{active, true}`
+mode as it could quickly flood your process mailbox. It's better to keep
+the data in the socket and read it only when required.
 
-Three different messages can be received:
+Four different messages can be received:
 
-* `{OK, Socket, Data}`
-* `{Closed, Socket}`
-* `{Error, Socket, Reason}`
+* Incoming data: `{OK, Socket, Data}`
+* Socket closed: `{Closed, Socket}`
+* Socket error: `{Error, Socket, Reason}`
+* Switch to passive mode: `{Passive, Socket}`
 
-The value of `OK`, `Closed` and `Error` can be different
+The value of `OK`, `Closed`, `Error` and `Passive` can be different
 depending on the transport being used. To be able to properly match
 on them you must first call the `Transport:messages/0` function.
 
 .Retrieving the transport's active message identifiers
 
 [source,erlang]
-{OK, Closed, Error} = Transport:messages().
+{OK, Closed, Error, Passive} = Transport:messages().
 
 To start receiving messages you will need to call the `Transport:setopts/2`
 function, and do so every time you want to receive data.
@@ -99,7 +101,7 @@ function, and do so every time you want to receive data.
 
 [source,erlang]
 ----
-{OK, Closed, Error} = Transport:messages(),
+{OK, Closed, Error, Passive} = Transport:messages(),
 Transport:setopts(Socket, [{active, once}]),
 receive
 	{OK, Socket, Data} ->
