@@ -24,6 +24,8 @@
 -import(ct_helper, [doc/1]).
 -import(ct_helper, [name/0]).
 
+-include_lib("kernel/include/file.hrl").
+
 %% ct.
 
 all() ->
@@ -34,6 +36,7 @@ groups() ->
 		tcp_active_echo,
 		tcp_active_n_echo,
 		tcp_echo,
+		tcp_local_sockfile_mode,
 		tcp_local_echo,
 		tcp_graceful,
 		tcp_inherit_options,
@@ -56,6 +59,7 @@ groups() ->
 		ssl_active_echo,
 		ssl_active_n_echo,
 		ssl_echo,
+		ssl_local_sockfile_mode,
 		ssl_local_echo,
 		ssl_graceful,
 		ssl_handshake,
@@ -633,6 +637,38 @@ ssl_handshake(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
+ssl_local_sockfile_mode(_) ->
+	case do_os_supports_local_sockets() of
+		true ->
+			do_ssl_local_sockfile_mode();
+		false ->
+			{skip, "No local socket support."}
+	end.
+
+do_ssl_local_sockfile_mode() ->
+	doc("Ensure that local socket files are created with the specified permissions with SSL transport."),
+	SockFile = do_tempname(),
+	try
+		Name = name(),
+		Opts = ct_helper:get_certs_from_ets(),
+
+		{ok, _} = ranch:start_listener(Name,
+			ranch_ssl, #{sockfile_mode => 8#600, socket_opts => [{ip, {local, SockFile}}|Opts]},
+			echo_protocol, []),
+		{ok, FileInfo1} = file:read_file_info(SockFile),
+		8#600 = FileInfo1#file_info.mode band 8#777,
+		ok = ranch:stop_listener(Name),
+
+		{ok, _} = ranch:start_listener(Name,
+			ranch_ssl, #{sockfile_mode => 8#777, socket_opts => [{ip, {local, SockFile}}|Opts]},
+			echo_protocol, []),
+		{ok, FileInfo2} = file:read_file_info(SockFile),
+		8#777 = FileInfo2#file_info.mode band 8#777,
+		ok = ranch:stop_listener(Name)
+	after
+		file:delete(SockFile)
+	end.
+
 ssl_local_echo(_) ->
 	case do_os_supports_local_sockets() of
 		true ->
@@ -928,6 +964,36 @@ tcp_echo(_) ->
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
+
+tcp_local_sockfile_mode(_) ->
+	case do_os_supports_local_sockets() of
+		true ->
+			do_tcp_local_sockfile_mode();
+		false ->
+			{skip, "No local socket support."}
+	end.
+
+do_tcp_local_sockfile_mode() ->
+	doc("Ensure that local socket files are created with the specified permissions with TCP transport."),
+	SockFile = do_tempname(),
+	try
+		Name = name(),
+		{ok, _} = ranch:start_listener(Name,
+			ranch_tcp, #{sockfile_mode => 8#600, socket_opts => [{ip, {local, SockFile}}]},
+			echo_protocol, []),
+		{ok, FileInfo1} = file:read_file_info(SockFile),
+		8#600 = FileInfo1#file_info.mode band 8#777,
+		ok = ranch:stop_listener(Name),
+
+		{ok, _} = ranch:start_listener(Name,
+			ranch_tcp, #{sockfile_mode => 8#777, socket_opts => [{ip, {local, SockFile}}]},
+			echo_protocol, []),
+		{ok, FileInfo2} = file:read_file_info(SockFile),
+		8#777 = FileInfo2#file_info.mode band 8#777,
+		ok = ranch:stop_listener(Name)
+	after
+		file:delete(SockFile)
+	end.
 
 tcp_local_echo(_) ->
 	case do_os_supports_local_sockets() of

@@ -64,7 +64,8 @@
 	num_conns_sups => pos_integer(),
 	num_listen_sockets => pos_integer(),
 	shutdown => timeout() | brutal_kill,
-	socket_opts => SocketOpts
+	socket_opts => SocketOpts,
+	sockfile_mode => non_neg_integer()
 }.
 -export_type([transport_opts/1]).
 
@@ -139,6 +140,8 @@ validate_transport_opt(shutdown, Value, _) ->
 	is_integer(Value) andalso Value >= 0;
 validate_transport_opt(socket_opts, _, _) ->
 	true;
+validate_transport_opt(sockfile_mode, Value, _) ->
+	is_integer(Value) andalso Value >= 0;
 validate_transport_opt(_, _, _) ->
 	false.
 

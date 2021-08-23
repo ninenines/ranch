@@ -16,6 +16,9 @@
 -module(ranch_ssl).
 -behaviour(ranch_transport).
 
+%% @todo Remove when spec of ssl:sockname/1 is updated to return local addresses.
+-dialyzer({no_match, post_listen/2}).
+
 -export([name/0]).
 -export([secure/0]).
 -export([messages/0]).
@@ -120,12 +123,13 @@ listen(TransOpts) ->
 			orelse lists:keymember(sni_hosts, 1, SocketOpts) of
 		true ->
 			Logger = maps:get(logger, TransOpts, logger),
-			do_listen(SocketOpts, Logger);
+			do_listen(TransOpts, Logger);
 		false ->
 			{error, no_cert}
 	end.
 
-do_listen(SocketOpts0, Logger) ->
+do_listen(TransOpts, Logger) ->
+	SocketOpts0 = maps:get(socket_opts, TransOpts, []),
 	SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
 	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
 	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
@@ -133,8 +137,20 @@ do_listen(SocketOpts0, Logger) ->
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(SocketOpts, disallowed_listen_options(),
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)).
+	Res = ssl:listen(0, ranch:filter_options(SocketOpts, disallowed_listen_options(),
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)),
+	post_listen(Res, TransOpts).
+
+post_listen(Ok = {ok, Sock}, #{sockfile_mode:=Mode}) ->
+	case sockname(Sock) of
+		{ok, {local, SockFile}} ->
+			ok = file:change_mode(SockFile, Mode),
+			Ok;
+		_ ->
+			Ok
+	end;
+post_listen(ListenResult, _) ->
+	ListenResult.
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.

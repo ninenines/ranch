@@ -98,8 +98,20 @@ listen(TransOpts) ->
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	gen_tcp:listen(0, ranch:filter_options(SocketOpts4, disallowed_listen_options(),
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)).
+	Res = gen_tcp:listen(0, ranch:filter_options(SocketOpts4, disallowed_listen_options(),
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)),
+	post_listen(Res, TransOpts).
+
+post_listen(Ok = {ok, Sock}, #{sockfile_mode:=Mode}) ->
+	case sockname(Sock) of
+		{ok, {local, SockFile}} ->
+			ok = file:change_mode(SockFile, Mode),
+			Ok;
+		_ ->
+			Ok
+	end;
+post_listen(ListenResult, _) ->
+	ListenResult.
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.
