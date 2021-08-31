@@ -110,7 +110,7 @@ The namespace's name for the original connection.
 
 ssl::
 
-Various informations pertaining to the original SSL/TLS
+Various information pertaining to the original SSL/TLS
 connection.
 
 client:::
