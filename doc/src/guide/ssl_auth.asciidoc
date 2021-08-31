@@ -10,7 +10,7 @@ based authentication to attain greater security.
 
 The server only needs to retain the certificate serial number and
 the certificate issuer to authenticate the certificate. Together,
-they can be used to uniquely identify a certicate.
+they can be used to uniquely identify a certificate.
 
 As Ranch allows the same protocol code to be used for both SSL and
 non-SSL transports, you need to make sure you are in an SSL context
