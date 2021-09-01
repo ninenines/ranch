@@ -33,6 +33,5 @@ to close any of the currently opened sockets.
 
 == Getting help
 
-* Official IRC Channel: #ninenines on irc.freenode.net
 * https://github.com/ninenines/ranch/issues[Issues tracker]
 * https://ninenines.eu/services[Commercial Support]
