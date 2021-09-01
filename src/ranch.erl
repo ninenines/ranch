@@ -58,11 +58,12 @@
 -type transport_opts(SocketOpts) :: #{
 	connection_type => worker | supervisor,
 	handshake_timeout => timeout(),
-	max_connections => max_conns(),
 	logger => module(),
+	max_connections => max_conns(),
 	num_acceptors => pos_integer(),
 	num_conns_sups => pos_integer(),
 	num_listen_sockets => pos_integer(),
+	post_listen_callback => fun((term()) -> ok | {error, term()}),
 	shutdown => timeout() | brutal_kill,
 	socket_opts => SocketOpts
 }.
@@ -131,6 +132,8 @@ validate_transport_opt(num_conns_sups, Value, _) ->
 validate_transport_opt(num_listen_sockets, Value, Opts) ->
 	is_integer(Value) andalso Value > 0
 		andalso Value =< maps:get(num_acceptors, Opts, 10);
+validate_transport_opt(post_listen_callback, Value, _) ->
+	is_function(Value, 1);
 validate_transport_opt(shutdown, brutal_kill, _) ->
 	true;
 validate_transport_opt(shutdown, infinity, _) ->

@@ -177,6 +177,44 @@ file must not exist: Ranch must be able to create it.
     ]}, echo_protocol, []
 ).
 
+=== Performing additional setup steps on a listening socket
+
+If it is necessary to perform additional setup steps on the listening
+socket, it is possible to specify a function with the transport option
+`post_listen_callback`. This function will be called after the listening
+socket has been created but before accepting connections on it,
+with the socket as the single argument.
+
+The function must return either the atom `ok`, after which the listener
+will start accepting connections on the socket, or a tuple
+`{error, Reason}` which will cause the listener to fail starting with
+`Reason`.
+
+.Setting permissions on a UNIX Domain socket file
+
+[source,erlang]
+----
+PostListenCb = fun (Sock) ->
+    case ranch_tcp:sockname(Sock) of
+        {ok, {local, SockFile}} ->
+            file:change_mode(SockFile, 8#777);
+	{ok, _} ->
+	    ok;
+	Error = {error, _} ->
+            Error
+    end
+end,
+
+{ok, _} = ranch:start_listener(tcp_echo,
+    ranch_tcp, #{
+        socket_opts => [
+            {ip, {local, "/tmp/ranch_echo.sock"}},
+            {port, 0}],
+        post_listen_callback => PostListenCb},
+    echo_protocol, []
+).
+----
+
 === Accepting connections on an existing socket
 
 If you want to accept connections on an existing socket, you can write

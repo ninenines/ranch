@@ -77,6 +77,8 @@ groups() ->
 		misc_info_embedded,
 		misc_metrics,
 		misc_opts_logger,
+		misc_post_listen_callback,
+		misc_post_listen_callback_error,
 		misc_set_transport_options,
 		misc_wait_for_connections,
 		misc_multiple_ip_local_socket_opts
@@ -339,6 +341,47 @@ misc_opts_logger(_) ->
 
 warning(Format, Args) ->
 	misc_opts_logger ! {warning, Format, Args}.
+
+misc_post_listen_callback(_) ->
+	doc("Ensure that the post-listen callback works."),
+	Name = name(),
+	Self = self(),
+	Ref = make_ref(),
+	PostListenCb = fun (LSock) ->
+		ok = ranch_tcp:setopts(LSock, [{send_timeout, 1000}]),
+		Self ! {post_listen, Ref, LSock},
+		ok
+	end,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{post_listen_callback => PostListenCb,
+			socket_opts => [{send_timeout, infinity}]},
+		echo_protocol, []),
+	receive
+		{post_listen, Ref, LSock} ->
+			{ok, [{send_timeout, 1000}]} = ranch_tcp:getopts(LSock, [send_timeout]),
+			ok
+	after 1000 ->
+		error(timeout)
+	end,
+	Port = ranch:get_port(Name),
+	{ok, S} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(S, <<"Test">>),
+	{ok, <<"Test">>} = gen_tcp:recv(S, 4, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = gen_tcp:recv(S, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+misc_post_listen_callback_error(_) ->
+	doc("Ensure that starting a listener fails when the post-listen callback returns an error."),
+	Name = name(),
+	PostListenCb = fun (_) -> {error, test} end,
+	{error, _} = ranch:start_listener(Name,
+		ranch_tcp, #{post_listen_callback => PostListenCb},
+		echo_protocol, []),
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
 
 misc_repeated_remove(_) ->
 	doc("Ensure repeated removal of connection does not crash the connection supervisor."),

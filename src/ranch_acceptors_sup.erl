@@ -77,7 +77,13 @@ start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts0, Logger) when 
 start_listen_socket(Ref, Transport, TransOpts, Logger) ->
 	case Transport:listen(TransOpts) of
 		{ok, Socket} ->
-			Socket;
+			PostListenCb = maps:get(post_listen_callback, TransOpts, fun (_) -> ok end),
+			case PostListenCb(Socket) of
+				ok ->
+					Socket;
+				{error, Reason} ->
+					listen_error(Ref, Transport, TransOpts, Reason, Logger)
+			end;
 		{error, Reason} ->
 			listen_error(Ref, Transport, TransOpts, Reason, Logger)
 	end.

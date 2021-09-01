@@ -29,6 +29,7 @@ Changes to the following options will take effect...
 * only after the listener has been suspended and resumed:
 ** `num_acceptors`
 ** `num_listen_sockets`
+** `post_listen_callback`
 ** `socket_opts`
 * only when the entire listener is restarted:
 ** `connection_type`
