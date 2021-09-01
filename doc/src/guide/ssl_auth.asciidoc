@@ -50,12 +50,12 @@ the listener to enable this behavior.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(my_ssl,
-	ranch_ssl, [
+	ranch_ssl, #{socket_opts => [
 		{port, SSLPort},
 		{certfile, PathToCertfile},
 		{cacertfile, PathToCACertfile},
 		{verify, verify_peer}
-	],
+	]},
 	my_protocol, []
 ).
 

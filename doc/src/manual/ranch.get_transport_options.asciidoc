@@ -24,11 +24,6 @@ The listener name.
 
 The current transport options are returned.
 
-If the transport options were specified as only socket options (not a map) using
-link:man:ranch:start_listener(3)[ranch:start_listener(3)] or
-link:man:ranch:set_transport_options(3)[ranch:set_transport_options(3)], they
-are returned as `#{socket_opts => SocketOpts}`.
-
 == Examples
 
 .Get the current transport options
