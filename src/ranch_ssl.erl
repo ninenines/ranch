@@ -130,10 +130,12 @@ do_listen(SocketOpts0, Logger) ->
 	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
 	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
 	SocketOpts = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
+	DisallowedOpts0 = disallowed_listen_options(),
+	DisallowedOpts = unsupported_tls_options(SocketOpts) ++ DisallowedOpts0,
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(SocketOpts, disallowed_listen_options(),
+	ssl:listen(0, ranch:filter_options(SocketOpts, DisallowedOpts,
 		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)).
 
 %% 'binary' and 'list' are disallowed but they are handled
@@ -143,6 +145,22 @@ disallowed_listen_options() ->
 	[alpn_advertised_protocols, client_preferred_next_protocols,
 		fallback, server_name_indication, srp_identity
 		|ranch_tcp:disallowed_listen_options()].
+
+unsupported_tls_options(SocketOpts) ->
+	unsupported_tls_version_options(lists:usort(get_tls_versions(SocketOpts))).
+
+unsupported_tls_version_options([tlsv1|_]) ->
+	[];
+unsupported_tls_version_options(['tlsv1.1'|_]) ->
+	[beast_mitigation, padding_check];
+unsupported_tls_version_options(['tlsv1.2'|_]) ->
+	[beast_mitigation, padding_check];
+unsupported_tls_version_options(['tlsv1.3'|_]) ->
+	[beast_mitigation, client_renegotiation, next_protocols_advertised,
+		padding_check, psk_identity, reuse_session, reuse_sessions,
+		secure_renegotiate, user_lookup_fun];
+unsupported_tls_version_options(_) ->
+	[].
 
 -spec accept(ssl:sslsocket(), timeout())
 	-> {ok, ssl:sslsocket()} | {error, closed | timeout | atom()}.
@@ -296,3 +314,26 @@ cleanup(#{socket_opts:=SocketOpts}) ->
 	end;
 cleanup(_) ->
 	ok.
+
+get_tls_versions(SocketOpts) ->
+	%% Socket options need to be reversed for keyfind because later options
+	%% take precedence when contained multiple times, but keyfind will return
+	%% the earliest occurence.
+	case lists:keyfind(versions, 1, lists:reverse(SocketOpts)) of
+		{versions, Versions} ->
+			Versions;
+		false ->
+			get_tls_versions_env()
+	end.
+
+get_tls_versions_env() ->
+	case application:get_env(ssl, protocol_version) of
+		{ok, Versions} ->
+			Versions;
+		undefined ->
+			get_tls_versions_app()
+	end.
+
+get_tls_versions_app() ->
+	{supported, Versions} = lists:keyfind(supported, 1, ssl:versions()),
+	Versions.

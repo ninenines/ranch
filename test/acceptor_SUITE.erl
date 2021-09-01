@@ -68,7 +68,8 @@ groups() ->
 		ssl_many_listen_sockets_no_reuseport,
 		ssl_error_eaddrinuse,
 		ssl_error_no_cert,
-		ssl_error_eacces
+		ssl_error_eacces,
+		ssl_unsupported_tlsv13_options
 	]}, {misc, [
 		misc_bad_transport,
 		misc_bad_transport_options,
@@ -599,13 +600,11 @@ ssl_active_echo(_) ->
 	ok.
 
 ssl_active_n_echo(_) ->
-	case application:get_key(ssl, vsn) of
-		{ok, "9.0"++_} ->
-			{skip, "No Active N support."};
-		{ok, "9.1"++_} ->
-			{skip, "No Active N support."};
-		{ok, _} ->
-			do_ssl_active_n_echo()
+	case do_get_ssl_version() >= {9, 2, 0} of
+		true ->
+			do_ssl_active_n_echo();
+		false ->
+			{skip, "No Active N support."}
 	end.
 
 do_ssl_active_n_echo() ->
@@ -874,6 +873,46 @@ ssl_error_eacces(_) ->
 				active_echo_protocol, []),
 			ok
 	end.
+
+ssl_unsupported_tlsv13_options(_) ->
+	{available, Versions} = lists:keyfind(available, 1, ssl:versions()),
+	case {lists:member('tlsv1.3', Versions), do_get_ssl_version() >= {10, 0, 0}} of
+		{true, true} ->
+			do_ssl_unsupported_tlsv13_options();
+		{false, _} ->
+			{skip, "No TLSv1.3 support."};
+		{_, false} ->
+			{skip, "No TLSv1.3 option dependency checking."}
+	end.
+
+do_ssl_unsupported_tlsv13_options() ->
+	doc("Ensure that a listener can be started when TLSv1.3 is "
+	    "the only protocol and unsupported options are present."),
+	CheckOpts = [
+		{beast_mitigation, one_n_minus_one},
+		{client_renegotiation, true},
+		{next_protocols_advertised, [<<"dummy">>]},
+		{padding_check, true},
+		{psk_identity, "dummy"},
+		{secure_renegotiate, true},
+		{reuse_session, fun (_, _, _, _) -> true end},
+		{reuse_sessions, true},
+		{user_lookup_fun, {fun (_, _, _) -> error end, <<"dummy">>}}
+	],
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets() ++ [{versions, ['tlsv1.3']}],
+	ok = lists:foreach(
+		fun (CheckOpt) ->
+			Opts1 = Opts ++ [CheckOpt],
+			{error, {options, dependency, _}} = ssl:listen(0, Opts1),
+			{ok, _} = ranch:start_listener(Name,
+				ranch_ssl, #{socket_opts => Opts1},
+				echo_protocol, []),
+			ok = ranch:stop_listener(Name)
+		end,
+		CheckOpts
+	),
+	ok.
 
 %% tcp.
 
@@ -1674,3 +1713,14 @@ do_os_supports_local_sockets() ->
 
 do_tempname() ->
 	list_to_binary(lists:droplast(os:cmd("mktemp -u"))).
+
+do_get_ssl_version() ->
+	{ok, Vsn} = application:get_key(ssl, vsn),
+	Vsns0 = re:split(Vsn, "\\D+", [{return, list}]),
+	Vsns1 = lists:map(fun list_to_integer/1, Vsns0),
+	case Vsns1 of
+		[] -> {0, 0, 0};
+		[Major] -> {Major, 0, 0};
+		[Major, Minor] -> {Major, Minor, 0};
+		[Major, Minor, Patch|_] -> {Major, Minor, Patch}
+	end.
