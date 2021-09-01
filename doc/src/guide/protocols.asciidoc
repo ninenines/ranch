@@ -59,7 +59,7 @@ loop(Socket, Transport) ->
 	end.
 ----
 
-=== Using gen_statem
+=== Using gen_statem and gen_server
 
 Special processes like the ones that use the `gen_statem` or `gen_server`
 behaviours have the particularity of having their `start_link` call not
@@ -67,12 +67,21 @@ return until the `init` function returns. This is problematic, because
 you won't be able to call `ranch:handshake/1,2` from the `init` callback
 as this would cause a deadlock to happen.
 
-Use the `gen_statem:enter_loop/4` function. It allows you to start your process
-normally (although it must be started with `proc_lib` like all special
-processes), then perform any needed operations before falling back into
-the normal `gen_statem` execution loop.
+This problem can be addressed in several ways.
 
-.Use a gen_statem for protocol handling
+==== gen_statem
+
+* Use state enter calls and place the `ranch:handshake/1,2` call in the enter
+  clause of the initial state. Check the `tcp_reverse` example for a complete
+  example.
+* Use a `next_event` action in the return from `init/1` and place the
+  `ranch:handshake/1,2` call in the clause handling the event in the initial
+  state.
+* Use the `gen_statem:enter_loop/4` function and start your process with
+  `proc_lib:spawn_link/3` or `proc_lib:start_link/3,4,5`. See below for an
+  example.
+
+.Using gen_statem:enter_loop/4 to start a protocol
 
 [source,erlang]
 ----
@@ -87,7 +96,7 @@ the normal `gen_statem` execution loop.
 start_link(Ref, Transport, Opts) ->
 	{ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Transport, Opts}])}.
 
-init({Ref, Transport, _Opts = []}) ->
+init({Ref, Transport, _Opts}) ->
 	%% Perform any required state initialization here.
 	{ok, Socket} = ranch:handshake(Ref),
 	ok = Transport:setopts(Socket, [{active, once}]),
@@ -96,4 +105,9 @@ init({Ref, Transport, _Opts = []}) ->
 %% Other gen_statem callbacks here.
 ----
 
-Check the `tcp_reverse` example for a complete example.
+==== gen_server
+
+* Use `{continue, Continue}` in the return from `init/1` and place the
+  `ranch:handshake/1,2` call in a corresponding `handle_continue/2` clause.
+* Use the `gen_server:enter_loop/3` function and start your process with
+  `proc_lib:spawn_link/3` or `proc_lib:start_link/3,4,5`.

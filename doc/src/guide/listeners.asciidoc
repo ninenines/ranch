@@ -19,7 +19,6 @@ A listener can be started and stopped at will.
 When starting a listener, a number of different settings are required:
 
 * A name to identify it locally and be able to interact with it.
-* The number of acceptors in the pool.
 * A transport handler and its associated options.
 * A protocol handler and its associated options.
 
@@ -43,8 +42,8 @@ to the `echo_protocol` handler.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, [{port, 5555}],
-	echo_protocol, []
+    ranch_tcp, #{socket_opts => [{port, 5555}]},
+    echo_protocol, []
 ).
 
 You can try this out by compiling and running the `tcp_echo` example in the
@@ -142,8 +141,8 @@ argument is the name of the listener you gave in `ranch:start_listener/5`.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, [{port, 0}],
-	echo_protocol, []
+    ranch_tcp, #{socket_opts => [{port, 0}]},
+    echo_protocol, []
 ).
 Port = ranch:get_port(tcp_echo).
 
@@ -200,8 +199,8 @@ overloaded and ensuring all the connections are handled optimally.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, #{socket_opts => [{port, 5555}], max_connections => 100},
-	echo_protocol, []
+    ranch_tcp, #{socket_opts => [{port, 5555}], max_connections => 100},
+    echo_protocol, []
 ).
 
 You can disable this limit by setting its value to the atom `infinity`.
@@ -210,8 +209,8 @@ You can disable this limit by setting its value to the atom `infinity`.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, #{socket_opts => [{port, 5555}], max_connections => infinity},
-	echo_protocol, []
+    ranch_tcp, #{socket_opts => [{port, 5555}], max_connections => infinity},
+    echo_protocol, []
 ).
 
 The maximum number of connections is a soft limit. In practice, it
@@ -267,8 +266,8 @@ measure to find the best value for your application.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, [{port, 5555}, {num_acceptors, 42}],
-	echo_protocol, []
+    ranch_tcp, #{socket_opts => [{port, 5555}], num_acceptors => 42},
+    echo_protocol, []
 ).
 
 === Customizing the number of connection supervisors
@@ -287,8 +286,8 @@ processes.
 
 [source,erlang]
 {ok, _} = ranch:start_listener(tcp_echo,
-	ranch_tcp, #{socket_opts => [{port, 5555}], num_conns_sups => 42}],
-	echo_protocol, []
+    ranch_tcp, #{socket_opts => [{port, 5555}], num_conns_sups => 42},
+    echo_protocol, []
 ).
 
 === When running out of file descriptors

@@ -49,9 +49,6 @@ Transport options include the Ranch-specific options
 and the socket options. The listener's port number must
 be defined in the socket options.
 +
-Socket options may be given directly if there are no
-Ranch-specific options.
-+
 The available options for the built-in Ranch transports
 are documented in the link:man:ranch_tcp(3)[ranch_tcp(3)]
 and link:man:ranch_ssl(3)[ranch_ssl(3)] manuals.
