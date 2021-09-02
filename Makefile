@@ -2,7 +2,7 @@
 
 PROJECT = ranch
 PROJECT_DESCRIPTION = Socket acceptor pool for TCP protocols.
-PROJECT_VERSION = 2.0.0
+PROJECT_VERSION = 2.1.0
 PROJECT_REGISTERED = ranch_server
 
 # Options.
@@ -34,6 +34,20 @@ AUTO_CI_OTP ?= OTP-22+
 AUTO_CI_HIPE ?= OTP-LATEST
 # AUTO_CI_ERLLVM ?= OTP-LATEST
 AUTO_CI_WINDOWS ?= OTP-22+
+
+# Hex configuration.
+
+define HEX_TARBALL_EXTRA_METADATA
+#{
+	licenses => [<<"ISC">>],
+	links => #{
+		<<"User guide">> => <<"https://ninenines.eu/docs/en/ranch/2.1/guide/">>,
+		<<"Function reference">> => <<"https://ninenines.eu/docs/en/ranch/2.1/manual/">>,
+		<<"GitHub">> => <<"https://github.com/ninenines/ranch">>,
+		<<"Sponsor">> => <<"https://github.com/sponsors/essen">>
+	}
+}
+endef
 
 # Standard targets.
 
@@ -67,6 +81,8 @@ ci-setup:: $(DEPS_DIR)/ct_helper
 # Prepare for the release.
 
 prepare_tag:
+	$(verbose) $(warning Hex metadata: $(HEX_TARBALL_EXTRA_METADATA))
+	$(verbose) echo
 	$(verbose) echo -n "Most recent tag:            "
 	$(verbose) git tag --sort=creatordate | tail -n1
 	$(verbose) git verify-tag `git tag --sort=creatordate | tail -n1`
@@ -76,6 +92,12 @@ prepare_tag:
 	$(verbose) grep -m1 vsn ebin/$(PROJECT).app | sed 's/	//g'
 	$(verbose) echo -n "APPUP:               "
 	$(verbose) grep -m1 {\" src/$(PROJECT).appup
+	$(verbose) echo -n "GUIDE:  "
+	$(verbose) grep -h dep_$(PROJECT)_commit doc/src/guide/*.asciidoc || true
+	$(verbose) echo
+	$(verbose) echo "Dependencies:"
+	$(verbose) grep ^DEPS Makefile || echo "DEPS ="
+	$(verbose) grep ^dep_ Makefile || true
 	$(verbose) echo
 	$(verbose) echo "Links in the README:"
 	$(verbose) grep http.*:// README.asciidoc
