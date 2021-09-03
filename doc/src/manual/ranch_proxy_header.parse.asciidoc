@@ -46,4 +46,5 @@ error.
 == See also
 
 link:man:ranch_proxy_header:header(3)[ranch_proxy_header:header(3)],
+link:man:ranch_proxy_header:to_connection_info(3)[ranch_proxy_header:to_connection_info(3)],
 link:man:ranch_proxy_header(3)[ranch_proxy_header(3)]

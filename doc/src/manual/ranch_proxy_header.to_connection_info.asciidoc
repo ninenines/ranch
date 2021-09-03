@@ -1,0 +1,49 @@
+= ranch_proxy_header:to_connection_info(3)
+
+== Name
+
+ranch_proxy_header:to_connection_info - Convert proxy_info() to ssl:connection_info()
+
+== Description
+
+[source,erlang]
+----
+to_connection_info(ProxyInfo :: proxy_info())
+    -> ssl:connection_info()
+----
+
+Convert `ranch_proxy_header:proxy_info()` information
+to the `ssl:connection_info()` format returned by
+`ssl:connection_information/1,2`.
+
+== Arguments
+
+ProxyInfo::
+
+The PROXY protocol information.
+
+== Return value
+
+Connection information is returned as a proplist.
+
+Because the PROXY protocol header includes limited
+information, only the keys `protocol`, `selected_cipher_suite`
+and `sni_hostname` will be returned, at most. All keys
+are optional.
+
+== Changelog
+
+* *2.1*: Function introduced.
+
+== Examples
+
+.Convert the PROXY protocol information
+[source,erlang]
+----
+ConnInfo = ranch_proxy_header:to_connection_info(ProxyInfo).
+----
+
+== See also
+
+link:man:ranch_proxy_header:parse(3)[ranch_proxy_header:parse(3)],
+link:man:ranch_proxy_header(3)[ranch_proxy_header(3)]

@@ -13,6 +13,7 @@ for parsing and building the PROXY protocol header.
 
 * link:man:ranch_proxy_header:parse(3)[ranch_proxy_header:parse(3)] - Parse a PROXY protocol header
 * link:man:ranch_proxy_header:header(3)[ranch_proxy_header:header(3)] - Build a PROXY protocol header
+* link:man:ranch_proxy_header:to_connection_info(3)[ranch_proxy_header:to_connection_info(3)] - Convert proxy_info() to ssl:connection_info()
 
 == Types
 

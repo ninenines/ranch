@@ -17,6 +17,7 @@
 -export([parse/1]).
 -export([header/1]).
 -export([header/2]).
+-export([to_connection_info/1]).
 
 -type proxy_info() :: #{
 	%% Mandatory part.
@@ -830,7 +831,7 @@ v2_tlvs_test() ->
 	Test4 = Common#{ssl => #{
 		client => [ssl, cert_conn, cert_sess],
 		verified => true,
-		version => <<"TLSv1.3">>, %% Note that I'm not sure this example value is correct.
+		version => <<"TLSv1.3">>,
 		cipher => <<"ECDHE-RSA-AES128-GCM-SHA256">>,
 		sig_alg => <<"SHA256">>,
 		key_alg => <<"RSA2048">>,
@@ -876,5 +877,131 @@ v2_padding_test() ->
 		dest_port => 23456
 	},
 	{ok, Test, <<>>} = parse(iolist_to_binary(header(Test, #{padding => 123}))),
+	ok.
+-endif.
+
+%% Helper to convert proxy_info() to ssl:connection_info().
+%%
+%% Because there isn't a lot of fields common to both types
+%% this only ends up returning the keys protocol, selected_cipher_suite
+%% and sni_hostname *at most*.
+
+-spec to_connection_info(proxy_info()) -> ssl:connection_info().
+to_connection_info(ProxyInfo=#{ssl := SSL}) ->
+	ConnInfo0 = case ProxyInfo of
+		#{authority := Authority} ->
+			[{sni_hostname, Authority}];
+		_ ->
+			[]
+	end,
+	ConnInfo = case SSL of
+		#{cipher := Cipher} ->
+			case ssl:str_to_suite(binary_to_list(Cipher)) of
+				{error, {not_recognized, _}} ->
+					ConnInfo0;
+				CipherInfo ->
+					[{selected_cipher_suite, CipherInfo}|ConnInfo0]
+			end;
+		_ ->
+			ConnInfo0
+	end,
+	%% https://www.openssl.org/docs/man1.1.1/man3/SSL_get_version.html
+	case SSL of
+		#{version := <<"TLSv1.3">>} -> [{protocol, 'tlsv1.3'}|ConnInfo];
+		#{version := <<"TLSv1.2">>} -> [{protocol, 'tlsv1.2'}|ConnInfo];
+		#{version := <<"TLSv1.1">>} -> [{protocol, 'tlsv1.1'}|ConnInfo];
+		#{version := <<"TLSv1">>} -> [{protocol, tlsv1}|ConnInfo];
+		#{version := <<"SSLv3">>} -> [{protocol, sslv3}|ConnInfo];
+		#{version := <<"SSLv2">>} -> [{protocol, sslv2}|ConnInfo];
+		%% <<"unknown">>, unsupported or missing version.
+		_ -> ConnInfo
+	end;
+%% No SSL/TLS information available.
+to_connection_info(_) ->
+	[].
+
+-ifdef(TEST).
+to_connection_info_test() ->
+	Common = #{
+		version => 2,
+		command => proxy,
+		transport_family => ipv4,
+		transport_protocol => stream,
+		src_address => {127, 0, 0, 1},
+		src_port => 1234,
+		dest_address => {10, 11, 12, 13},
+		dest_port => 23456
+	},
+	%% Version 1.
+	[] = to_connection_info(#{
+		version => 1,
+		command => proxy,
+		transport_family => undefined,
+		transport_protocol => undefined
+	}),
+	[] = to_connection_info(Common#{version => 1}),
+	%% Version 2, no ssl data.
+	[] = to_connection_info(#{
+		version => 2,
+		command => local
+	}),
+	[] = to_connection_info(#{
+		version => 2,
+		command => proxy,
+		transport_family => undefined,
+		transport_protocol => undefined
+	}),
+	[] = to_connection_info(Common),
+	[] = to_connection_info(#{
+		version => 2,
+		command => proxy,
+		transport_family => unix,
+		transport_protocol => dgram,
+		src_address => <<"/run/source.sock">>,
+		dest_address => <<"/run/destination.sock">>
+	}),
+	[] = to_connection_info(Common#{netns => <<"/var/run/netns/example">>}),
+	[] = to_connection_info(Common#{raw_tlvs => [
+		{16#ff, <<1, 2, 3, 4, 5, 6, 7, 8, 9, 0>>}
+	]}),
+	%% Version 2, with ssl-related data.
+	[] = to_connection_info(Common#{alpn => <<"h2">>}),
+	%% The authority alone is not enough to deduce that this is SNI.
+	[] = to_connection_info(Common#{authority => <<"internal.example.org">>}),
+	[
+		{protocol, 'tlsv1.3'},
+		{selected_cipher_suite, #{
+			cipher := aes_128_gcm,
+			key_exchange := ecdhe_rsa,
+			mac := aead,
+			prf := sha256
+		}}
+	] = to_connection_info(Common#{ssl => #{
+		client => [ssl, cert_conn, cert_sess],
+		verified => true,
+		version => <<"TLSv1.3">>,
+		cipher => <<"ECDHE-RSA-AES128-GCM-SHA256">>,
+		sig_alg => <<"SHA256">>,
+		key_alg => <<"RSA2048">>,
+		cn => <<"example.com">>
+	}}),
+	[
+		{protocol, 'tlsv1.3'},
+		{selected_cipher_suite, #{
+			cipher := aes_128_gcm,
+			key_exchange := ecdhe_rsa,
+			mac := aead,
+			prf := sha256
+		}},
+		{sni_hostname, <<"internal.example.org">>}
+	] = to_connection_info(Common#{authority => <<"internal.example.org">>, ssl => #{
+		client => [ssl, cert_conn, cert_sess],
+		verified => true,
+		version => <<"TLSv1.3">>,
+		cipher => <<"ECDHE-RSA-AES128-GCM-SHA256">>,
+		sig_alg => <<"SHA256">>,
+		key_alg => <<"RSA2048">>,
+		cn => <<"example.com">>
+	}}),
 	ok.
 -endif.
