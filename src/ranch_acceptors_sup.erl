@@ -60,12 +60,7 @@ start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts0, Logger) when 
 			[];
 		{_, Port} ->
 			SocketOpts = maps:get(socket_opts, TransOpts0, []),
-			SocketOpts1 = case lists:keyfind(port, 1, SocketOpts) of
-				{port, Port} ->
-					SocketOpts;
-				_ ->
-					[{port, Port}|lists:keydelete(port, 1, SocketOpts)]
-			end,
+			SocketOpts1 = lists:keystore(port, 1, SocketOpts, {port, Port}),
 			TransOpts1 = TransOpts0#{socket_opts => SocketOpts1},
 			[{N, start_listen_socket(Ref, Transport, TransOpts1, Logger)}
 				|| N <- lists:seq(2, NumListenSockets)]

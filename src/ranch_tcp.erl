@@ -90,16 +90,24 @@ messages() -> {tcp, tcp_closed, tcp_error, tcp_passive}.
 listen(TransOpts) ->
 	ok = cleanup(TransOpts),
 	Logger = maps:get(logger, TransOpts, logger),
-	SocketOpts0 = maps:get(socket_opts, TransOpts, []),
+	SocketOpts = maps:get(socket_opts, TransOpts, []),
+	%% We set the port to 0 because it is given in the Opts directly.
+	%% The port in the options takes precedence over the one in the
+	%% first argument.
+	gen_tcp:listen(0, prepare_socket_opts(SocketOpts, Logger)).
+
+prepare_socket_opts([Backend = {inet_backend, _}|SocketOpts], Logger) ->
+	%% In OTP/23, the inet_backend option may be used to activate the
+	%% experimental socket backend for inet/gen_tcp. If present, it must
+	%% be the first option in the list.
+	[Backend|prepare_socket_opts(SocketOpts, Logger)];
+prepare_socket_opts(SocketOpts0, Logger) ->
 	SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
 	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
 	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
 	SocketOpts4 = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
-	%% We set the port to 0 because it is given in the Opts directly.
-	%% The port in the options takes precedence over the one in the
-	%% first argument.
-	gen_tcp:listen(0, ranch:filter_options(SocketOpts4, disallowed_listen_options(),
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)).
+	ranch:filter_options(SocketOpts4, disallowed_listen_options(),
+		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger).
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.
