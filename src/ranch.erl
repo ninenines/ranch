@@ -55,17 +55,17 @@
 -type opts() :: any() | transport_opts(any()).
 -export_type([opts/0]).
 
--type alarm_name() :: term().
+-type alarm(Type, Callback) :: #{
+	type := Type,
+	callback := Callback,
+	treshold := non_neg_integer(),
+	cooldown := non_neg_integer()
+}.
 
--type alarm_type() :: num_connections.
-
--type alarm_opts() :: #{treshold => non_neg_integer(),
-			callback => fun((ref(), alarm_name(), pid(), [pid()]) -> any()) | {module(), atom()},
-			cooldown => non_neg_integer()}.
--export_type([alarm_opts/0]).
+-type alarm_num_connections() :: alarm(num_connections, fun((ref(), term(), pid(), [pid()]) -> any())).
 
 -type transport_opts(SocketOpts) :: #{
-	alarms => undefined | #{alarm_name() => {alarm_type(), alarm_opts()}},
+	alarms => #{term() => alarm_num_connections()},
 	connection_type => worker | supervisor,
 	handshake_timeout => timeout(),
 	logger => module(),
@@ -133,13 +133,11 @@ validate_transport_opt(max_connections, infinity, _) ->
 	true;
 validate_transport_opt(max_connections, Value, _) ->
 	is_integer(Value) andalso Value >= 0;
-validate_transport_opt(alarms, undefined, _) ->
-	true;
 validate_transport_opt(alarms, Alarms, _) ->
 	maps:fold(
 		fun
-			(_, {Type, Opts}, true) ->
-				validate_alarm(Type, Opts);
+			(_, Opts, true) ->
+				validate_alarm(Opts);
 			(_, _, false) ->
 				false
 		end,
@@ -167,16 +165,12 @@ validate_transport_opt(socket_opts, _, _) ->
 validate_transport_opt(_, _, _) ->
 	false.
 
-validate_alarm(num_connections, #{treshold := Treshold,
+validate_alarm(#{type := num_connections, treshold := Treshold,
 		callback := Callback, cooldown := Cooldown}) ->
-	ValidTreshold = is_integer(Treshold) andalso Treshold >= 0,
-	ValidCooldown = is_integer(Cooldown) andalso Cooldown >= 0,
-	ValidCallback = case Callback of
-		{Mod, Fun} -> is_atom(Mod) andalso is_atom(Fun);
-		_ -> is_function(Callback, 4)
-	end,
-	ValidTreshold andalso ValidCooldown andalso ValidCallback;
-validate_alarm(_, _) ->
+	is_integer(Treshold) andalso Treshold >= 0
+	andalso is_integer(Cooldown) andalso Cooldown >= 0
+	andalso is_function(Callback, 4);
+validate_alarm(_) ->
 	false.
 
 maybe_started({error, {{shutdown,

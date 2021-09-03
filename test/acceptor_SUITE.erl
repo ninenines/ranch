@@ -587,8 +587,8 @@ misc_connection_alarms(_) ->
 		Self ! {connection_alarm, {Ref, AlarmName, length(ActiveConns)}}
 	end,
 	Alarms0 = #{
-		test1 => {num_connections, AlarmOpts1 = #{treshold => 2, cooldown => 0, callback => AlarmCallback}},
-		test2 => {num_connections, AlarmOpts2 = #{treshold => 3, cooldown => 0, callback => AlarmCallback}}
+		test1 => Alarm1 = #{type => num_connections, treshold => 2, cooldown => 0, callback => AlarmCallback},
+		test2 => Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback}
 	},
 	ConnectOpts = [binary, {active, false}, {packet, raw}],
 
@@ -609,8 +609,8 @@ misc_connection_alarms(_) ->
 	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 100),
 
 	Alarms1 = #{
-		test1 => {num_connections, AlarmOpts1#{cooldown => 100}},
-		test2 => {num_connections, AlarmOpts2#{cooldown => 100}}
+		test1 => Alarm1#{cooldown => 100},
+		test2 => Alarm2#{cooldown => 100}
 	},
 	ok = ranch:set_transport_options(Name, TransOpts0#{alarms => Alarms1}),
 	ok = do_flush_connection_alarms(Name),

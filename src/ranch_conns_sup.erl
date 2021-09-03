@@ -43,7 +43,7 @@
 	handshake_timeout :: timeout(),
 	max_conns = undefined :: ranch:max_conns(),
 	stats_counters_ref :: counters:counters_ref(),
-	alarms = #{} :: #{ranch:alarm_name() => {undefined | reference(), ranch:alarm_opts()}},
+	alarms = #{} :: #{term() => {undefined | reference(), map()}},
 	logger = undefined :: module()
 }).
 
@@ -307,7 +307,7 @@ schedule_activate_alarm(_, _) ->
 get_alarms(#{alarms := Alarms}) when is_map(Alarms) ->
 	maps:fold(
 		fun
-			(Name, {num_connections, Opts}, Acc) -> Acc#{Name => {Opts, undefined}};
+			(Name, Opts = #{type := num_connections}, Acc) -> Acc#{Name => {Opts, undefined}};
 			(_, _, Acc) -> Acc
 		end,
 		#{},
