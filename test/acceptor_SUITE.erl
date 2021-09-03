@@ -21,13 +21,14 @@
 %% @todo Remove when specs in ssl are updated to accept local addresses.
 -dialyzer({nowarn_function, do_ssl_local_echo/0}).
 
+-import(ct_helper, [config/2]).
 -import(ct_helper, [doc/1]).
 -import(ct_helper, [name/0]).
 
 %% ct.
 
 all() ->
-	[{group, tcp}, {group, ssl}, {group, misc}, {group, supervisor}].
+	[{group, tcp}, {group, tcp_socket}, {group, ssl}, {group, misc}, {group, supervisor}].
 
 groups() ->
 	[{tcp, [
@@ -51,6 +52,30 @@ groups() ->
 		tcp_many_listen_sockets_no_reuseport,
 		tcp_error_eaddrinuse,
 		tcp_error_eacces
+	]}, {tcp_socket, [
+		tcp_active_echo,
+		tcp_active_n_echo,
+		tcp_echo,
+		tcp_graceful,
+		tcp_inherit_options,
+		tcp_max_connections,
+		tcp_max_connections_and_beyond,
+		tcp_max_connections_infinity,
+		tcp_remove_connections,
+		tcp_remove_connections_acceptor_wakeup,
+		tcp_set_max_connections,
+		tcp_set_max_connections_clean,
+		tcp_getopts_capability,
+		tcp_getstat_capability,
+		tcp_upgrade,
+		%% @TODO: Enable when https://github.com/erlang/otp/issues/5122
+		%%        is in an official release, probably 24.1.
+		% tcp_10_acceptors_10_listen_sockets,
+		% tcp_many_listen_sockets_no_reuseport,
+		tcp_error_eaddrinuse
+		%% @TODO: Not working in OTP/24.0 but fixed in current master.
+		%%        Enable when fixed in an official release, probably 24.1.
+		% tcp_error_eacces
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_active_echo,
@@ -101,6 +126,37 @@ groups() ->
 		supervisor_server_recover_state,
 		supervisor_unexpected_message
 	]}].
+
+init_per_group(tcp_socket, Config) ->
+	%% The socket backend for inet/gen_tcp was introduced as an experimental
+	%% feature in OTP/23.0, and bugs https://bugs.erlang.org/browse/ERL-1284,
+	%% 1287 and 1293 were solved in OTP/23.1. socket:use_registry/1 first
+	%% appears in this release.
+	%% Due to https://bugs.erlang.org/browse/ERL-1401, the socket backend
+	%% is not working on Windows.
+	case
+		os:type() =/= {win32, nt} andalso
+		code:ensure_loaded(socket) =:= {module, socket} andalso
+		erlang:function_exported(socket, use_registry, 1)
+	of
+		true ->
+			[{socket_opts, [{inet_backend, socket}]}|Config];
+		false ->
+			{skip, "No socket backend support"}
+	end;
+init_per_group(_, Config) ->
+	case
+		code:ensure_loaded(socket) =:= {module, socket} andalso
+		erlang:function_exported(socket, use_registry, 1)
+	of
+		true ->
+			[{socket_opts, [{inet_backend, inet}]}|Config];
+		false ->
+			[{socket_opts, []}|Config]
+	end.
+
+end_per_group(_, _) ->
+	ok.
 
 %% misc.
 
@@ -961,53 +1017,62 @@ do_ssl_unsupported_tlsv13_options() ->
 
 %% tcp.
 
-tcp_10_acceptors_10_listen_sockets(_) ->
+tcp_10_acceptors_10_listen_sockets(Config) ->
 	case do_os_supports_reuseport() of
 		true ->
-			ok = do_tcp_10_acceptors_10_listen_sockets();
+			ok = do_tcp_10_acceptors_10_listen_sockets(Config);
 		false ->
 			{skip, "No SO_REUSEPORT support."}
 	end.
 
-do_tcp_10_acceptors_10_listen_sockets() ->
+do_tcp_10_acceptors_10_listen_sockets(Config) ->
 	doc("Ensure that we can use 10 listen sockets across 10 acceptors with TCP."),
 	Name = name(),
-	{ok, ListenerSupPid} = ranch:start_listener(Name,
+	SockOpts = config(socket_opts, Config),
+	Self = self(),
+	Tag = make_ref(),
+	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => [{raw, 1, 15, <<1:32/native>>}]},
+			socket_opts => SockOpts ++ [{raw, 1, 15, <<1:32/native>>}],
+			post_listen_callback => fun (LSocket) -> Self ! {Tag, LSocket}, ok end},
 		echo_protocol, []),
-	10 = length(do_get_listener_sockets(ListenerSupPid)),
+	LSockets = [receive {Tag, LSocket} -> LSocket after 1000 -> error(timeout) end
+		|| _ <- lists:seq(1, 10)],
+	10 = length(LSockets),
+	10 = length(lists:usort(LSockets)),
 	ok = ranch:stop_listener(Name),
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_many_listen_sockets_no_reuseport(_) ->
+tcp_many_listen_sockets_no_reuseport(Config) ->
 	case do_os_supports_reuseport() of
 		true ->
-			ok = do_tcp_many_listen_sockets_no_reuseport();
+			ok = do_tcp_many_listen_sockets_no_reuseport(Config);
 		false ->
 			{skip, "No SO_REUSEPORT support."}
 	end.
 
-do_tcp_many_listen_sockets_no_reuseport() ->
+do_tcp_many_listen_sockets_no_reuseport(Config) ->
 	doc("Confirm that ranch:start_listener/5 fails when SO_REUSEPORT is not available with TCP."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{error, eaddrinuse} = ranch:start_listener(Name,
 		ranch_tcp, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => [{raw, 1, 15, <<0:32/native>>}]},
+			socket_opts => SockOpts ++ [{raw, 1, 15, <<0:32/native>>}]},
 		echo_protocol, []),
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_active_echo(_) ->
+tcp_active_echo(Config) ->
 	doc("Ensure that active mode works with TCP transport."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		active_echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
@@ -1019,11 +1084,12 @@ tcp_active_echo(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_active_n_echo(_) ->
+tcp_active_n_echo(Config) ->
 	doc("Ensure that active N mode works with TCP transport."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		batch_echo_protocol, [{batch_size, 3}]),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
@@ -1040,11 +1106,12 @@ tcp_active_n_echo(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_echo(_) ->
+tcp_echo(Config) ->
 	doc("Ensure that passive mode works with TCP transport."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
@@ -1087,11 +1154,12 @@ do_tcp_local_echo() ->
 		file:delete(SockFile)
 	end.
 
-tcp_graceful(_) ->
+tcp_graceful(Config) ->
 	doc("Ensure suspending and resuming of listeners does not kill active connections."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
 	%% Make sure connections with a fresh listener work.
@@ -1123,24 +1191,26 @@ tcp_graceful(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_inherit_options(_) ->
+tcp_inherit_options(Config) ->
 	doc("Ensure TCP options are inherited in the protocol."),
 	Name = name(),
-	Opts = [{nodelay, false}, {send_timeout_close, false}],
+	Opts0 = config(socket_opts, Config),
+	Opts1 = [{nodelay, false}, {send_timeout_close, false}],
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, Opts,
-		check_tcp_options, [{pid, self()} | Opts]),
+		ranch_tcp, #{socket_opts => Opts0 ++ Opts1},
+		check_tcp_options, [{pid, self()} | Opts1]),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, true}, {packet, raw}]),
 	receive checked -> ok after 1000 -> error(timeout) end,
 	ok = gen_tcp:close(Socket),
 	ok = ranch:stop_listener(Name).
 
-tcp_max_connections(_) ->
+tcp_max_connections(Config) ->
 	doc("Ensure the max_connections option actually limits connections."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
+		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
 		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 11, 150),
@@ -1151,11 +1221,12 @@ tcp_max_connections(_) ->
 	ok = terminate_loop(stop, Pids2),
 	ok = ranch:stop_listener(Name).
 
-tcp_max_connections_and_beyond(_) ->
+tcp_max_connections_and_beyond(Config) ->
 	doc("Ensure the max_connections option works when connections are removed from the count."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
+		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
 		remove_conn_and_wait_protocol, [{remove, true, 2500}]),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 10, 0),
@@ -1178,11 +1249,12 @@ tcp_max_connections_and_beyond(_) ->
 	{_, 20} = lists:keyfind(workers, 1, Counts2),
 	ok = ranch:stop_listener(Name).
 
-tcp_max_connections_infinity(_) ->
+tcp_max_connections_infinity(Config) ->
 	doc("Set the max_connections option from 10 to infinity and back to 10."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
+		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
 		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 20, 0),
@@ -1200,11 +1272,12 @@ tcp_max_connections_infinity(_) ->
 	ok = terminate_loop(stop, Pids1 ++ Pids2),
 	ok = ranch:stop_listener(Name).
 
-tcp_remove_connections(_) ->
+tcp_remove_connections(Config) ->
 	doc("Ensure that removed connections are only removed once."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		remove_conn_and_wait_protocol, [{remove, true, 0}]),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 10, 0),
@@ -1212,11 +1285,12 @@ tcp_remove_connections(_) ->
 	0 = ranch_server:count_connections(Name),
 	ok = ranch:stop_listener(Name).
 
-tcp_remove_connections_acceptor_wakeup(_) ->
+tcp_remove_connections_acceptor_wakeup(Config) ->
 	doc("Ensure that removed connections wake up acceptors."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{max_connections => 1, num_acceptors => 1},
+		ranch_tcp, #{max_connections => 1, num_acceptors => 1, socket_opts => SockOpts},
 		remove_conn_and_wait_protocol, [{remove, true, infinity}]),
 	Port = ranch:get_port(Name),
 	ConnectOptions = [binary, {active, false}],
@@ -1230,11 +1304,12 @@ tcp_remove_connections_acceptor_wakeup(_) ->
 	ok = gen_tcp:send(Socket2, <<"bye">>),
 	ok = ranch:stop_listener(Name).
 
-tcp_set_max_connections(_) ->
+tcp_set_max_connections(Config) ->
 	doc("Ensure that changing the max_connections option to a larger value allows for more connections."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
+		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
 		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 20, 0),
@@ -1247,11 +1322,12 @@ tcp_set_max_connections(_) ->
 	ok = terminate_loop(stop, Pids1 ++ Pids2),
 	ok = ranch:stop_listener(Name).
 
-tcp_set_max_connections_clean(_) ->
+tcp_set_max_connections_clean(Config) ->
 	doc("Ensure that setting max_connections does not crash any process."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, ListSupPid} = ranch:start_listener(Name,
-		ranch_tcp, #{max_connections => 4},
+		ranch_tcp, #{max_connections => 4, socket_opts => SockOpts},
 		notify_and_wait_protocol, #{pid => self()}),
 	Children = supervisor:which_children(ListSupPid),
 	{_, AccSupPid, _, _} = lists:keyfind(ranch_acceptors_sup, 1, Children),
@@ -1273,11 +1349,12 @@ tcp_set_max_connections_clean(_) ->
 	ok = clean_traces(),
 	ok = ranch:stop_listener(Name).
 
-tcp_getopts_capability(_) ->
+tcp_getopts_capability(Config) ->
 	doc("Ensure getopts/2 capability."),
 	Name=name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _}=ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		transport_capabilities_protocol, []),
 	Port=ranch:get_port(Name),
 	{ok, Socket}=gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
@@ -1288,11 +1365,12 @@ tcp_getopts_capability(_) ->
 	{'EXIT', _}=begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_getstat_capability(_) ->
+tcp_getstat_capability(Config) ->
 	doc("Ensure getstat/1,2 capability."),
 	Name=name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _}=ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		transport_capabilities_protocol, []),
 	Port=ranch:get_port(Name),
 	{ok, Socket}=gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
@@ -1305,11 +1383,12 @@ tcp_getstat_capability(_) ->
 	{'EXIT', _}=begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_upgrade(_) ->
+tcp_upgrade(Config) ->
 	doc("Ensure that protocol options can be updated."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 1, 0),
@@ -1320,11 +1399,12 @@ tcp_upgrade(_) ->
 	ok = terminate_loop(stop, Pids1 ++ Pids2),
 	ok = ranch:stop_listener(Name).
 
-tcp_error_eaddrinuse(_) ->
+tcp_error_eaddrinuse(Config) ->
 	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
 	Name = name(),
+	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{socket_opts => SockOpts},
 		active_echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{error, eaddrinuse} = ranch:start_listener({Name, fails},
@@ -1335,7 +1415,7 @@ tcp_error_eaddrinuse(_) ->
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
 
-tcp_error_eacces(_) ->
+tcp_error_eacces(Config) ->
 	case os:type() of
 		{win32, nt} ->
 			{skip, "No privileged ports."};
@@ -1344,8 +1424,9 @@ tcp_error_eacces(_) ->
 		_ ->
 			doc("Ensure that failure due to an eacces returns a compact readable error."),
 			Name = name(),
+			SockOpts = config(socket_opts, Config),
 			{error, eacces} = ranch:start_listener(Name,
-				ranch_tcp, [{port, 283}],
+				ranch_tcp, #{socket_opts => SockOpts ++ [{port, 283}]},
 				active_echo_protocol, []),
 			ok
 	end.

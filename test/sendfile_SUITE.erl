@@ -21,7 +21,7 @@
 -import(ct_helper, [doc/1]).
 
 all() ->
-	[{group, tcp}, {group, ssl}].
+	[{group, tcp}, {group, tcp_socket}, {group, ssl}].
 
 suite() ->
 	[{timetrap, {seconds, 60}}].
@@ -38,7 +38,11 @@ groups() ->
 		rawfile_range_medium,
 		rawfile_range_small
 	],
-	[{tcp, [parallel], Tests}, {ssl, [parallel], Tests ++ [ssl_chunk_size]}].
+	[
+		{tcp, [parallel], Tests},
+		{tcp_socket, [parallel], Tests},
+		{ssl, [parallel], Tests ++ [ssl_chunk_size]}
+	].
 
 init_per_suite(Config) ->
 	Filename = filename:join(config(priv_dir, Config), "sendfile"),
@@ -55,7 +59,24 @@ init_per_group(ssl, Config) ->
 	SslOpts = ct_helper:get_certs_from_ets(),
 	[{transport, ranch_ssl}, {transport_opts, SslOpts} | Config];
 init_per_group(tcp, Config) ->
-	[{transport, ranch_tcp}, {transport_opts, []} | Config].
+	[{transport, ranch_tcp}, {transport_opts, []} | Config];
+init_per_group(tcp_socket, Config) ->
+        %% The socket backend for inet/gen_tcp was introduced as an experimental
+        %% feature in OTP/23.0, and bugs https://bugs.erlang.org/browse/ERL-1284,
+        %% 1287 and 1293 were solved in OTP/23.1. socket:use_registry/1 first
+        %% appears in this release.
+        %% Due to https://bugs.erlang.org/browse/ERL-1401, the socket backend
+        %% is not working on Windows.
+	case
+		os:type() =/= {win32, nt} andalso
+		code:ensure_loaded(socket) =:= {module, socket} andalso
+		erlang:function_exported(socket, use_registry, 1)
+	of
+		true ->
+			[{transport, ranch_tcp}, {transport_opts, [{inet_backend, socket}]} | Config];
+		false ->
+			{skip, "No socket backend support"}
+	end.
 
 end_per_group(_, _) ->
 	ok.

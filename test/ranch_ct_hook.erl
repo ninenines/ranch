@@ -32,6 +32,8 @@ init(_, _) ->
 			ok;
 		{{win32, nt}, {ok, "9."++_}} ->
 			application:set_env(ssl, internal_active_n, 1);
+		{{win32, nt}, {ok, "10."++_}} ->
+			application:set_env(ssl, internal_active_n, 1);
 		_ ->
 			ok
 	end,
