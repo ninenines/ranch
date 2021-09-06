@@ -307,7 +307,10 @@ schedule_activate_alarm(_, _) ->
 get_alarms(#{alarms := Alarms}) when is_map(Alarms) ->
 	maps:fold(
 		fun
-			(Name, Opts = #{type := num_connections}, Acc) -> Acc#{Name => {Opts, undefined}};
+			(Name, Opts = #{type := num_connections, cooldown := _}, Acc) ->
+				Acc#{Name => {Opts, undefined}};
+			(Name, Opts = #{type := num_connections}, Acc) ->
+				Acc#{Name => {Opts#{cooldown => 5000}, undefined}};
 			(_, _, Acc) -> Acc
 		end,
 		#{},
