@@ -1,0 +1,70 @@
+[appendix]
+== Migrating from Ranch 2.0 to Ranch 2.1
+
+Ranch 2.1 adds counters and alarms.
+
+The https://github.com/juhlig/prometheus_ranch[Prometheus collector]
+was updated to include accepted/terminated connections
+metrics.
+
+Ranch 2.1 is compatible with Erlang/OTP 22.0 onward. Support
+for Erlang/OTP 22 has been removed.
+
+=== Features added
+
+* Metrics are now provided by `ranch:info/0,1`. Currently
+  includes accepted/terminated connection counts per
+  connection supervisor.
+
+* Alarms can now be configured. The only alarm currently
+  available is `num_connections`. When the number of
+  connections goes over a configurable treshold Ranch
+  will call the given callback. This can be used to
+  programmatically shut down idle connections to
+  make up space for new connections, for example.
+
+* A `post_listen` callback option has been added. It
+  receives sockets immediately after the `Transport:listen/1`
+  call. It can be used for some additional initialization
+  of the socket, such as setting file permissions on
+  Unix domain sockets.
+
+* It is now possible to use TLS-PSK authentication
+  without having to specify a default certificate
+  for TLS < 1.3.
+
+=== Experimental features added
+
+* The `inet_backend` option is now properly handled
+  and tested for TCP listeners. This allows using
+  the experimental `socket` backend. The `socket`
+  backend is now tested with Ranch. Note that
+  there are known issues and Windows support is not
+  currently implemented.
+
+=== Changed behaviors
+
+* Ranch will now remove unsupported SSL/TLS options
+  where applicable. A warning will be logged when
+  this happens. Options are only removed when they
+  are not compatible with the selected TLS version
+  and leaving them would prevent the listener from
+  starting.
++
+  The following options are removed when using TLS
+  1.1, 1.2 or 1.3: `beast_mitigation` and `padding_check`.
++
+  The following options are removed when using TLS
+  1.3 exclusively: `client_renegotiation`,
+  `next_protocols_advertised`, `psk_identity`,
+  `reuse_session`, `reuse_sessions`,
+  `secure_renegotiate` and `user_lookup_fun`.
+
+=== Added functions
+
+* The function `ranch_proxy_header:to_connection_info/1`
+  converts PROXY protocol information to the same
+  format as `ssl:connection_information/1`. Because
+  there is little overlap only the `protocol`,
+  `selected_cipher_suite` and `sni_hostname` will
+  be available, however.

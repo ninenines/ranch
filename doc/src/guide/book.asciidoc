@@ -29,6 +29,8 @@ include::internals.asciidoc[Internals]
 
 = Additional information
 
+include::migrating_from_2.0.asciidoc[Migrating from Ranch 2.0 to 2.1]
+
 include::migrating_from_1.7.asciidoc[Migrating from Ranch 1.7 to 2.0]
 
 include::migrating_from_1.6.asciidoc[Migrating from Ranch 1.6 to 1.7]
