@@ -59,7 +59,7 @@
 	type := Type,
 	callback := Callback,
 	treshold := non_neg_integer(),
-	cooldown := non_neg_integer()
+	cooldown => non_neg_integer()
 }.
 
 -type alarm_num_connections() :: alarm(num_connections, fun((ref(), term(), pid(), [pid()]) -> any())).
@@ -165,11 +165,16 @@ validate_transport_opt(socket_opts, _, _) ->
 validate_transport_opt(_, _, _) ->
 	false.
 
-validate_alarm(#{type := num_connections, treshold := Treshold,
-		callback := Callback, cooldown := Cooldown}) ->
+validate_alarm(Alarm = #{type := num_connections, treshold := Treshold,
+		callback := Callback}) ->
 	is_integer(Treshold) andalso Treshold >= 0
-	andalso is_integer(Cooldown) andalso Cooldown >= 0
-	andalso is_function(Callback, 4);
+	andalso is_function(Callback, 4)
+	andalso case Alarm of
+		#{cooldown := Cooldown} ->
+			is_integer(Cooldown) andalso Cooldown >= 0;
+		_ ->
+			true
+	end;
 validate_alarm(_) ->
 	false.
 
