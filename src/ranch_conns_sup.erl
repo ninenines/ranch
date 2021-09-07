@@ -43,7 +43,7 @@
 	handshake_timeout :: timeout(),
 	max_conns = undefined :: ranch:max_conns(),
 	stats_counters_ref :: counters:counters_ref(),
-	alarms = #{} :: #{term() => {undefined | reference(), map()}},
+	alarms = #{} :: #{term() => {map(), undefined | reference()}},
 	logger = undefined :: module()
 }).
 

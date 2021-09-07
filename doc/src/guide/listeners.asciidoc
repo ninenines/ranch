@@ -330,7 +330,7 @@ processes.
 
 === Setting connection count alarms
 
-The `alarms` transport options allows you to configure alarms
+The `alarms` transport option allows you to configure alarms
 which will be triggered when the number of connections under a connection
 supervisor reaches or exceeds the defined treshold.
 
@@ -340,7 +340,7 @@ options as values.
 Any term is allowed as an alarm name.
 
 Alarm options, defining the alarm behavior, are again a map with the following
-keys, all of which are mandatory:
+keys:
 
 `type`::
 The alarm type. Currently, `num_connections` is the only allowed type.
@@ -356,7 +356,7 @@ alarm is triggered. Its arguments are the listener name, the alarm
 name, the Pid of the triggering connection supervisor, and the Pids of
 all the connection processes under that supervisor.
 
-`cooldown`::
+`cooldown` (5000)::
 The minimum time to elapse before the alarm can trigger again, in
 milliseconds.
 
@@ -373,8 +373,7 @@ Alarms = #{
                     "Supervisor ~s of listener ~s "
                     "has ~b connections",
                 [Name, Ref, ConnSup, length(ConnPids)])
-        end,
-        cooldown => 5000
+        end
     }
 },
 {ok, _} = ranch:start_listener(tcp_echo,
@@ -386,8 +385,8 @@ Alarms = #{
 In the example code, an alarm named `my_alarm` is defined, which will
 call the given function when the number of connections under a
 connection supervisor reaches or exceeds 100. When the number of
-connections is still (or again) above 100 after 5 seconds, the
-alarm will trigger again.
+connections is still (or again) above 100 after the default cooldown
+period of 5 seconds, the alarm will trigger again.
 
 === When running out of file descriptors
 
