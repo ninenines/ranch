@@ -339,26 +339,9 @@ options as values.
 
 Any term is allowed as an alarm name.
 
-Alarm options, defining the alarm behavior, are again a map with the following
-keys:
-
-`type`::
-The alarm type. Currently, `num_connections` is the only allowed type.
-
-`treshold`::
-The alarm treshold. When the number of connections under a connection
-supervisor reaches or exceeds this value, the alarm will trigger and
-call the function given in the `callback` key.
-
-`callback`::
-The alarm function, that is, the function which will be called when the
-alarm is triggered. Its arguments are the listener name, the alarm
-name, the Pid of the triggering connection supervisor, and the Pids of
-all the connection processes under that supervisor.
-
-`cooldown` (5000)::
-The minimum time to elapse before the alarm can trigger again, in
-milliseconds.
+Alarm options include the alarm type and a treshold that, when reached,
+triggers the given callback. A cooldown prevents the alarm from being
+triggered too often.
 
 .Setting an alarm to log warnings when the number of connections exceed 100
 
