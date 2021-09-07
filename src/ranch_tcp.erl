@@ -1,5 +1,5 @@
 %% Copyright (c) 2011-2020, Loïc Hoguin <essen@ninenines.eu>
-%% Copyright (c) 2020, Jan Uhlig <j.uhlig@mailingwork.de>
+%% Copyright (c) 2020, Jan Uhlig <juhlig@hnc-agency.org>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
