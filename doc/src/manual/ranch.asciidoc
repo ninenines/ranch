@@ -88,6 +88,14 @@ Unique name used to refer to a listener.
 [source,erlang]
 ----
 transport_opts(SocketOpts) = #{
+    alarms               => #{
+                                term() => #{
+                                    type := num_connections,
+                                    treshold := non_neg_integer(),
+                                    callback := fun((ref(), term(), pid(), [pid()]) -> any()),
+                                    cooldown => non_neg_integer()
+                                }
+                            },
     connection_type      => worker | supervisor,
     handshake_timeout    => timeout(),
     max_connections      => max_conns(),
@@ -106,6 +114,38 @@ The transport options are a combination of Ranch-specific
 options and transport-specific socket options.
 
 None of the options are required.
+
+alarms (#{})::
+
+Alarms to call a function when the number of connections under a
+connection supervisor reaches or exceeds a defined treshold.
++
+The map keys are the alarm names, which can be any `term`. The
+associated values are the respective alarm options, again in a map
+with the following keys:
+
+type:::
+
+Must be set to `num_connections`.
+
+treshold:::
+
+Treshold value, which must be a `non_neg_integer`. When the
+number of connections under a connection supervisor reaches
+or exceeds this value, The alarm will trigger and call
+the function defined in the `callback` key (see below).
+
+callback:::
+
+The alarm function, which takes the listener name, the alarm
+name, the pid of the connection supervisor and a list of the pids
+of all connection processes under that supervisor as arguments.
+The return value is ignored.
+
+cooldown (5000):::
+
+The minimum time after which the alarm can be triggered again,
+in milliseconds.
 
 connection_type (worker)::
 
