@@ -117,8 +117,8 @@ None of the options are required.
 
 alarms (#{})::
 
-Alarms to call a function when the number of connections under a
-connection supervisor reaches or exceeds a defined treshold.
+Alarms to call a function when the number of connections tracked
+by one connection supervisor reaches or exceeds a defined treshold.
 +
 The map keys are the alarm names, which can be any `term`. The
 associated values are the respective alarm options, again in a map
@@ -131,8 +131,8 @@ Must be set to `num_connections`.
 treshold:::
 
 Treshold value, which must be a `non_neg_integer`. When the
-number of connections under a connection supervisor reaches
-or exceeds this value, The alarm will trigger and call
+number of connections tracked by a single connection supervisor
+reaches or exceeds this value, The alarm will trigger and call
 the function defined in the `callback` key (see below).
 
 callback:::

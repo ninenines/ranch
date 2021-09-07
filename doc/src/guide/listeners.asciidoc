@@ -331,8 +331,8 @@ processes.
 === Setting connection count alarms
 
 The `alarms` transport option allows you to configure alarms
-which will be triggered when the number of connections under a connection
-supervisor reaches or exceeds the defined treshold.
+which will be triggered when the number of connections tracked
+by one connection supervisor reaches or exceeds the defined treshold.
 
 The `alarms` transport option takes a map with alarm names as keys and alarm
 options as values.
@@ -343,7 +343,7 @@ Alarm options include the alarm type and a treshold that, when reached,
 triggers the given callback. A cooldown prevents the alarm from being
 triggered too often.
 
-.Setting an alarm to log warnings when the number of connections exceed 100
+.Log warnings when the number of connections exceeds 100
 
 [source,erlang]
 ----
@@ -366,8 +366,8 @@ Alarms = #{
 ----
 
 In the example code, an alarm named `my_alarm` is defined, which will
-call the given function when the number of connections under a
-connection supervisor reaches or exceeds 100. When the number of
+call the given function when the number of connections tracked
+by the connection supervisor reaches or exceeds 100. When the number of
 connections is still (or again) above 100 after the default cooldown
 period of 5 seconds, the alarm will trigger again.
 
