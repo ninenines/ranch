@@ -8,7 +8,7 @@ was updated to include accepted/terminated connections
 metrics.
 
 Ranch 2.1 is compatible with Erlang/OTP 22.0 onward. Support
-for Erlang/OTP 22 has been removed.
+for Erlang/OTP 21 has been removed.
 
 === Features added
 
