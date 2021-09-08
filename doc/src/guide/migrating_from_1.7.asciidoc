@@ -1,5 +1,5 @@
 [appendix]
-== Migrating from Ranch 1.7 to Ranch 2.0
+== Migrating from Ranch 1.7+ to Ranch 2.0
 
 Ranch 2.0 adds support for multiple connection supervisors.
 
