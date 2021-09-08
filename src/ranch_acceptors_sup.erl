@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2020, Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) 2011-2021, Loïc Hoguin <essen@ninenines.eu>
 %% Copyright (c) 2020-2021, Jan Uhlig <juhlig@hnc-agency.org>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
