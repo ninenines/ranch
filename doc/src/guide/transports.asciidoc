@@ -153,9 +153,12 @@ A connected TCP socket can be upgraded to a SSL socket via the function
 before telling the client that the server is ready to upgrade in order
 to avoid race conditions.
 
+IMPORTANT: The new socket received from `ranch_ssl:handshake/3` must be
+used via the `ranch_ssl` transport.
+
 .Performing a TLS handshake on a TCP socket
 [source,erlang]
-{ok, NewSocket} = ranch_ssl:handshake(Socket, SslOpts, 5000).
+{ok, SslSocket} = ranch_ssl:handshake(TcpSocket, SslOpts, 5000).
 
 === Writing a transport handler
 
