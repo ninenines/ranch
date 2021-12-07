@@ -86,14 +86,25 @@ start_listen_socket(Ref, Transport, TransOpts, Logger) ->
 -spec listen_error(any(), module(), any(), atom(), module()) -> no_return().
 listen_error(Ref, Transport, TransOpts0, Reason, Logger) ->
 	SocketOpts0 = maps:get(socket_opts, TransOpts0, []),
-	SocketOpts1 = [{cert, '...'}|proplists:delete(cert, SocketOpts0)],
-	SocketOpts2 = [{key, '...'}|proplists:delete(key, SocketOpts1)],
-	SocketOpts = [{cacerts, '...'}|proplists:delete(cacerts, SocketOpts2)],
+	SocketOpts = hide_socket_opts(SocketOpts0),
 	TransOpts = TransOpts0#{socket_opts => SocketOpts},
 	ranch:log(error,
 		"Failed to start Ranch listener ~p in ~p:listen(~999999p) for reason ~p (~s)~n",
 		[Ref, Transport, TransOpts, Reason, format_error(Reason)], Logger),
 	exit({listen_error, Ref, Reason}).
+
+hide_socket_opts([]) ->
+	[];
+hide_socket_opts([{cert, _}|SocketOpts]) ->
+	[{cert, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{key, _}|SocketOpts]) ->
+	[{key, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{cacerts, _}|SocketOpts]) ->
+	[{cacerts, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{password, _}|SocketOpts]) ->
+	[{password, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([SocketOpt|SocketOpts]) ->
+	[SocketOpt|hide_socket_opts(SocketOpts)].
 
 format_error(no_cert) ->
 	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
