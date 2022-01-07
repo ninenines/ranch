@@ -43,6 +43,7 @@
 -export([controlling_process/2]).
 -export([peername/1]).
 -export([sockname/1]).
+-export([peercert/1]).
 -export([shutdown/2]).
 -export([close/1]).
 -export([cleanup/1]).
@@ -295,6 +296,11 @@ peername(Socket) ->
 	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 sockname(Socket) ->
 	ssl:sockname(Socket).
+
+-spec peercert(ssl:sslsocket())
+	-> {ok, public_key:der_encoded()} | {error, any()}.
+peercert(Socket) ->
+	ssl:peercert(Socket).
 
 -spec shutdown(ssl:sslsocket(), read | write | read_write)
 	-> ok | {error, atom()}.
