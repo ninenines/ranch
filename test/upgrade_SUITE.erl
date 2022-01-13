@@ -193,57 +193,33 @@ upgrade_ranch_one_conn(_) ->
 
 do_upgrade_ranch_one_conn() ->
 	Example = tcp_echo,
-	ExampleStr = atom_to_list(Example),
+%	ExampleStr = atom_to_list(Example),
 	Port = 5555,
-	{_, Rel, _} = do_get_paths(Example),
+%	{_, Rel, _} = do_get_paths(Example),
 	try
 		%% Copy the example.
 		do_copy(Example),
 		%% Build and start the example release using the previous Ranch version.
 		CommitOrTag = do_use_ranch_previous(Example),
 		do_compile_and_start(Example),
-		%% Ensure that the metrics key is not present in the ranch:info output.
-		"false\n" = do_exec_log(Rel ++ " eval "
-			"'maps:is_key(metrics, ranch:info(" ++ ExampleStr ++ "))'"),
 		%% Establish a connection and check that it works.
-		{ok, S} = gen_tcp:connect("localhost", Port, [{active, false}, binary]),
-		ok = gen_tcp:send(S, "Hello!"),
-		{ok, <<"Hello!">>} = gen_tcp:recv(S, 0, 1000),
+		{ok, S1} = gen_tcp:connect("localhost", Port, [{active, false}, binary]),
+		ok = gen_tcp:send(S1, "Hello!"),
+		{ok, <<"Hello!">>} = gen_tcp:recv(S1, 0, 1000),
 		%% Update Ranch to master then build a release upgrade.
 		do_build_relup(Example, CommitOrTag),
 		%% Perform the upgrade, then check that our connection is still up.
 		do_upgrade(Example),
-		%% Ensure that the mextrics key is present in the ranch:info output.
-		"true\n" = do_exec_log(Rel ++ " eval "
-			"'maps:is_key(metrics, ranch:info(" ++ ExampleStr ++ "))'"),
-		ok = gen_tcp:send(S, "Hello!"),
-		{ok, <<"Hello!">>} = gen_tcp:recv(S, 0, 1000),
-		%% Ensure that no accepts have been counted yet.
-		"0\n" = do_exec_log(Rel ++ " eval "
-			"'lists:sum([N || {{conns_sup, _, accept}, N} <- "
-			"maps:to_list(maps:get(metrics, ranch:info(" ++ ExampleStr ++ ")))])'"),
+		ok = gen_tcp:send(S1, "Hello!"),
+		{ok, <<"Hello!">>} = gen_tcp:recv(S1, 0, 1000),
 		%% Check that new connections are still accepted.
 		{ok, S2} = gen_tcp:connect("localhost", Port, [{active, false}, binary]),
-		%% Ensure that the accept has been counted.
-		"1\n" = do_exec_log(Rel ++ " eval "
-			"'lists:sum([N || {{conns_sup, _, accept}, N} <- "
-			"maps:to_list(maps:get(metrics, ranch:info(" ++ ExampleStr ++ ")))])'"),
-		%% Ensure that no terminates have been counted yet.
-		"0\n" = do_exec_log(Rel ++ " eval "
-			"'lists:sum([N || {{conns_sup, _, terminate}, N} <- "
-			"maps:to_list(maps:get(metrics, ranch:info(" ++ ExampleStr ++ ")))])'"),
-		%% Close the socket, ensure that the termination has been counted.
-		ok = gen_tcp:close(S2),
-		"1\n" = do_exec_log(Rel ++ " eval "
-			"'lists:sum([N || {{conns_sup, _, terminate}, N} <- "
-			"maps:to_list(maps:get(metrics, ranch:info(" ++ ExampleStr ++ ")))])'"),
-		%% Perform the downgrade, then check that our connection is still up.
+		%% Perform the downgrade, then check that our connections are still up.
 		do_downgrade(Example),
-		%% Ensure that the mextrics key is not present any more.
-		"false\n" = do_exec_log(Rel ++ " eval "
-			"'maps:is_key(metrics, ranch:info(" ++ ExampleStr ++ "))'"),
-		ok = gen_tcp:send(S, "Hello!"),
-		{ok, <<"Hello!">>} = gen_tcp:recv(S, 0, 1000),
+		ok = gen_tcp:send(S1, "Hello!"),
+		{ok, <<"Hello!">>} = gen_tcp:recv(S1, 0, 1000),
+		ok = gen_tcp:send(S2, "Hello!"),
+		{ok, <<"Hello!">>} = gen_tcp:recv(S2, 0, 1000),
 		%% Check that new connections are still accepted.
 		{ok, _} = gen_tcp:connect("localhost", Port, [{active, false}, binary]),
 		ok

@@ -471,25 +471,6 @@ system_terminate(Reason, _, _, {State, _, NbChildren, _}) ->
 	terminate(State, Reason, NbChildren).
 
 -spec system_code_change(any(), _, _, _) -> {ok, any()}.
-system_code_change({#state{parent=Parent, ref=Ref, conn_type=ConnType,
-		shutdown=Shutdown, transport=Transport, protocol=Protocol,
-		opts=Opts, handshake_timeout=HandshakeTimeout,
-		max_conns=MaxConns, logger=Logger}, CurConns, NbChildren,
-		Sleepers}, _, {down, _}, _) ->
-	{ok, {{state, Parent, Ref, ConnType, Shutdown, Transport, Protocol,
-		Opts, HandshakeTimeout, MaxConns, Logger}, CurConns, NbChildren,
-		Sleepers}};
-system_code_change({{state, Parent, Ref, ConnType, Shutdown, Transport, Protocol,
-		Opts, HandshakeTimeout, MaxConns, Logger}, CurConns, NbChildren,
-		Sleepers}, _, _, _) ->
-	Self = self(),
-	[Id] = [Id || {Id, Pid} <- ranch_server:get_connections_sups(Ref), Pid=:=Self],
-	StatsCounters = ranch_server:get_stats_counters(Ref),
-	{ok, {#state{parent=Parent, ref=Ref, id=Id, conn_type=ConnType, shutdown=Shutdown,
-		transport=Transport, protocol=Protocol, opts=Opts,
-		handshake_timeout=HandshakeTimeout, max_conns=MaxConns,
-		stats_counters_ref=StatsCounters,
-		logger=Logger}, CurConns, NbChildren, Sleepers}};
 system_code_change(Misc, _, _, _) ->
 	{ok, Misc}.
 
