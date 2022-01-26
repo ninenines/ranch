@@ -160,6 +160,14 @@ init_per_group(_, Config) ->
 end_per_group(_, _) ->
 	ok.
 
+init_per_testcase(_, Config) ->
+	Config.
+
+end_per_testcase(_, _) ->
+	%% Stop all listeners that a test case may have left running.
+	_ = [catch ranch:stop_listener(Name) || Name <- maps:keys(ranch:info())],
+	ok.
+
 %% misc.
 
 misc_bad_transport(_) ->
