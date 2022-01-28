@@ -194,6 +194,7 @@ documentation of the transport module you are using for more details.
 
 == Changelog
 
+* *2.1*: The `post_listen_callback` transport option was added.
 * *2.0*: The type `transport_opts(SocketOpts)` was added.
 * *2.0*: The function `ranch:accept_ack/1` was removed in favor of
          link:man:ranch:handshake(3)[ranch:handshake(3)].

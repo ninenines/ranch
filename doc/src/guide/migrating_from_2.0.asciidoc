@@ -23,7 +23,7 @@ for Erlang/OTP 21 has been removed.
   programmatically shut down idle connections to
   make up space for new connections, for example.
 
-* A `post_listen` callback option has been added. It
+* A `post_listen_callback` option has been added. It
   receives sockets immediately after the `Transport:listen/1`
   call. It can be used for some additional initialization
   of the socket, such as setting file permissions on
