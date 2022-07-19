@@ -111,7 +111,8 @@ groups() ->
 		misc_set_transport_options,
 		misc_wait_for_connections,
 		misc_multiple_ip_local_socket_opts,
-		misc_connection_alarms
+		misc_connection_alarms,
+		misc_stop_unknown_listener
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -658,6 +659,11 @@ do_flush_connection_alarms(Name) ->
 	after 0 ->
 		ok
 	end.
+
+misc_stop_unknown_listener(_) ->
+	doc("Ensure that stopping an unknown listener returns an error."),
+	{error, not_found} = ranch:stop_listener(make_ref()),
+	ok.
 
 %% ssl.
 

@@ -193,15 +193,24 @@ start_error(_, Error) -> Error.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
-	[_, Transport, _, _, _] = ranch_server:get_listener_start_args(Ref),
-	TransOpts = get_transport_options(Ref),
-	case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
-		ok ->
-			_ = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
-			ranch_server:cleanup_listener_opts(Ref),
-			Transport:cleanup(TransOpts);
-		{error, Reason} ->
-			{error, Reason}
+	try
+		[_, Transport, _, _, _] = ranch_server:get_listener_start_args(Ref),
+		TransOpts = get_transport_options(Ref),
+		{Transport, TransOpts}
+	of
+		{Transport, TransOpts} ->
+			case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
+				ok ->
+					_ = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
+					ranch_server:cleanup_listener_opts(Ref),
+					Transport:cleanup(TransOpts),
+					ok;
+				{error, Reason} ->
+					{error, Reason}
+			end
+	catch
+		error:badarg ->
+			{error, not_found}
 	end.
 
 -spec suspend_listener(ref()) -> ok | {error, any()}.
