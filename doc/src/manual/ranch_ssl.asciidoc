@@ -45,6 +45,11 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {cacertfile, file:filename()}
           | {cacerts, [public_key:der_encoded()]}
           | {cert, public_key:der_encoded()}
+          | {certs_keys, [#{cert => public_key:der_encoded(),
+                            key => ssl:key(),
+                            certfile => file:filename(),
+                            keyfile => file:filename(),
+                            key_pem_password => iodata() | fun(() -> iodata())}]}
           | {certfile, file:filename()}
           | {ciphers, ssl:ciphers()}
           | {client_renegotiation, boolean()}
@@ -122,6 +127,12 @@ List of DER encoded trusted certificates.
 cert::
 
 DER encoded user certificate.
+
+certs_keys::
+
+A list of a certificate (or possible a certificate and its chain)
+and the associated key of the certificate, that may be used to
+authenticate the client or the server.
 
 certfile::
 

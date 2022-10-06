@@ -53,6 +53,11 @@
 	| {cacertfile, file:filename()}
 	| {cacerts, [public_key:der_encoded()]}
 	| {cert, public_key:der_encoded()}
+	| {certs_keys, [#{cert => public_key:der_encoded(),
+			  key => ssl:key(),
+			  certfile => file:filename(),
+			  keyfile => file:filename(),
+			  key_pem_password => iodata() | fun(() -> iodata())}]}
 	| {certfile, file:filename()}
 	| {ciphers, ssl:ciphers()}
 	| {client_renegotiation, boolean()}
@@ -119,7 +124,8 @@ listen(TransOpts) ->
 			orelse lists:keymember(certfile, 1, SocketOpts)
 			orelse lists:keymember(sni_fun, 1, SocketOpts)
 			orelse lists:keymember(sni_hosts, 1, SocketOpts)
-			orelse lists:keymember(user_lookup_fun, 1, SocketOpts) of
+			orelse lists:keymember(user_lookup_fun, 1, SocketOpts)
+			orelse lists:keymember(certs_keys, 1, SocketOpts) of
 		true ->
 			Logger = maps:get(logger, TransOpts, logger),
 			do_listen(SocketOpts, Logger);
