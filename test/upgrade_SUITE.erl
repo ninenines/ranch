@@ -90,7 +90,7 @@ do_compile_and_start(Example) ->
 		++ Dir ++ "/_rel/" ++ ExampleStr
 			++ "_example/releases/1/start.boot"),
 	_ = do_exec_log(Rel ++ " stop"),
-	_ = do_exec_log(Rel ++ " start"),
+	_ = do_exec_log(Rel ++ " daemon"),
 	timer:sleep(2000),
 	_ = do_exec_log(Rel ++ " eval 'application:info()'"),
 	ok.
