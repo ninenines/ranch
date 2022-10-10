@@ -194,9 +194,9 @@ start_error(_, Error) -> Error.
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
 	try
-		[_, Transport, _, _, _] = ranch_server:get_listener_start_args(Ref),
-		TransOpts = get_transport_options(Ref),
-		{Transport, TransOpts}
+		[_, Transport0, _, _, _] = ranch_server:get_listener_start_args(Ref),
+		TransOpts0 = get_transport_options(Ref),
+		{Transport0, TransOpts0}
 	of
 		{Transport, TransOpts} ->
 			case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
