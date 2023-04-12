@@ -886,7 +886,15 @@ v2_padding_test() ->
 %% this only ends up returning the keys protocol, selected_cipher_suite
 %% and sni_hostname *at most*.
 
--spec to_connection_info(proxy_info()) -> ssl:connection_info().
+%% The type ssl:connection_info/0 is not exported. We just
+%% replicate the relevant info tuples here.
+-type ssl_connection_info() :: [
+	{sni_hostname, term()} |
+	{selected_cipher_suite, ssl:erl_cipher_suite()} |
+	{protocol, ssl:protocol_version()}
+].
+
+-spec to_connection_info(proxy_info()) -> ssl_connection_info().
 to_connection_info(ProxyInfo=#{ssl := SSL}) ->
 	ConnInfo0 = case ProxyInfo of
 		#{authority := Authority} ->

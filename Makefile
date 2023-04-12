@@ -8,7 +8,7 @@ PROJECT_REGISTERED = ranch_server
 # Options.
 
 CT_OPTS += -pa test -ct_hooks ranch_ct_hook [] # -boot start_sasl
-PLT_APPS = crypto public_key tools
+PLT_APPS = common_test crypto ct_helper public_key stampede tools
 
 # Dependencies.
 
