@@ -388,12 +388,16 @@ ssl_accept_socket(_) ->
 	doc("Ensure that listener can use an externally opened SSL listen socket."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, S} = ssl:listen(0, [binary, {active, false}, {packet, raw}, {reuseaddr, true}|Opts]),
+	{ok, S} = ssl:listen(0, [
+		binary, {active, false}, {packet, raw}, {reuseaddr, true}
+		|Opts] ++ [{verify, verify_none}]),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, #{socket => S},
+		ranch_ssl, #{socket => S, socket_opts => Opts ++ [{verify, verify_none}]},
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket, <<"TCP Ranch is working!">>),
 	{ok, <<"TCP Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),
@@ -407,10 +411,12 @@ ssl_active_echo(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		active_echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),
@@ -424,10 +430,12 @@ ssl_echo(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),
@@ -441,10 +449,12 @@ ssl_sni_echo(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, [{sni_hosts, [{"localhost", Opts}]}],
+		ranch_ssl, [{sni_hosts, [{"localhost", Opts ++ [{verify, verify_none}]}]}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),
@@ -461,7 +471,11 @@ ssl_sni_fail(_) ->
 		ranch_ssl, [{sni_hosts, [{"pouet", Opts}]}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
-	{error, _} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	%% We stick to TLS 1.2 because there seems to be a bug in OTP-23.0rc2
+	%% that leads to a malformed_handshake_data error.
+	{error, _} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
@@ -492,13 +506,14 @@ ssl_graceful(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
 	%% Make sure connections with a fresh listener work.
 	running = ranch:get_status(Name),
-	{ok, Socket1} = ssl:connect("localhost", Port,
-		[binary, {active, false}, {packet, raw}]),
+	{ok, Socket1} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket1, <<"SSL with fresh listener">>),
 	{ok, <<"SSL with fresh listener">>} = ssl:recv(Socket1, 23, 1000),
 	%% Make sure transport options cannot be changed on a running listener.
@@ -509,15 +524,17 @@ ssl_graceful(_) ->
 	ok = ssl:send(Socket1, <<"SSL with suspended listener">>),
 	{ok, <<"SSL with suspended listener">>} = ssl:recv(Socket1, 27, 1000),
 	%% Make sure new connections are refused on the suspended listener.
-	{error, econnrefused} = ssl:connect("localhost", Port,
-		[binary, {active, false}, {packet, raw}]),
+	{error, econnrefused} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	%% Make sure transport options can be changed when listener is suspended.
-	ok = ranch:set_transport_options(Name, #{socket_opts => [{port, Port}|Opts]}),
+	ok = ranch:set_transport_options(Name, #{socket_opts => [{port, Port}|Opts] ++ [{verify, verify_none}]}),
 	%% Resume listener, make sure connections can be established again.
 	ok = ranch:resume_listener(Name),
 	running = ranch:get_status(Name),
-	{ok, Socket2} = ssl:connect("localhost", Port,
-		[binary, {active, false}, {packet, raw}]),
+	{ok, Socket2} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket2, <<"SSL with resumed listener">>),
 	{ok, <<"SSL with resumed listener">>} = ssl:recv(Socket2, 25, 1000),
 	%% Make sure transport options cannot be changed on resumed listener.
@@ -533,10 +550,12 @@ ssl_accept_ack(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		accept_ack_protocol, []),
 	Port = ranch:get_port(Name),
-	{ok, Socket} = ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ssl:send(Socket, <<"SSL transport accept_ack is working!">>),
 	{ok, <<"SSL transport accept_ack is working!">>} = ssl:recv(Socket, 36, 1000),
 	ok = ranch:stop_listener(Name),
@@ -549,10 +568,12 @@ ssl_getopts_capability(_) ->
 	Name=name(),
 	Opts=ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		transport_capabilities_protocol, []),
 	Port=ranch:get_port(Name),
-	{ok, Socket}=ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok=ssl:send(Socket, <<"getopts/2">>),
 	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
 	ok=ranch:stop_listener(Name),
@@ -565,10 +586,12 @@ ssl_getstat_capability(_) ->
 	Name=name(),
 	Opts=ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		transport_capabilities_protocol, []),
 	Port=ranch:get_port(Name),
-	{ok, Socket}=ssl:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok=ssl:send(Socket, <<"getstat/1">>),
 	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
 	ok=ssl:send(Socket, <<"getstat/2">>),
