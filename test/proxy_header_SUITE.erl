@@ -216,7 +216,7 @@ do_proxy_header_ssl(Name, ProxyInfo, Data1, Data2) ->
 	Port = ranch:get_port(Name),
 	{ok, Socket0} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
 	ok = gen_tcp:send(Socket0, [ranch_proxy_header:header(ProxyInfo)]),
-	{ok, Socket} = ssl:connect(Socket0, [{versions, ['tlsv1.2']}], 1000),
+	{ok, Socket} = ssl:connect(Socket0, [{verify, verify_none}, {versions, ['tlsv1.2']}], 1000),
 	ok = ssl:send(Socket, Data1),
 	receive
 		{proxy_protocol, ProxyInfo} ->
