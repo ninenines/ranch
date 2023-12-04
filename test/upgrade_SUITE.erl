@@ -105,6 +105,7 @@ do_stop(Example) ->
 %% we use the tag before that as a starting point. Otherwise
 %% we use the most recent tag.
 do_use_ranch_previous(Example) ->
+	_ = do_exec_log("git fetch --tags"), %% Ensure we have all tags.
 	TagsOutput = do_exec_log("git tag | tr - \\~ | sort -V | tr \\~ -"),
 	Tags = string:lexemes(TagsOutput, "\n"),
 	DescribeOutput = do_exec_log("git describe --exact-match"),
