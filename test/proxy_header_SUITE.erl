@@ -211,7 +211,7 @@ recv_v2_local_header_ssl_extra_data(_) ->
 do_proxy_header_ssl(Name, ProxyInfo, Data1, Data2) ->
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		proxy_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket0} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),

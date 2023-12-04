@@ -734,7 +734,7 @@ ssl_active_echo(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		active_echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [
@@ -761,7 +761,7 @@ do_ssl_active_n_echo() ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		batch_echo_protocol, [{batch_size, 3}]),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [
@@ -785,7 +785,7 @@ ssl_echo(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [
@@ -804,8 +804,10 @@ ssl_handshake(_) ->
 	Name = name(),
 	{CaCert1, Cert1, Key1} = ct_helper:make_certs(),
 	{CaCert2, Cert2, Key2} = ct_helper:make_certs(),
-	Opts1 = [{cert, Cert1}, {key, Key1}, {cacerts, [CaCert1]}, {verify, verify_peer}],
-	Opts2 = [{cert, Cert2}, {key, Key2}, {cacerts, [CaCert2]}, {verify, verify_peer}],
+	Opts1 = [{cert, Cert1}, {key, Key1}, {cacerts, [CaCert1]},
+		{verify, verify_none}, {fail_if_no_peer_cert, false}],
+	Opts2 = [{cert, Cert2}, {key, Key2}, {cacerts, [CaCert2]},
+		{verify, verify_none}, {fail_if_no_peer_cert, false}],
 	DefaultOpts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, [{handshake, hello}|DefaultOpts],
@@ -847,7 +849,7 @@ do_ssl_local_echo() ->
 		Name = name(),
 		Opts = ct_helper:get_certs_from_ets(),
 		{ok, _} = ranch:start_listener(Name,
-			ranch_ssl, #{socket_opts => [{ip, {local, SockFile}}|Opts]},
+			ranch_ssl, #{socket_opts => [{ip, {local, SockFile}}|Opts] ++ [{verify, verify_none}]},
 			echo_protocol, []),
 		undefined = ranch:get_port(Name),
 		{ok, Socket} = ssl:connect({local, SockFile}, 0, [
@@ -871,7 +873,7 @@ ssl_sni_echo(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, [{sni_hosts, [{"localhost", Opts}]}],
+		ranch_ssl, [{sni_hosts, [{"localhost", Opts ++ [{verify, verify_none}]}]}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [
@@ -974,7 +976,7 @@ ssl_graceful(_) ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		echo_protocol, []),
 	Port = ranch:get_port(Name),
 	%% Make sure connections with a fresh listener work.
@@ -994,7 +996,7 @@ ssl_graceful(_) ->
 		binary, {active, false}, {packet, raw},
 		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	%% Make sure transport options can be changed when listener is suspended.
-	ok = ranch:set_transport_options(Name, #{socket_opts => [{port, Port}|Opts]}),
+	ok = ranch:set_transport_options(Name, #{socket_opts => [{port, Port}|Opts] ++ [{verify, verify_none}]}),
 	%% Resume listener, make sure connections can be established again.
 	ok = ranch:resume_listener(Name),
 	running = ranch:get_status(Name),
@@ -1014,7 +1016,7 @@ ssl_getopts_capability(_) ->
 	Name=name(),
 	Opts=ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		transport_capabilities_protocol, []),
 	Port=ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [
@@ -1032,7 +1034,7 @@ ssl_getstat_capability(_) ->
 	Name=name(),
 	Opts=ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, Opts,
+		ranch_ssl, Opts ++ [{verify, verify_none}],
 		transport_capabilities_protocol, []),
 	Port=ranch:get_port(Name),
 	{ok, Socket} = ssl:connect("localhost", Port, [
