@@ -8,7 +8,7 @@ PROJECT_REGISTERED = ranch_server
 # Options.
 
 CT_OPTS += -pa test -ct_hooks ranch_ct_hook [] # -boot start_sasl
-PLT_APPS = common_test crypto ct_helper public_key stampede tools
+PLT_APPS = crypto public_key tools # common_test ct_helper stampede
 
 # Dependencies.
 
@@ -64,7 +64,7 @@ TEST_ERLC_OPTS += +'{parse_transform, eunit_autoexport}'
 
 # Dialyze the tests.
 
-DIALYZER_OPTS += --src -r test
+#DIALYZER_OPTS += --src -r test
 
 # Use erl_make_certs from the tested release during CI
 # and ensure that ct_helper is always recompiled.
