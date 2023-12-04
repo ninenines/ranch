@@ -1,0 +1,15 @@
+## Use workflows from ninenines/ci.erlang.mk to test Ranch.
+
+name: Check Ranch
+
+on:
+  push:
+  pull_request:
+  schedule:
+      ## Every Monday at 4am.
+      - cron: 0 4 * * 1
+
+jobs:
+  check:
+    name: Ranch
+    uses: ninenines/ci.erlang.mk/.github/workflows/ci.yaml@master

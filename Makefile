@@ -30,10 +30,8 @@ CONCUERROR_TESTS = ranch_concuerror:start_stop ranch_concuerror:info
 dep_ci.erlang.mk = git https://github.com/ninenines/ci.erlang.mk master
 DEP_EARLY_PLUGINS = ci.erlang.mk
 
-AUTO_CI_OTP ?= OTP-22+
-AUTO_CI_HIPE ?= OTP-LATEST
-# AUTO_CI_ERLLVM ?= OTP-LATEST
-AUTO_CI_WINDOWS ?= OTP-22+
+AUTO_CI_OTP ?= OTP-LATEST-24+
+AUTO_CI_WINDOWS ?= OTP-LATEST-24+
 
 # Hex configuration.
 
