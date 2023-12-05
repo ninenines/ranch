@@ -37,6 +37,7 @@ proxy_info() = #{
     %% Extra TLV-encoded data.
     alpn      => binary(), %% US-ASCII.
     authority => binary(), %% UTF-8.
+    unique_id => binary(), %% Opaque byte sequence of up to 128 bytes.
     netns     => binary(), %% US-ASCII.
     ssl       => #{
         client   := [ssl | cert_conn | cert_sess],
@@ -105,6 +106,10 @@ authority::
 The host name serving as authority for the connection.
 This is typically passed using the SNI extension for TLS.
 
+unique_id::
+An opaque byte sequence of up to 128 bytes generated
+by the upstream proxy that uniquely identifies the connection.
+
 netns::
 
 The namespace's name for the original connection.
@@ -158,6 +163,7 @@ The non-standard TLVs that Ranch was not able to parse.
 
 == Changelog
 
+* *2.2*: The `unique_id` TLV was added.
 * *1.7*: Module introduced.
 
 == See also

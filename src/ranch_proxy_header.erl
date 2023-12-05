@@ -33,6 +33,7 @@
 	%% Extra TLV-encoded data.
 	alpn => binary(), %% US-ASCII.
 	authority => binary(), %% UTF-8.
+	unique_id => binary(), %% Opaque byte sequence of up to 128 bytes.
 	ssl => #{
 		client := [ssl | cert_conn | cert_sess],
 		verified := boolean(),
@@ -520,6 +521,12 @@ parse_tlv(<<16#3, TLVLen:16, CRC32C:32, Rest/bits>>, Len0, Info, Header) when TL
 %% PP2_TYPE_NOOP.
 parse_tlv(<<16#4, TLVLen:16, _:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	parse_tlv(Rest, Len - TLVLen - 3, Info, Header);
+%% PP2_TYPE_UNIQUE_ID.
+parse_tlv(<<16#5, TLVLen:16, UniqueID:TLVLen/binary, Rest/bits>>, Len, Info, Header)
+		when TLVLen =< 128 ->
+	parse_tlv(Rest, Len - TLVLen - 3, Info#{unique_id => UniqueID}, Header);
+parse_tlv(<<16#5, _/bits>>, _, _, _) ->
+	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2, PP 2.2.5)'};
 %% PP2_TYPE_SSL.
 parse_tlv(<<16#20, TLVLen:16, Client, Verify:32, Rest0/bits>>, Len, Info, Header) ->
 	SubsLen = TLVLen - 5,
@@ -682,6 +689,7 @@ tlvs(ProxyInfo, Opts) ->
 	[
 		binary_tlv(ProxyInfo, alpn, 16#1),
 		binary_tlv(ProxyInfo, authority, 16#2),
+		binary_tlv(ProxyInfo, unique_id, 16#5),
 		ssl_tlv(ProxyInfo),
 		binary_tlv(ProxyInfo, netns, 16#30),
 		raw_tlvs(ProxyInfo),
@@ -849,6 +857,8 @@ v2_tlvs_test() ->
 	]},
 	Test5Out = Test5In#{raw_tlvs => lists:reverse(RawTLVs)},
 	{ok, Test5Out, <<>>} = parse(iolist_to_binary(header(Test5In))),
+	Test6 = Common#{unique_id => rand:bytes(rand:uniform(128))},
+	{ok, Test6, <<>>} = parse(iolist_to_binary(header(Test6))),
 	ok.
 
 v2_checksum_test() ->
