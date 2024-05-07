@@ -331,15 +331,13 @@ handshake_result(Result, Ref, Transport, CSocket, Timeout) ->
 		{ok, CSocket2, Info} ->
 			self() ! {handshake_continue, Ref, Transport, CSocket2, Timeout},
 			{continue, Info};
-		{error, {tls_alert, _}} ->
-			ok = Transport:close(CSocket),
-			exit(normal);
-		{error, Reason} when Reason =:= timeout; Reason =:= closed ->
-			ok = Transport:close(CSocket),
-			exit(normal);
 		{error, Reason} ->
+			PeerInfo = case Transport:peername(CSocket) of
+				{ok, Peer} -> Peer;
+				{error, _} -> undefined
+			end,
 			ok = Transport:close(CSocket),
-			error(Reason)
+			exit({shutdown, {Reason, PeerInfo}})
 	end.
 
 -spec handshake_cancel(ref()) -> ok.
