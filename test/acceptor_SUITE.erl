@@ -112,7 +112,8 @@ groups() ->
 		misc_wait_for_connections,
 		misc_multiple_ip_local_socket_opts,
 		misc_connection_alarms,
-		misc_stop_unknown_listener
+		misc_stop_unknown_listener,
+		misc_repeated_start_stop
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -664,6 +665,21 @@ misc_stop_unknown_listener(_) ->
 	doc("Ensure that stopping an unknown listener returns an error."),
 	{error, not_found} = ranch:stop_listener(make_ref()),
 	ok.
+
+misc_repeated_start_stop(_) ->
+	doc("Ensure that repeated starts and stops of a listener works."),
+	Name = name(),
+	lists:foreach(
+		fun(_) ->
+			{ok, _} = ranch:start_listener(Name, ranch_tcp, #{}, echo_protocol, []),
+			true = is_integer(ranch:get_port(Name)),
+			ok = ranch:stop_listener(Name),
+			{'EXIT', _} = begin catch ranch:get_port(Name) end
+		end,
+		lists:seq(1, 10)
+	),
+	ok.
+
 
 %% ssl.
 
