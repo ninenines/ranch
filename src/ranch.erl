@@ -193,24 +193,42 @@ start_error(_, Error) -> Error.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
+	Parent = self(),
+	Tag = make_ref(),
+	{StopperPid, StopperMon} = spawn_monitor(fun() -> Parent ! {Tag, stop_listener1(Ref)} end),
+	receive
+		{Tag, Result} ->
+			demonitor(StopperMon, [flush]),
+			Result;
+		{'DOWN', StopperMon, process, StopperPid, Error} ->
+			{error, Error}
+	end.
+
+stop_listener1(Ref) ->
+	TransportAndOpts = maybe_get_transport_and_opts(Ref),
+	case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
+		ok ->
+			_ = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
+			ranch_server:cleanup_listener_opts(Ref),
+			stop_listener2(TransportAndOpts);
+		{error, _} = Error ->
+			Error
+	end.
+
+stop_listener2({Transport, TransOpts}) ->
+	Transport:cleanup(TransOpts),
+	ok;
+stop_listener2(undefined) ->
+	ok.
+
+maybe_get_transport_and_opts(Ref) ->
 	try
-		[_, Transport0, _, _, _] = ranch_server:get_listener_start_args(Ref),
-		TransOpts0 = get_transport_options(Ref),
-		{Transport0, TransOpts0}
-	of
-		{Transport, TransOpts} ->
-			case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
-				ok ->
-					_ = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
-					ranch_server:cleanup_listener_opts(Ref),
-					Transport:cleanup(TransOpts),
-					ok;
-				{error, Reason} ->
-					{error, Reason}
-			end
+		[_, Transport, _, _, _] = ranch_server:get_listener_start_args(Ref),
+		TransOpts = get_transport_options(Ref),
+		{Transport, TransOpts}
 	catch
 		error:badarg ->
-			{error, not_found}
+			undefined
 	end.
 
 -spec suspend_listener(ref()) -> ok | {error, any()}.
