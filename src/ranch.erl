@@ -193,16 +193,11 @@ start_error(_, Error) -> Error.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
-	Parent = self(),
-	Tag = make_ref(),
-	{StopperPid, StopperMon} = spawn_monitor(fun() -> Parent ! {Tag, stop_listener1(Ref)} end),
-	receive
-		{Tag, Result} ->
-			demonitor(StopperMon, [flush]),
-			Result;
-		{'DOWN', StopperMon, process, StopperPid, Error} ->
-			{error, Error}
-	end.
+	%% We need to provide an integer timeout to erpc:call,
+	%% otherwise the function will be executed in the calling
+	%% process. 16#ffffffff is as close to 'infinity' as we
+	%% can get.
+	erpc:call(node(), fun() -> stop_listener1(Ref) end, 16#ffffffff).
 
 stop_listener1(Ref) ->
 	TransportAndOpts = maybe_get_transport_and_opts(Ref),
