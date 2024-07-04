@@ -195,20 +195,15 @@ start_error(_, Error) -> Error.
 stop_listener(Ref) ->
 	%% We need to provide an integer timeout to erpc:call,
 	%% otherwise the function will be executed in the calling
-	%% process. 16#ffffffff is as close to 'infinity' as we
-	%% can get.
-	erpc:call(node(), fun() -> stop_listener1(Ref) end, 16#ffffffff).
+	%% process. 5 minutes should be enough.
+	erpc:call(node(), fun() -> stop_listener1(Ref) end, 300000).
 
 stop_listener1(Ref) ->
 	TransportAndOpts = maybe_get_transport_and_opts(Ref),
-	case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
-		ok ->
-			_ = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
-			ranch_server:cleanup_listener_opts(Ref),
-			stop_listener2(TransportAndOpts);
-		{error, _} = Error ->
-			Error
-	end.
+	_ = supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}),
+	Result = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
+	ok = stop_listener2(TransportAndOpts),
+	Result.
 
 stop_listener2({Transport, TransOpts}) ->
 	Transport:cleanup(TransOpts),
