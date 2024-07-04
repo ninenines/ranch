@@ -193,6 +193,11 @@ start_error(_, Error) -> Error.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
+	%% The stop procedure must be executed in a separate
+	%% process to make sure that it won't be interrupted
+	%% in the middle in case the calling process crashes.
+	%% We use erpc:call locally so we don't have to
+	%% implement a custom spawn/call mechanism.
 	%% We need to provide an integer timeout to erpc:call,
 	%% otherwise the function will be executed in the calling
 	%% process. 5 minutes should be enough.
