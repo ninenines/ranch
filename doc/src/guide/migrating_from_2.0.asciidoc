@@ -18,7 +18,7 @@ for Erlang/OTP 21 has been removed.
 
 * Alarms can now be configured. The only alarm currently
   available is `num_connections`. When the number of
-  connections goes over a configurable treshold Ranch
+  connections goes over a configurable threshold Ranch
   will call the given callback. This can be used to
   programmatically shut down idle connections to
   make up space for new connections, for example.

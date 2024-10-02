@@ -287,7 +287,7 @@ trigger_alarms(Ref, Alarms, CurConns) ->
 		Alarms
 	).
 
-trigger_alarm(Ref, AlarmName, {Opts=#{treshold := Treshold, callback := Callback}, undefined}, CurConns) when CurConns >= Treshold ->
+trigger_alarm(Ref, AlarmName, {Opts=#{threshold := Threshold, callback := Callback}, undefined}, CurConns) when CurConns >= Threshold ->
 	ActiveConns = [Pid || {Pid, active} <- get()],
 	case Callback of
 		{Mod, Fun} ->
@@ -306,6 +306,7 @@ schedule_activate_alarm(_, _) ->
 	undefined.
 
 get_alarms(#{alarms := Alarms}) when is_map(Alarms) ->
+	Alarms1 = ranch:compat_normalize_alarms_option(Alarms),
 	maps:fold(
 		fun
 			(Name, Opts = #{type := num_connections, cooldown := _}, Acc) ->
@@ -315,7 +316,7 @@ get_alarms(#{alarms := Alarms}) when is_map(Alarms) ->
 			(_, _, Acc) -> Acc
 		end,
 		#{},
-		Alarms
+		Alarms1
 	);
 get_alarms(_) ->
 	#{}.
