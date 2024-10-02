@@ -50,6 +50,9 @@
 -export([require/1]).
 -export([log/4]).
 
+%% Internal
+-export([compat_normalize_alarms_option/1]).
+
 -type max_conns() :: non_neg_integer() | infinity.
 -export_type([max_conns/0]).
 
@@ -59,7 +62,7 @@
 -type alarm(Type, Callback) :: #{
 	type := Type,
 	callback := Callback,
-	treshold := non_neg_integer(),
+	threshold := non_neg_integer(),
 	cooldown => non_neg_integer()
 }.
 
@@ -135,6 +138,7 @@ validate_transport_opt(max_connections, infinity, _) ->
 validate_transport_opt(max_connections, Value, _) ->
 	is_integer(Value) andalso Value >= 0;
 validate_transport_opt(alarms, Alarms, _) ->
+	Alarms1 = compat_normalize_alarms_option(Alarms),
 	maps:fold(
 		fun
 			(_, Opts, true) ->
@@ -143,7 +147,7 @@ validate_transport_opt(alarms, Alarms, _) ->
 				false
 		end,
 		true,
-		Alarms);
+		Alarms1);
 validate_transport_opt(logger, Value, _) ->
 	is_atom(Value);
 validate_transport_opt(num_acceptors, Value, _) ->
@@ -166,9 +170,9 @@ validate_transport_opt(socket_opts, _, _) ->
 validate_transport_opt(_, _, _) ->
 	false.
 
-validate_alarm(Alarm = #{type := num_connections, treshold := Treshold,
+validate_alarm(Alarm = #{type := num_connections, threshold := Threshold,
 		callback := Callback}) ->
-	is_integer(Treshold) andalso Treshold >= 0
+	is_integer(Threshold) andalso Threshold >= 0
 	andalso is_function(Callback, 4)
 	andalso case Alarm of
 		#{cooldown := Cooldown} ->
@@ -632,3 +636,22 @@ log(Level, Format, Args, _) ->
 		debug -> info_msg
 	end,
 	error_logger:Function(Format, Args).
+
+%% For backwards compatibility with the misspelled alarm
+%% setting `treshold`.
+%% See https://github.com/ninenines/ranch/issues/349
+-spec compat_normalize_alarms_option(any()) -> any().
+compat_normalize_alarms_option(Alarms = #{}) ->
+	maps:map(
+		fun
+			(_, Alarm = #{threshold := _}) ->
+				maps:remove(treshold, Alarm);
+			(_, Alarm = #{treshold := Threshold}) ->
+				maps:put(threshold, Threshold, maps:remove(treshold, Alarm));
+			(_, Alarm) ->
+				Alarm
+		end,
+		Alarms
+	);
+compat_normalize_alarms_option(Alarms) ->
+	Alarms.
