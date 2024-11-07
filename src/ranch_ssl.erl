@@ -243,7 +243,12 @@ recv_proxy_header(SSLSocket, Timeout) ->
 	%% nothing prevents us from retrieving the TCP socket and using
 	%% it. Since it's an undocumented interface this may however
 	%% make forward-compatibility more difficult.
-	{sslsocket, {gen_tcp, TCPSocket, _, _}, _} = SSLSocket,
+	TCPSocket = case element(2, SSLSocket) of
+		%% Before OTP-28.
+		{gen_tcp, TCPSocket0, _, _} -> TCPSocket0;
+		%% OTP-28+.
+		TCPSocket0 -> TCPSocket0
+	end,
 	ranch_tcp:recv_proxy_header(TCPSocket, Timeout).
 
 -spec send(ssl:sslsocket(), iodata()) -> ok | {error, atom()}.
