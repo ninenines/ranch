@@ -85,6 +85,7 @@ groups() ->
 		ssl_local_echo,
 		ssl_graceful,
 		ssl_handshake,
+		ssl_handshake_error,
 		ssl_sni_echo,
 		ssl_sni_fail,
 		ssl_tls_psk,
@@ -846,6 +847,32 @@ ssl_handshake(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket1, 0, 1000),
 	{error, closed} = ssl:recv(Socket2, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_handshake_error(_) ->
+	doc("Acceptor must not crash if client disconnects in the middle of SSL handshake."),
+	Name = name(),
+	Opts = ct_helper:get_certs_from_ets(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, #{num_acceptors => 1, socket_opts => Opts},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	receive after 500 -> ok end,
+	[ConnPid] = ranch:procs(Name, connections),
+	ConnMon = monitor(process, ConnPid),
+	ok = gen_tcp:send(Socket, <<"GARBAGE">>),
+	ok = gen_tcp:close(Socket),
+	receive
+		{'DOWN', ConnMon, process, ConnPid, R} ->
+			{shutdown, {_, _}} = R
+	after 1000 ->
+		error(timeout)
+	end,
+	receive after 500 -> ok end,
+	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
 	{'EXIT', _} = begin catch ranch:get_port(Name) end,
 	ok.
