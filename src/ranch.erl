@@ -301,8 +301,9 @@ handshake(Ref, Opts) ->
 
 handshake1(Ref, Opts) ->
 	receive {handshake, Ref, Transport, CSocket, Timeout} ->
+		PeerInfo = get_peer_info(Transport, CSocket, undefined),
 		Handshake = handshake_transport(Transport, handshake, CSocket, Opts, Timeout),
-		handshake_result(Handshake, Ref, Transport, CSocket, Timeout)
+		handshake_result(Handshake, Ref, Transport, CSocket, PeerInfo, Timeout)
 	end.
 
 -spec handshake_continue(ref()) -> {ok, ranch_transport:socket()}.
@@ -315,8 +316,9 @@ handshake_continue(Ref, Opts) ->
 
 handshake_continue1(Ref, Opts) ->
 	receive {handshake_continue, Ref, Transport, CSocket, Timeout} ->
+		PeerInfo = get_peer_info(Transport, CSocket, undefined),
 		Handshake = handshake_transport(Transport, handshake_continue, CSocket, Opts, Timeout),
-		handshake_result(Handshake, Ref, Transport, CSocket, Timeout)
+		handshake_result(Handshake, Ref, Transport, CSocket, PeerInfo, Timeout)
 	end.
 
 handshake_transport(Transport, Fun, CSocket, undefined, Timeout) ->
@@ -324,7 +326,7 @@ handshake_transport(Transport, Fun, CSocket, undefined, Timeout) ->
 handshake_transport(Transport, Fun, CSocket, {opts, Opts}, Timeout) ->
 	Transport:Fun(CSocket, Opts, Timeout).
 
-handshake_result(Result, Ref, Transport, CSocket, Timeout) ->
+handshake_result(Result, Ref, Transport, CSocket, PeerInfo0, Timeout) ->
 	case Result of
 		OK = {ok, _} ->
 			OK;
@@ -332,10 +334,7 @@ handshake_result(Result, Ref, Transport, CSocket, Timeout) ->
 			self() ! {handshake_continue, Ref, Transport, CSocket2, Timeout},
 			{continue, Info};
 		{error, Reason} ->
-			PeerInfo = case Transport:peername(CSocket) of
-				{ok, Peer} -> Peer;
-				{error, _} -> undefined
-			end,
+			PeerInfo = get_peer_info(Transport, CSocket, PeerInfo0),
 			ok = Transport:close(CSocket),
 			exit({shutdown, {Reason, PeerInfo}})
 	end.
@@ -344,6 +343,12 @@ handshake_result(Result, Ref, Transport, CSocket, Timeout) ->
 handshake_cancel(Ref) ->
 	receive {handshake_continue, Ref, Transport, CSocket, _} ->
 		Transport:handshake_cancel(CSocket)
+	end.
+
+get_peer_info(Transport, Socket, Default) ->
+	case Transport:peername(Socket) of
+		{ok, Peer} -> Peer;
+		{error, _} -> Default
 	end.
 
 %% Unlike handshake/2 this function always return errors because
