@@ -206,6 +206,7 @@ stop_listener(Ref) ->
 stop_listener1(Ref) ->
 	TransportAndOpts = maybe_get_transport_and_opts(Ref),
 	_ = supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}),
+	ok = ranch_server:cleanup_listener_opts(Ref),
 	Result = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
 	ok = stop_listener2(TransportAndOpts),
 	Result.
