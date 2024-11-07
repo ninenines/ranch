@@ -4,6 +4,8 @@ name: Check Ranch
 
 on:
   push:
+    branches:
+      - master
   pull_request:
   schedule:
       ## Every Monday at 4am.
