@@ -193,24 +193,38 @@ start_error(_, Error) -> Error.
 
 -spec stop_listener(ref()) -> ok | {error, not_found}.
 stop_listener(Ref) ->
+	%% The stop procedure must be executed in a separate
+	%% process to make sure that it won't be interrupted
+	%% in the middle in case the calling process crashes.
+	%% We use erpc:call locally so we don't have to
+	%% implement a custom spawn/call mechanism.
+	%% We need to provide an integer timeout to erpc:call,
+	%% otherwise the function will be executed in the calling
+	%% process. 5 minutes should be enough.
+	erpc:call(node(), fun() -> stop_listener1(Ref) end, 300000).
+
+stop_listener1(Ref) ->
+	TransportAndOpts = maybe_get_transport_and_opts(Ref),
+	_ = supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}),
+	ok = ranch_server:cleanup_listener_opts(Ref),
+	Result = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
+	ok = stop_listener2(TransportAndOpts),
+	Result.
+
+stop_listener2({Transport, TransOpts}) ->
+	Transport:cleanup(TransOpts),
+	ok;
+stop_listener2(undefined) ->
+	ok.
+
+maybe_get_transport_and_opts(Ref) ->
 	try
-		[_, Transport0, _, _, _] = ranch_server:get_listener_start_args(Ref),
-		TransOpts0 = get_transport_options(Ref),
-		{Transport0, TransOpts0}
-	of
-		{Transport, TransOpts} ->
-			case supervisor:terminate_child(ranch_sup, {ranch_listener_sup, Ref}) of
-				ok ->
-					_ = supervisor:delete_child(ranch_sup, {ranch_listener_sup, Ref}),
-					ranch_server:cleanup_listener_opts(Ref),
-					Transport:cleanup(TransOpts),
-					ok;
-				{error, Reason} ->
-					{error, Reason}
-			end
+		[_, Transport, _, _, _] = ranch_server:get_listener_start_args(Ref),
+		TransOpts = get_transport_options(Ref),
+		{Transport, TransOpts}
 	catch
 		error:badarg ->
-			{error, not_found}
+			undefined
 	end.
 
 -spec suspend_listener(ref()) -> ok | {error, any()}.
