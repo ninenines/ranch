@@ -332,14 +332,14 @@ processes.
 
 The `alarms` transport option allows you to configure alarms
 which will be triggered when the number of connections tracked
-by one connection supervisor reaches or exceeds the defined treshold.
+by one connection supervisor reaches or exceeds the defined threshold.
 
 The `alarms` transport option takes a map with alarm names as keys and alarm
 options as values.
 
 Any term is allowed as an alarm name.
 
-Alarm options include the alarm type and a treshold that, when reached,
+Alarm options include the alarm type and a threshold that, when reached,
 triggers the given callback. A cooldown prevents the alarm from being
 triggered too often.
 
@@ -350,7 +350,7 @@ triggered too often.
 Alarms = #{
     my_alarm => #{
         type => num_connections,
-        treshold => 100,
+        threshold => 100,
         callback => fun(Ref, Name, ConnSup, ConnPids]) ->
             logger:warning("Warning (~s): "
                     "Supervisor ~s of listener ~s "
