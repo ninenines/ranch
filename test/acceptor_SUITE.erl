@@ -598,6 +598,8 @@ misc_connection_alarms(_) ->
 	end,
 	Alarms0 = #{
 		test1 => Alarm1 = #{type => num_connections, threshold => 2, cooldown => 0, callback => AlarmCallback},
+		%% The test2 alarm uses the misspelled treshold key to test for backwards compatibility.
+		%% @TODO: Change to use the proper spelling when treshold gets removed in Ranch 3.0.
 		test2 => Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback}
 	},
 	ConnectOpts = [binary, {active, false}, {packet, raw}],
