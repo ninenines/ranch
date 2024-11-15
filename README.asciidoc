@@ -33,5 +33,6 @@ to close any of the currently opened sockets.
 
 == Getting help
 
+* https://discord.gg/x468ZsxG[Discord server]
 * https://github.com/ninenines/ranch/issues[Issues tracker]
 * https://ninenines.eu/services[Commercial Support]
