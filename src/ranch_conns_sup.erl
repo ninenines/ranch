@@ -138,7 +138,7 @@ loop(State=#state{parent=Parent, ref=Ref, id=Id, conn_type=ConnType,
 					To ! self(),
 					ranch:log(error,
 						"Ranch listener ~p connection process start failure; "
-						"~p:start_link/3 returned: ~999999p~n",
+						"~p:start_link/3 returned: ~0p~n",
 						[Ref, Protocol, Ret], Logger),
 					Transport:close(Socket),
 					loop(State, CurConns, NbChildren, Sleepers)
@@ -146,7 +146,7 @@ loop(State=#state{parent=Parent, ref=Ref, id=Id, conn_type=ConnType,
 				To ! self(),
 				ranch:log(error,
 					"Ranch listener ~p connection process start failure; "
-					"~p:start_link/3 crashed with reason: ~p:~999999p~n",
+					"~p:start_link/3 crashed with reason: ~p:~0p~n",
 					[Ref, Protocol, Class, Reason], Logger),
 				Transport:close(Socket),
 				loop(State, CurConns, NbChildren, Sleepers)
@@ -475,7 +475,7 @@ system_terminate(Reason, _, _, {State, _, NbChildren, _}) ->
 system_code_change(Misc, _, _, _) ->
 	{ok, Misc}.
 
-%% We use ~999999p here instead of ~w because the latter doesn't
+%% We use ~0p here instead of ~w because the latter doesn't
 %% support printable strings.
 report_error(_, _, _, _, normal) ->
 	ok;
@@ -486,5 +486,5 @@ report_error(_, _, _, _, {shutdown, _}) ->
 report_error(Logger, Ref, Protocol, Pid, Reason) ->
 	ranch:log(error,
 		"Ranch listener ~p had connection process started with "
-		"~p:start_link/3 at ~p exit with reason: ~999999p~n",
+		"~p:start_link/3 at ~p exit with reason: ~0p~n",
 		[Ref, Protocol, Pid, Reason], Logger).

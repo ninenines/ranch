@@ -89,7 +89,7 @@ listen_error(Ref, Transport, TransOpts0, Reason, Logger) ->
 	SocketOpts = hide_socket_opts(SocketOpts0),
 	TransOpts = TransOpts0#{socket_opts => SocketOpts},
 	ranch:log(error,
-		"Failed to start Ranch listener ~p in ~p:listen(~999999p) for reason ~p (~s)~n",
+		"Failed to start Ranch listener ~p in ~p:listen(~0p) for reason ~p (~s)~n",
 		[Ref, Transport, TransOpts, Reason, format_error(Transport, Reason)], Logger),
 	exit({listen_error, Ref, Reason}).
 
@@ -120,5 +120,5 @@ format_error(Transport, Reason) ->
 		true ->
 			Transport:format_error(Reason);
 		false ->
-			lists:flatten(io_lib:format("~999999p", [Reason]))
+			lists:flatten(io_lib:format("~0p", [Reason]))
 	end.
