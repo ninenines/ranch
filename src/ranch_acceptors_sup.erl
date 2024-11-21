@@ -90,7 +90,7 @@ listen_error(Ref, Transport, TransOpts0, Reason, Logger) ->
 	TransOpts = TransOpts0#{socket_opts => SocketOpts},
 	ranch:log(error,
 		"Failed to start Ranch listener ~p in ~p:listen(~999999p) for reason ~p (~s)~n",
-		[Ref, Transport, TransOpts, Reason, format_error(Reason)], Logger),
+		[Ref, Transport, TransOpts, Reason, format_error(Transport, Reason)], Logger),
 	exit({listen_error, Ref, Reason}).
 
 hide_socket_opts([]) ->
@@ -106,9 +106,19 @@ hide_socket_opts([{password, _}|SocketOpts]) ->
 hide_socket_opts([SocketOpt|SocketOpts]) ->
 	[SocketOpt|hide_socket_opts(SocketOpts)].
 
-format_error(no_cert) ->
+%% Handling of no_cert really should be done in ranch_ssl. We leave it here for
+%% backwards compatibility with possibly existing custom transports without an
+%% format_error/1 implementation that may rely on this module handling it.
+%% TODO: Remove in Ranch 3.0
+format_error(_, no_cert) ->
 	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
-format_error(reuseport_local) ->
+format_error(_, reuseport_local) ->
 	"num_listen_sockets must be set to 1 for local sockets";
-format_error(Reason) ->
-	inet:format_error(Reason).
+format_error(Transport, Reason) ->
+	%% TODO: Required callback in Ranch 3.0
+	case erlang:function_exported(Transport, format_error, 1) of
+		true ->
+			Transport:format_error(Reason);
+		false ->
+			lists:flatten(io_lib:format("~999999p", [Reason]))
+	end.

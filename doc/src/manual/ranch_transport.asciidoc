@@ -47,6 +47,19 @@ Assign a new controlling process to the socket. The
 controlling process is the process that is linked to
 and receives messages from the socket.
 
+=== format_error
+
+[source,erlang]
+----
+format_error(Reason :: term())
+    -> ReasonString :: string()
+----
+
+Format a listen error into a human-readable diagnostic string.
+
+This callback is optional, but implementing it is highly
+recommended. It will become mandatory in Ranch 3.0.
+
 === getopts
 
 [source,erlang]
