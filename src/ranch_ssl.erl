@@ -46,6 +46,7 @@
 -export([shutdown/2]).
 -export([close/1]).
 -export([cleanup/1]).
+-export([format_error/1]).
 
 -type ssl_opt() :: {alpn_preferred_protocols, [binary()]}
 	| {anti_replay, '10k' | '100k' | {integer(), integer(), integer()}}
@@ -327,6 +328,12 @@ cleanup(#{socket_opts:=SocketOpts}) ->
 	end;
 cleanup(_) ->
 	ok.
+
+-spec format_error({error, ssl:reason()} | ssl:reason()) -> string().
+format_error(no_cert) ->
+	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
+format_error(Reason) ->
+	ssl:format_error(Reason).
 
 get_tls_versions(SocketOpts) ->
 	%% Socket options need to be reversed for keyfind because later options

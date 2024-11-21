@@ -68,6 +68,10 @@
 	-> ok | {error, atom()}.
 -callback close(socket()) -> ok.
 -callback cleanup(ranch:transport_opts(any())) -> ok.
+-callback format_error(term()) -> string().
+
+%% TODO: Required callback in Ranch 3.0
+-optional_callbacks([format_error/1]).
 
 %% A fallback for transports that don't have a native sendfile implementation.
 %% Note that the ordering of arguments is different from file:sendfile/5 and

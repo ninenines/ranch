@@ -175,3 +175,8 @@ implement the `{active, once}` and the `{active, true}` options.
 If the transport handler doesn't have a native implementation of `sendfile/5` a
 fallback is available, `ranch_transport:sendfile/6`. The extra first argument
 is the transport's module. See `ranch_ssl` for an example.
+
+It is highly recommended for a custom transport handler to implement the
+optional `format_error/1` callback, in order to provide a human-readable
+diagnostic string. Implementing this callback will become mandatory in
+Ranch 3.0.
