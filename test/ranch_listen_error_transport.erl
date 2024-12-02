@@ -1,5 +1,4 @@
-%% Copyright (c) 2011-2021, Loïc Hoguin <essen@ninenines.eu>
-%% Copyright (c) 2020-2021, Jan Uhlig <juhlig@hnc-agency.org>
+%% Copyright (c) 2024, Jan Uhlig <juhlig@hnc-agency.org>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
@@ -13,7 +12,7 @@
 %% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
--module(ranch_tcp).
+-module(ranch_listen_error_transport).
 -behaviour(ranch_transport).
 
 -export([name/0]).
@@ -47,34 +46,10 @@
 -export([cleanup/1]).
 -export([format_error/1]).
 
--type opt() :: {backlog, non_neg_integer()}
-	| {buffer, non_neg_integer()}
-	| {delay_send, boolean()}
-	| {dontroute, boolean()}
-	| {exit_on_close, boolean()}
-	| {fd, non_neg_integer()}
-	| {high_msgq_watermark, non_neg_integer()}
-	| {high_watermark, non_neg_integer()}
-	| inet
-	| inet6
-	| {ip, inet:ip_address() | inet:local_address()}
-	| {ipv6_v6only, boolean()}
-	| {keepalive, boolean()}
-	| {linger, {boolean(), non_neg_integer()}}
-	| {low_msgq_watermark, non_neg_integer()}
-	| {low_watermark, non_neg_integer()}
-	| {nodelay, boolean()}
-	| {port, inet:port_number()}
-	| {priority, integer()}
-	| {raw, non_neg_integer(), non_neg_integer(), binary()}
-	| {recbuf, non_neg_integer()}
-	| {send_timeout, timeout()}
-	| {send_timeout_close, boolean()}
-	| {sndbuf, non_neg_integer()}
-	| {tos, integer()}.
+-type opt() :: ranch_tcp:opt().
 -export_type([opt/0]).
 
--type opts() :: [opt()].
+-type opts() :: ranch_tcp:opts().
 -export_type([opts/0]).
 
 -spec name() -> tcp.
@@ -88,205 +63,132 @@ secure() ->
 messages() -> {tcp, tcp_closed, tcp_error, tcp_passive}.
 
 -spec listen(ranch:transport_opts(opts())) -> {ok, inet:socket()} | {error, atom()}.
-listen(TransOpts) ->
-	ok = cleanup(TransOpts),
-	Logger = maps:get(logger, TransOpts, logger),
-	SocketOpts = maps:get(socket_opts, TransOpts, []),
-	%% We set the port to 0 because it is given in the Opts directly.
-	%% The port in the options takes precedence over the one in the
-	%% first argument.
-	gen_tcp:listen(0, prepare_socket_opts(SocketOpts, Logger)).
+listen(_TransOpts) ->
+	{error, {?MODULE, listen_error}}.
 
-prepare_socket_opts([Backend = {inet_backend, _}|SocketOpts], Logger) ->
-	%% In OTP/23, the inet_backend option may be used to activate the
-	%% experimental socket backend for inet/gen_tcp. If present, it must
-	%% be the first option in the list.
-	[Backend|prepare_socket_opts(SocketOpts, Logger)];
-prepare_socket_opts(SocketOpts0, Logger) ->
-	SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
-	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
-	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
-	SocketOpts4 = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
-	ranch:filter_options(SocketOpts4, disallowed_listen_options(),
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger).
-
-%% 'binary' and 'list' are disallowed but they are handled
-%% specifically as they do not have 2-tuple equivalents.
 -spec disallowed_listen_options() -> [atom()].
 disallowed_listen_options() ->
-	[active, header, mode, packet, packet_size, line_delimiter, reuseaddr].
+	ranch_tcp:disallowed_listen_options().
 
 -spec accept(inet:socket(), timeout())
 	-> {ok, inet:socket()} | {error, closed | timeout | atom()}.
 accept(LSocket, Timeout) ->
-	gen_tcp:accept(LSocket, Timeout).
+	ranch_tcp:accept(LSocket, Timeout).
 
 -spec handshake(inet:socket(), timeout()) -> {ok, inet:socket()}.
 handshake(CSocket, Timeout) ->
-	handshake(CSocket, [], Timeout).
+	iranch_tcp:handshake(CSocket, Timeout).
 
 -spec handshake(inet:socket(), opts(), timeout()) -> {ok, inet:socket()}.
-handshake(CSocket, _, _) ->
-	{ok, CSocket}.
+handshake(CSocket, Opts, Timeout) ->
+	ranch_tcp:handshake(CSocket, Opts, Timeout).
 
 -spec handshake_continue(inet:socket(), timeout()) -> no_return().
 handshake_continue(CSocket, Timeout) ->
-	handshake_continue(CSocket, [], Timeout).
+	ranch_tcp:handshake_continue(CSocket, Timeout).
 
 -spec handshake_continue(inet:socket(), opts(), timeout()) -> no_return().
-handshake_continue(_, _, _) ->
-	error(not_supported).
+handshake_continue(CSocket, Opts, Timeout) ->
+	ranch_tcp:handshake_continue(CSocket, Opts, Timeout).
 
 -spec handshake_cancel(inet:socket()) -> no_return().
-handshake_cancel(_) ->
-	error(not_supported).
+handshake_cancel(CSocket) ->
+	ranch_tcp:handshake_cancel(CSocket).
 
 %% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any())
 	-> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts) when is_integer(Port) ->
-	gen_tcp:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}]).
+	ranch_tcp:connect(Host, Port, Opts).
 
 %% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any(), timeout())
 	-> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
-	gen_tcp:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}],
-		Timeout).
+	ranch_tcp:connect(Host, Port, Opts, Timeout).
 
 -spec recv(inet:socket(), non_neg_integer(), timeout())
 	-> {ok, any()} | {error, closed | atom()}.
 recv(Socket, Length, Timeout) ->
-	gen_tcp:recv(Socket, Length, Timeout).
+	ranch_tcp:recv(Socket, Length, Timeout).
 
 -spec recv_proxy_header(inet:socket(), timeout())
 	-> {ok, ranch_proxy_header:proxy_info()}
 	| {error, closed | atom()}
 	| {error, protocol_error, atom()}.
 recv_proxy_header(Socket, Timeout) ->
-	case recv(Socket, 0, Timeout) of
-		{ok, Data} ->
-			case ranch_proxy_header:parse(Data) of
-				{ok, ProxyInfo, <<>>} ->
-					{ok, ProxyInfo};
-				{ok, ProxyInfo, Rest} ->
-					case gen_tcp:unrecv(Socket, Rest) of
-						ok ->
-							{ok, ProxyInfo};
-						Error ->
-							Error
-					end;
-				{error, HumanReadable} ->
-					{error, protocol_error, HumanReadable}
-			end;
-		Error ->
-			Error
-	end.
+	ranch_tcp:recv_proxy_header(Socket, Timeout).
 
 -spec send(inet:socket(), iodata()) -> ok | {error, atom()}.
 send(Socket, Packet) ->
-	gen_tcp:send(Socket, Packet).
+	ranch_tcp:send(Socket, Packet).
 
 -spec sendfile(inet:socket(), file:name_all() | file:fd())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, Filename) ->
-	sendfile(Socket, Filename, 0, 0, []).
+	ranch_tcp:sendfile(Socket, Filename).
 
 -spec sendfile(inet:socket(), file:name_all() | file:fd(), non_neg_integer(),
 		non_neg_integer())
 	-> {ok, non_neg_integer()} | {error, atom()}.
 sendfile(Socket, File, Offset, Bytes) ->
-	sendfile(Socket, File, Offset, Bytes, []).
+	ranch_tcp:sendfile(Socket, File, Offset, Bytes).
 
 -spec sendfile(inet:socket(), file:name_all() | file:fd(), non_neg_integer(),
 		non_neg_integer(), [{chunk_size, non_neg_integer()}])
 	-> {ok, non_neg_integer()} | {error, atom()}.
-sendfile(Socket, Filename, Offset, Bytes, Opts)
-		when is_list(Filename) orelse is_atom(Filename)
-		orelse is_binary(Filename) ->
-	case file:open(Filename, [read, raw, binary]) of
-		{ok, RawFile} ->
-			try sendfile(Socket, RawFile, Offset, Bytes, Opts) of
-				Result -> Result
-			after
-				ok = file:close(RawFile)
-			end;
-		{error, _} = Error ->
-			Error
-	end;
-sendfile(Socket, RawFile, Offset, Bytes, Opts) ->
-	Opts2 = case Opts of
-		[] -> [{chunk_size, 16#1FFF}];
-		_ -> Opts
-	end,
-	try file:sendfile(RawFile, Socket, Offset, Bytes, Opts2) of
-		Result -> Result
-	catch
-		error:{badmatch, {error, enotconn}} ->
-			%% file:sendfile/5 might fail by throwing a
-			%% {badmatch, {error, enotconn}}. This is because its
-			%% implementation fails with a badmatch in
-			%% prim_file:sendfile/10 if the socket is not connected.
-			{error, closed}
-	end.
+sendfile(Socket, Filename, Offset, Bytes, Opts) ->
+	ranch_tcp:sendfile(Socket, Filename, Offset, Bytes, Opts).
 
 %% @todo Probably filter Opts?
 -spec setopts(inet:socket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
-	inet:setopts(Socket, Opts).
+	ranch_tcp:setopts(Socket, Opts).
 
 -spec getopts(inet:socket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getopts(Socket, Opts) ->
-	inet:getopts(Socket, Opts).
+	ranch_tcp:getopts(Socket, Opts).
 
 -spec getstat(inet:socket()) -> {ok, list()} | {error, atom()}.
 getstat(Socket) ->
-	inet:getstat(Socket).
+	ranch_tcp:getstat(Socket).
 
 -spec getstat(inet:socket(), [atom()]) -> {ok, list()} | {error, atom()}.
 getstat(Socket, OptionNames) ->
-	inet:getstat(Socket, OptionNames).
+	ranch_tcp:getstat(Socket, OptionNames).
 
 -spec controlling_process(inet:socket(), pid())
 	-> ok | {error, closed | not_owner | atom()}.
 controlling_process(Socket, Pid) ->
-	gen_tcp:controlling_process(Socket, Pid).
+	ranch_tcp:controlling_process(Socket, Pid).
 
 -spec peername(inet:socket())
 	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 peername(Socket) ->
-	inet:peername(Socket).
+	ranch_tcp:peername(Socket).
 
 -spec sockname(inet:socket())
 	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 sockname(Socket) ->
-	inet:sockname(Socket).
+	ranch_tcp:sockname(Socket).
 
 -spec shutdown(inet:socket(), read | write | read_write)
 	-> ok | {error, atom()}.
 shutdown(Socket, How) ->
-	gen_tcp:shutdown(Socket, How).
+	ranch_tcp:shutdown(Socket, How).
 
 -spec close(inet:socket()) -> ok.
 close(Socket) ->
-	gen_tcp:close(Socket).
+	ranch_tcp:close(Socket).
 
 -spec cleanup(ranch:transport_opts(opts())) -> ok.
-cleanup(#{socket_opts:=SocketOpts}) ->
-	case lists:keyfind(ip, 1, lists:reverse(SocketOpts)) of
-		{ip, {local, SockFile}} ->
-			_ = file:delete(SockFile),
-			ok;
-		_ ->
-			ok
-	end;
-cleanup(_) ->
-	ok.
+cleanup(Opts) ->
+	ranch_tcp:cleanup(Opts).
 
 -spec format_error(inet:posix() | system_limit) -> string().
+format_error({?MODULE, Reason}) ->
+	io_lib:format("There was an error in ~0p: ~0p", [?MODULE, Reason]);
 format_error(Reason) ->
-	inet:format_error(Reason).
+	ranch_tcp:format_error(Reason).

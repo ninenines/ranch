@@ -114,7 +114,8 @@ groups() ->
 		misc_multiple_ip_local_socket_opts,
 		misc_connection_alarms,
 		misc_stop_unknown_listener,
-		misc_repeated_start_stop
+		misc_repeated_start_stop,
+		misc_listen_error
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -683,6 +684,27 @@ misc_repeated_start_stop(_) ->
 	),
 	ok.
 
+misc_listen_error(_) ->
+	doc(""),
+	Name = name(),
+	Self = self(),
+	logger:add_primary_filter(Name, {fun(Event, _Args) -> Self ! {Name, Event}, ignore end, undefined}),
+	{error, _} = ranch:start_listener(Name,
+		ranch_listen_error_transport, #{},
+		echo_protocol, []),
+	receive
+		{Name, #{msg := {Format, Args}}} ->
+			FormattedMsg = lists:flatten(io_lib:format(Format, Args)),
+			NormalizedMsg = re:replace(FormattedMsg, "\\s", "", [global, {return, list}]),
+			"FailedtostartRanchlistenermisc_listen_error"
+			"inranch_listen_error_transport:listen(#{socket_opts=>[]})"
+			"forreason{ranch_listen_error_transport,listen_error}"
+			"(Therewasanerrorinranch_listen_error_transport:listen_error)" = NormalizedMsg
+	after 1000 ->
+		error(timeout)
+	end,
+	logger:remove_primary_filter(Name),
+	ok.
 
 %% ssl.
 
