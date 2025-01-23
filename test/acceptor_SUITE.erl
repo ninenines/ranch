@@ -83,6 +83,7 @@ groups() ->
 		ssl_active_n_echo,
 		ssl_echo,
 		ssl_local_echo,
+		ssl_dtls_echo,
 		ssl_graceful,
 		ssl_handshake,
 		ssl_handshake_error,
@@ -832,6 +833,27 @@ ssl_echo(_) ->
 	{ok, Socket} = ssl:connect("localhost", Port, [
 		binary, {active, false}, {packet, raw},
 		{verify, verify_none}, {versions, ['tlsv1.2']}]),
+	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
+	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	{error, closed} = ssl:recv(Socket, 0, 1000),
+	%% Make sure the listener stopped.
+	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	ok.
+
+ssl_dtls_echo(_) ->
+	doc("Ensure that passive mode works with SSL transport."),
+	Name = name(),
+	%% We are using DTLS so the version should be 'dtlsv1.2'.
+	%% But since we don't really need it we simply don't set 'versions'.
+	Opts = ct_helper:get_certs_from_ets() -- [{versions, ['tlsv1.2']}],
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, Opts ++ [{protocol, dtls}, {verify, verify_none}],
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {protocol, dtls},
+		{verify, verify_none}]),
 	ok = ssl:send(Socket, <<"SSL Ranch is working!">>),
 	{ok, <<"SSL Ranch is working!">>} = ssl:recv(Socket, 21, 1000),
 	ok = ranch:stop_listener(Name),

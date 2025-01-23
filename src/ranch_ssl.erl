@@ -135,17 +135,25 @@ listen(TransOpts) ->
 	end.
 
 do_listen(SocketOpts0, Logger) ->
-	SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
-	SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
-	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
-	SocketOpts = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
+	SocketOpts = set_default_options(SocketOpts0),
 	DisallowedOpts0 = disallowed_listen_options(),
 	DisallowedOpts = unsupported_tls_options(SocketOpts) ++ DisallowedOpts0,
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
 	ssl:listen(0, ranch:filter_options(SocketOpts, DisallowedOpts,
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger)).
+		[binary, {active, false}, {reuseaddr, true}], Logger)).
+
+set_default_options(SocketOpts0) ->
+	case proplists:get_value(protocol, SocketOpts0, tls) of
+		tls ->
+			SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
+			SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
+			SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
+			ranch:set_option_default(SocketOpts3, send_timeout_close, true);
+		dtls ->
+			SocketOpts0
+	end.
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.
