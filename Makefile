@@ -2,7 +2,7 @@
 
 PROJECT = ranch
 PROJECT_DESCRIPTION = Socket acceptor pool for TCP protocols.
-PROJECT_VERSION = 2.1.0
+PROJECT_VERSION = 2.2.0
 PROJECT_REGISTERED = ranch_server
 
 # Options.
@@ -39,8 +39,8 @@ define HEX_TARBALL_EXTRA_METADATA
 #{
 	licenses => [<<"ISC">>],
 	links => #{
-		<<"User guide">> => <<"https://ninenines.eu/docs/en/ranch/2.1/guide/">>,
-		<<"Function reference">> => <<"https://ninenines.eu/docs/en/ranch/2.1/manual/">>,
+		<<"User guide">> => <<"https://ninenines.eu/docs/en/ranch/2.2/guide/">>,
+		<<"Function reference">> => <<"https://ninenines.eu/docs/en/ranch/2.2/manual/">>,
 		<<"GitHub">> => <<"https://github.com/ninenines/ranch">>,
 		<<"Sponsor">> => <<"https://github.com/sponsors/essen">>
 	}

@@ -354,6 +354,7 @@ The exact type will vary depending on the transport module.
 
 == Changelog
 
+* *2.2*: The callback `format_error/1` was added.
 * *2.0*: The callback `listen/1` has changed to accept a map of
          transport options instead of socket options.
 * *2.0*: The callback `messages/0` return value was updated to

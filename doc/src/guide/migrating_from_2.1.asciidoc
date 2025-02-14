@@ -1,0 +1,49 @@
+[appendix]
+== Migrating from Ranch 2.1 to Ranch 2.2
+
+Ranch 2.2 is a maintenance release containing a small number
+of fixes and improvements.
+
+Ranch 2.2 is tested with Erlang/OTP 24.0 onward, although it
+should be compatible with Erlang/OTP 22.0 and above.
+
+=== Features added
+
+* `DTLS` is now supported.
+
+* The `certs_keys` option from `ssl` is now accepted
+  and documented.
+
+* The `UNIQUE_ID` PROXY protocol header extension is
+  now supported.
+
+* The `ranch_transport` behavior has a new callback
+  `format_error/1` which allows finer grained formatting
+  of Ranch's error messages. The callback is currently
+  optional and will become required in Ranch 3.0.
+
+=== Changed behaviors
+
+* Ranch will now obfuscate certificates, keys and passwords
+  in the error message produced on listen error.
+
+* The exception reason when a connection process has failed
+  its handshake has been changed to `{shutdown, {Reason, PeerInfo}}`
+  where `PeerInfo` contains the peer name when available.
+
+* The `{packet, raw}` socket option is no longer set explicitly,
+  as this is already the default value.
+
+=== Bugs fixed
+
+* `ranch:stop_listener/1` will now return an error instead
+  of throwing an exception when the listener does not exist.
+
+* Fix `ranch:recv_proxy_header/2` for the upcoming Erlang/OTP 28.
+
+* Ensure that a user crash while stopping a listener does
+  not prevent a subsequent attempt to stop it.
+
+* Alarm option `threshold` was mispelled in Ranch 2.1. This
+  has been corrected. The wrong spelling `treshold` is still
+  accepted and will be removed in Ranch 3.0.
