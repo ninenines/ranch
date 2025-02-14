@@ -92,6 +92,8 @@ prepare_tag:
 	$(verbose) grep -m1 {\" src/$(PROJECT).appup
 	$(verbose) echo -n "GUIDE:  "
 	$(verbose) grep -h dep_$(PROJECT)_commit doc/src/guide/*.asciidoc || true
+	$(verbose) echo ; echo
+	$(verbose) echo -n "LICENSE: " ; head -n1 LICENSE
 	$(verbose) echo
 	$(verbose) echo "Dependencies:"
 	$(verbose) grep ^DEPS Makefile || echo "DEPS ="

@@ -1,5 +1,5 @@
-%% Copyright (c) 2020-2021, Loïc Hoguin <essen@ninenines.eu>
-%% Copyright (c) 2021, Maria Scott <maria-12648430@hnc-agency.org>
+%% Copyright (c) Loïc Hoguin <essen@ninenines.eu>
+%% Copyright (c) Maria Scott <maria-12648430@hnc-agency.org>
 %%
 %% Permission to use, copy, modify, and/or distribute this software for any
 %% purpose with or without fee is hereby granted, provided that the above
