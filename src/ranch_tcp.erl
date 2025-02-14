@@ -108,7 +108,7 @@ prepare_socket_opts(SocketOpts0, Logger) ->
 	SocketOpts3 = ranch:set_option_default(SocketOpts2, send_timeout, 30000),
 	SocketOpts4 = ranch:set_option_default(SocketOpts3, send_timeout_close, true),
 	ranch:filter_options(SocketOpts4, disallowed_listen_options(),
-		[binary, {active, false}, {packet, raw}, {reuseaddr, true}], Logger).
+		[binary, {active, false}, {reuseaddr, true}], Logger).
 
 %% 'binary' and 'list' are disallowed but they are handled
 %% specifically as they do not have 2-tuple equivalents.
@@ -147,7 +147,7 @@ handshake_cancel(_) ->
 	-> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts) when is_integer(Port) ->
 	gen_tcp:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}]).
+		Opts ++ [binary, {active, false}]).
 
 %% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
@@ -155,7 +155,7 @@ connect(Host, Port, Opts) when is_integer(Port) ->
 	-> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
 	gen_tcp:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}],
+		Opts ++ [binary, {active, false}],
 		Timeout).
 
 -spec recv(inet:socket(), non_neg_integer(), timeout())

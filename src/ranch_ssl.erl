@@ -226,7 +226,7 @@ handshake_cancel(CSocket) ->
 	-> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts) when is_integer(Port) ->
 	ssl:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}]).
+		Opts ++ [binary, {active, false}]).
 
 %% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
@@ -234,7 +234,7 @@ connect(Host, Port, Opts) when is_integer(Port) ->
 	-> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts, Timeout) when is_integer(Port) ->
 	ssl:connect(Host, Port,
-		Opts ++ [binary, {active, false}, {packet, raw}],
+		Opts ++ [binary, {active, false}],
 		Timeout).
 
 -spec recv(ssl:sslsocket(), non_neg_integer(), timeout())
