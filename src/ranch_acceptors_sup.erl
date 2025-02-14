@@ -103,6 +103,8 @@ hide_socket_opts([{cacerts, _}|SocketOpts]) ->
 	[{cacerts, '...'}|hide_socket_opts(SocketOpts)];
 hide_socket_opts([{password, _}|SocketOpts]) ->
 	[{password, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{certs_keys, _}|SocketOpts]) ->
+	[{certs_keys, '...'}|hide_socket_opts(SocketOpts)];
 hide_socket_opts([SocketOpt|SocketOpts]) ->
 	[SocketOpt|hide_socket_opts(SocketOpts)].
 
