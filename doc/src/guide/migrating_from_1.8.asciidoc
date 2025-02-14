@@ -1,0 +1,14 @@
+[appendix]
+== Changes since Ranch 1.8
+
+Ranch 1.8 is the last Ranch 1.x release series. Only compatibility
+fixes are to be released moving forward. Support for Ranch 1.8
+will be discontinued when Cowboy 3.0 is released.
+
+The following patch releases have been issued:
+
+=== Ranch 1.8.1
+
+* Fix `ranch:recv_proxy_header/2` for the upcoming Erlang/OTP 28.
+
+* Erlang.mk has been updated.
