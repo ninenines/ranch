@@ -34,13 +34,13 @@ A list of pids is returned.
 .Get the pids of the acceptor processes
 [source,erlang]
 ----
-Pids = ranch:procs(acceptors).
+Pids = ranch:procs(example_listener, acceptors).
 ----
 
 .Get the pids of the connection processes
 [source,erlang]
 ----
-Pids = ranch:procs(connections).
+Pids = ranch:procs(example_listener, connections).
 ----
 
 == See also
