@@ -29,5 +29,5 @@ $ telnet localhost 5555
 
 Type in a few words and see them reversed! Amazing!
 
-Be aware that there is a timeout of 5 seconds without receiving
+Be aware that there is a timeout of 60 seconds without receiving
 data before the example server disconnects your session.
