@@ -16,23 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  cleanup-master:
-    name: Cleanup master build
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-
-    - name: Cleanup master build if necessary
-      if: ${{ github.event_name == 'schedule' }}
-      run: |
-        gh cache delete Linux-X64-Erlang-master -R $REPO || true
-        gh cache delete macOS-ARM64-Erlang-master -R $REPO || true
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        REPO: ${{ github.repository }}
-
   check:
-    name: Ranch
-    needs: cleanup-master
+    name: Check
     uses: ninenines/ci.erlang.mk/.github/workflows/ci.yaml@master
