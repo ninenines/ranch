@@ -40,6 +40,7 @@
 -export([controlling_process/2]).
 -export([peername/1]).
 -export([sockname/1]).
+-export([peercert/1]).
 -export([shutdown/2]).
 -export([close/1]).
 -export([cleanup/1]).
@@ -159,6 +160,11 @@ peername(_Socket) ->
 	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 sockname(_Socket) ->
 	{ok, {{127, 0, 0, 1}, 12710}}.
+
+-spec peercert(reference())
+	-> no_return().
+peercert(_Socket) ->
+	error(not_supported).
 
 -spec shutdown(reference(), read | write | read_write)
 	-> ok | {error, atom()}.
