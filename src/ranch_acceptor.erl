@@ -55,7 +55,10 @@ loop(LSocket, Transport, Logger, ConnsSup, MonitorRef) ->
 		{error, closed} ->
 			exit(closed);
 		%% Continue otherwise.
-		{error, _} ->
+		{error, Reason} ->
+			ranch:log(warning,
+				"Ranch acceptor could not accept connection with reason: ~p~n",
+				[Reason], Logger),
 			ok
 	end,
 	flush(Logger),
