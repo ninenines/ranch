@@ -17,6 +17,7 @@
 -module(acceptor_SUITE).
 -compile(export_all).
 -compile(nowarn_export_all).
+-compile(nowarn_deprecated_catch).
 
 -dialyzer({nowarn_function, misc_wait_for_connections/1}).
 %% @todo Remove when specs in ssl are updated to accept local addresses.
@@ -600,12 +601,11 @@ misc_connection_alarms(_) ->
 	AlarmCallback = fun (Ref, AlarmName, _, ActiveConns) ->
 		Self ! {connection_alarm, {Ref, AlarmName, length(ActiveConns)}}
 	end,
-	Alarms0 = #{
-		test1 => Alarm1 = #{type => num_connections, threshold => 2, cooldown => 0, callback => AlarmCallback},
-		%% The test2 alarm uses the misspelled treshold key to test for backwards compatibility.
-		%% @TODO: Change to use the proper spelling when treshold gets removed in Ranch 3.0.
-		test2 => Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback}
-	},
+	Alarm1 = #{type => num_connections, threshold => 2, cooldown => 0, callback => AlarmCallback},
+	%% The test2 alarm uses the misspelled treshold key to test for backwards compatibility.
+	%% @TODO: Change to use the proper spelling when treshold gets removed in Ranch 3.0.
+	Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback},
+	Alarms0 = #{test1 => Alarm1, test2 => Alarm2},
 	ConnectOpts = [binary, {active, false}, {packet, raw}],
 
 	{ok, _} = ranch:start_listener(Name, ranch_tcp,
