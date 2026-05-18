@@ -86,8 +86,12 @@ start_protocol(SupPid, MonitorRef, Socket) ->
 -spec active_connections(pid()) -> non_neg_integer().
 active_connections(SupPid) ->
 	Tag = erlang:monitor(process, SupPid),
-	catch erlang:send(SupPid, {?MODULE, active_connections, self(), Tag},
-		[noconnect]),
+	Msg = {?MODULE, active_connections, self(), Tag},
+	try erlang:send(SupPid, Msg, [noconnect]) of
+		_ -> ok
+	catch _:_ ->
+		ok
+	end,
 	receive
 		{Tag, Ret} ->
 			erlang:demonitor(Tag, [flush]),

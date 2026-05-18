@@ -5,6 +5,6 @@
 	{registered, [ranch_sup,ranch_server]},
 	{applications, [kernel,stdlib,ssl]},
 	{optional_applications, []},
-	{mod, {ranch_app, []}},
+	{mod, {'ranch_app', []}},
 	{env, []}
 ]}.
