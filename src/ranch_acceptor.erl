@@ -46,7 +46,7 @@ loop(LSocket, Transport, Logger, ConnsSup, MonitorRef) ->
 		%% Reduce the accept rate if we run out of file descriptors.
 		%% We can't accept anymore anyway, so we might as well wait
 		%% a little for the situation to resolve itself.
-		{error, emfile} ->
+		{error, Reason} when Reason =:= emfile; Reason =:= enfile ->
 			ranch:log(warning,
 				"Ranch acceptor reducing accept rate: out of file descriptors~n",
 				[], Logger),
