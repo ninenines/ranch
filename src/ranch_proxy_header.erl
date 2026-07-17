@@ -150,13 +150,14 @@ parse_ipv6(Addr0, Rest) ->
 		{error, einval} -> throw(parse_ipv6_error)
 	end.
 
-parse_port(<<Port:1/binary, C, Rest/bits>>, C) -> parse_port(Port, Rest);
-parse_port(<<Port:2/binary, C, Rest/bits>>, C) -> parse_port(Port, Rest);
-parse_port(<<Port:3/binary, C, Rest/bits>>, C) -> parse_port(Port, Rest);
-parse_port(<<Port:4/binary, C, Rest/bits>>, C) -> parse_port(Port, Rest);
-parse_port(<<Port:5/binary, C, Rest/bits>>, C) -> parse_port(Port, Rest);
+parse_port(<<Port:1/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
+parse_port(<<Port:2/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
+parse_port(<<Port:3/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
+parse_port(<<Port:4/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
+parse_port(<<Port:5/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
+parse_port(_, _) -> throw(parse_port_error).
 
-parse_port(Port0, Rest) ->
+parse_port1(Port0, Rest) ->
 	try binary_to_integer(Port0) of
 		Port when Port > 0, Port =< 65535 ->
 			{ok, Port, Rest};
