@@ -852,13 +852,14 @@ v2_tlvs_test() ->
 	{ok, Test4, <<>>} = parse(iolist_to_binary(header(Test4))),
 	%% Note that the raw_tlvs order is not relevant and therefore
 	%% the parser does not reverse the list it builds.
-	Test5In = Common#{raw_tlvs => RawTLVs=[
+	RawTLVs=[
 		%% The only custom TLV I am aware of is defined at:
 		%% https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html#proxy-protocol
 		{16#ea, <<16#1, "instance-id">>},
 		%% This TLV is entirely fictional.
 		{16#ff, <<1, 2, 3, 4, 5, 6, 7, 8, 9, 0>>}
-	]},
+	],
+	Test5In = Common#{raw_tlvs => RawTLVs},
 	Test5Out = Test5In#{raw_tlvs => lists:reverse(RawTLVs)},
 	{ok, Test5Out, <<>>} = parse(iolist_to_binary(header(Test5In))),
 	Test6 = Common#{unique_id => rand:bytes(rand:uniform(128))},

@@ -26,6 +26,8 @@
 -import(ct_helper, [doc/1]).
 -import(ct_helper, [name/0]).
 
+-include_lib("stdlib/include/assert.hrl").
+
 %% ct.
 
 all() ->
@@ -170,7 +172,8 @@ init_per_testcase(_, Config) ->
 
 end_per_testcase(_, _) ->
 	%% Stop all listeners that a test case may have left running.
-	_ = [catch ranch:stop_listener(Name) || Name <- maps:keys(ranch:info())],
+	_ = [try ranch:stop_listener(Name) catch _:_ -> ok end
+		|| Name <- maps:keys(ranch:info())],
 	ok.
 
 %% misc.
@@ -385,7 +388,7 @@ misc_metrics(_) ->
 	#{metrics := Metrics4} = ranch:info(Name),
 	{20, 20} = do_accumulate_metrics(Metrics4),
 	ok = ranch:stop_listener(Name),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 do_accumulate_metrics(Metrics) ->
@@ -444,7 +447,7 @@ misc_post_listen_callback(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(S, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 misc_post_listen_callback_error(_) ->
@@ -454,7 +457,7 @@ misc_post_listen_callback_error(_) ->
 	{error, _} = ranch:start_listener(Name,
 		ranch_tcp, #{post_listen_callback => PostListenCb},
 		echo_protocol, []),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 misc_repeated_remove(_) ->
@@ -498,10 +501,10 @@ misc_wait_for_connections(_) ->
 	Name = name(),
 	Self = self(),
 	%% Ensure invalid arguments are rejected.
-	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, 'foo', 0) end,
-	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '==', -1) end,
-	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '==', 0, -1) end,
-	{'EXIT', {badarg, _}} = begin catch ranch:wait_for_connections(Name, '<', 0) end,
+	?assertError(badarg, ranch:wait_for_connections(Name, 'foo', 0)),
+	?assertError(badarg, ranch:wait_for_connections(Name, '==', -1)),
+	?assertError(badarg, ranch:wait_for_connections(Name, '==', 0, -1)),
+	?assertError(badarg, ranch:wait_for_connections(Name, '<', 0)),
 	%% Create waiters for increasing number of connections.
 	Pid1GT = do_create_waiter(Self, Name, '>', 0),
 	Pid1GE = do_create_waiter(Self, Name, '>=', 1),
@@ -544,7 +547,7 @@ misc_wait_for_connections(_) ->
 	ok = do_expect_waiter(undefined),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 do_create_waiter(ReplyTo, Ref, Op, NumConns) ->
@@ -600,11 +603,13 @@ misc_connection_alarms(_) ->
 	AlarmCallback = fun (Ref, AlarmName, _, ActiveConns) ->
 		Self ! {connection_alarm, {Ref, AlarmName, length(ActiveConns)}}
 	end,
+	Alarm1 = #{type => num_connections, threshold => 2, cooldown => 0, callback => AlarmCallback},
+	%% The test2 alarm uses the misspelled treshold key to test for backwards compatibility.
+	%% @todo: Change to use the proper spelling when treshold gets removed in Ranch 3.0.
+	Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback},
 	Alarms0 = #{
-		test1 => Alarm1 = #{type => num_connections, threshold => 2, cooldown => 0, callback => AlarmCallback},
-		%% The test2 alarm uses the misspelled treshold key to test for backwards compatibility.
-		%% @TODO: Change to use the proper spelling when treshold gets removed in Ranch 3.0.
-		test2 => Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback}
+		test1 => Alarm1,
+		test2 => Alarm2
 	},
 	ConnectOpts = [binary, {active, false}, {packet, raw}],
 
@@ -679,7 +684,7 @@ misc_repeated_start_stop(_) ->
 			{ok, _} = ranch:start_listener(Name, ranch_tcp, #{}, echo_protocol, []),
 			true = is_integer(ranch:get_port(Name)),
 			ok = ranch:stop_listener(Name),
-			{'EXIT', _} = begin catch ranch:get_port(Name) end
+			?assertError(badarg, ranch:get_port(Name))
 		end,
 		lists:seq(1, 10)
 	),
@@ -747,7 +752,7 @@ do_ssl_10_acceptors_10_listen_sockets() ->
 		echo_protocol, []),
 	10 = length(do_get_listener_sockets(ListenerSupPid)),
 	ok = ranch:stop_listener(Name),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_many_listen_sockets_no_reuseport(_) ->
@@ -768,7 +773,7 @@ do_ssl_many_listen_sockets_no_reuseport() ->
 			num_listen_sockets => 10,
 			socket_opts => [{raw, 1, 15, <<0:32/native>>}|Opts]},
 		echo_protocol, []),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_active_echo(_) ->
@@ -787,7 +792,7 @@ ssl_active_echo(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_active_n_echo(_) ->
@@ -819,7 +824,7 @@ do_ssl_active_n_echo() ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_echo(_) ->
@@ -838,7 +843,7 @@ ssl_echo(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_dtls_echo(_) ->
@@ -859,7 +864,7 @@ ssl_dtls_echo(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_handshake(_) ->
@@ -894,7 +899,7 @@ ssl_handshake(_) ->
 	{error, closed} = ssl:recv(Socket1, 0, 1000),
 	{error, closed} = ssl:recv(Socket2, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_handshake_error(_) ->
@@ -920,7 +925,7 @@ ssl_handshake_error(_) ->
 	receive after 500 -> ok end,
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_local_echo(_) ->
@@ -949,7 +954,7 @@ do_ssl_local_echo() ->
 		ok = ranch:stop_listener(Name),
 		{error, closed} = ssl:recv(Socket, 0, 1000),
 		%% Make sure the listener stopped.
-		{'EXIT', _} = begin catch ranch:get_port(Name) end,
+		?assertError(badarg, ranch:get_port(Name)),
 		%% Make sure the socket file is removed.
 		{error, enoent} = file:read_file_info(SockFile),
 		ok
@@ -973,7 +978,7 @@ ssl_sni_echo(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_sni_fail(_) ->
@@ -991,7 +996,7 @@ ssl_sni_fail(_) ->
 		{verify, verify_none}, {versions, ['tlsv1.2']}]),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_tls_psk(_) ->
@@ -1012,7 +1017,7 @@ ssl_tls_psk(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_tls_psk_fail(_) ->
@@ -1031,7 +1036,7 @@ ssl_tls_psk_fail(_) ->
 	]),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 psk_lookup_helper(psk, _PskIdentity, UserState) ->
@@ -1057,7 +1062,7 @@ ssl_upgrade_from_tcp(_) ->
 	{ok, <<"After upgrading to SSL">>} = ssl:recv(SslSocket, 22, 1000),
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(SslSocket, 0, 1000),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_graceful(_) ->
@@ -1097,7 +1102,7 @@ ssl_graceful(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = ssl:recv(Socket1, 0, 1000),
 	{error, closed} = ssl:recv(Socket2, 0, 1000),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_getopts_capability(_) ->
@@ -1115,7 +1120,7 @@ ssl_getopts_capability(_) ->
 	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
 	ok=ranch:stop_listener(Name),
 	{error, closed}=ssl:recv(Socket, 0, 1000),
-	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_getstat_capability(_) ->
@@ -1135,7 +1140,7 @@ ssl_getstat_capability(_) ->
 	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
 	ok=ranch:stop_listener(Name),
 	{error, closed}=ssl:recv(Socket, 0, 1000),
-	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_error_eaddrinuse(_) ->
@@ -1151,7 +1156,7 @@ ssl_error_eaddrinuse(_) ->
 		active_echo_protocol, []),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 ssl_error_no_cert(_) ->
@@ -1248,7 +1253,7 @@ do_tcp_10_acceptors_10_listen_sockets(Config) ->
 	10 = length(LSockets),
 	10 = length(lists:usort(LSockets)),
 	ok = ranch:stop_listener(Name),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_many_listen_sockets_no_reuseport(Config) ->
@@ -1269,7 +1274,7 @@ do_tcp_many_listen_sockets_no_reuseport(Config) ->
 			num_listen_sockets => 10,
 			socket_opts => SockOpts ++ [{raw, 1, 15, <<0:32/native>>}]},
 		echo_protocol, []),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_active_echo(Config) ->
@@ -1286,7 +1291,7 @@ tcp_active_echo(Config) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_active_n_echo(Config) ->
@@ -1308,7 +1313,7 @@ tcp_active_n_echo(Config) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_echo(Config) ->
@@ -1325,7 +1330,7 @@ tcp_echo(Config) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_local_echo(_) ->
@@ -1351,7 +1356,7 @@ do_tcp_local_echo() ->
 		ok = ranch:stop_listener(Name),
 		{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 		%% Make sure the listener stopped.
-		{'EXIT', _} = begin catch ranch:get_port(Name) end,
+		?assertError(badarg, ranch:get_port(Name)),
 		%% Make sure the socket file is removed.
 		{error, enoent} = file:read_file_info(SockFile),
 		ok
@@ -1393,7 +1398,7 @@ tcp_graceful(Config) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket1, 0, 1000),
 	{error, closed} = gen_tcp:recv(Socket2, 0, 1000),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_inherit_options(Config) ->
@@ -1567,7 +1572,7 @@ tcp_getopts_capability(Config) ->
 	{ok, <<"OK">>}=gen_tcp:recv(Socket, 0, 1000),
 	ok=ranch:stop_listener(Name),
 	{error, closed}=gen_tcp:recv(Socket, 0, 1000),
-	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_getstat_capability(Config) ->
@@ -1585,7 +1590,7 @@ tcp_getstat_capability(Config) ->
 	{ok, <<"OK">>}=gen_tcp:recv(Socket, 0, 1000),
 	ok=ranch:stop_listener(Name),
 	{error, closed}=gen_tcp:recv(Socket, 0, 1000),
-	{'EXIT', _}=begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_upgrade(Config) ->
@@ -1617,7 +1622,7 @@ tcp_error_eaddrinuse(Config) ->
 		active_echo_protocol, []),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 tcp_error_eacces(Config) ->
@@ -1652,7 +1657,7 @@ connection_type_supervisor(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 connection_type_supervisor_separate_from_connection(_) ->
@@ -1669,7 +1674,7 @@ connection_type_supervisor_separate_from_connection(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 supervisor_10_acceptors_1_conns_sup(_) ->
@@ -1722,7 +1727,7 @@ do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
 	100 = ranch_server:count_connections(Name),
 	ok = terminate_loop(stop, Pids),
 	ok = ranch:stop_listener(Name),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 supervisor_changed_options_restart(_) ->
@@ -1765,7 +1770,7 @@ supervisor_changed_options_restart(_) ->
 	{ok, [{send_timeout, 300001}]}
 		= inet:getopts(do_get_listener_socket(ListenerSupPid2), [send_timeout]),
 	ok = ranch:stop_listener(Name),
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 supervisor_clean_child_restart(_) ->
@@ -1936,7 +1941,7 @@ supervisor_server_recover_state(_) ->
 	ConnsSups = ranch_server:get_connections_sups(Name),
 	ok = ranch:stop_listener(Name),
 	%% Check ranch_server has removed the ranch_conns_sup.
-	[] = (catch ranch_server:get_connections_sups(Name)),
+	[] = ranch_server:get_connections_sups(Name),
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces().
 
@@ -1959,7 +1964,7 @@ supervisor_unexpected_message(_) ->
 	ok = ranch:stop_listener(Name),
 	{error, closed} = gen_tcp:recv(Socket, 0, 1000),
 	%% Make sure the listener stopped.
-	{'EXIT', _} = begin catch ranch:get_port(Name) end,
+	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
 %% Utility functions.

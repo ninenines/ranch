@@ -29,25 +29,31 @@ loop(Socket, Transport) ->
 	end.
 
 check(Socket, Transport, <<"getopts/2">>) ->
-	case catch Transport:getopts(Socket, []) of
+	try Transport:getopts(Socket, []) of
 		{ok, _} ->
 			ok;
 		_ ->
 			error
+	catch _:_ ->
+		error
 	end;
 
 check(Socket, Transport, <<"getstat/1">>) ->
-	case catch Transport:getstat(Socket) of
+	try Transport:getstat(Socket) of
 		{ok, _} ->
 			ok;
 		_ ->
 			error
+	catch _:_ ->
+		error
 	end;
 
 check(Socket, Transport, <<"getstat/2">>) ->
-	case catch Transport:getstat(Socket, []) of
+	try Transport:getstat(Socket, []) of
 		{ok, _} ->
 			ok;
 		_ ->
 			error
+	catch _:_ ->
+		error
 	end.
