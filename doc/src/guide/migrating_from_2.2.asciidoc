@@ -1,0 +1,13 @@
+[appendix]
+== Changes since Ranch 2.2
+
+The following patch versions were released since Ranch 2.2:
+
+=== Ranch 2.2.1
+
+* Unnecessary crash logs were sometimes produced during
+  PROXY header parsing. This has been addressed.
+
+* Acceptors now handle `emfile` and `enfile` errors the
+  same way, instead of just handling `emfile`. `enfile`
+  is the system-wide equivalent of `emfile`.
