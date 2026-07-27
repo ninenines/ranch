@@ -508,7 +508,8 @@ parse_tlv(<<16#1, TLVLen:16, ALPN:TLVLen/binary, Rest/bits>>, Len, Info, Header)
 parse_tlv(<<16#2, TLVLen:16, Authority:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	parse_tlv(Rest, Len - TLVLen - 3, Info#{authority => Authority}, Header);
 %% PP2_TYPE_CRC32C.
-parse_tlv(<<16#3, TLVLen:16, CRC32C:32, Rest/bits>>, Len0, Info, Header) when TLVLen =:= 4 ->
+parse_tlv(<<16#3, TLVLen:16, CRC32C:32, Rest/bits>>, Len0, Info, Header)
+		when TLVLen =:= 4, Len0 >= 7 ->
 	Len = Len0 - TLVLen - 3,
 	BeforeLen = byte_size(Header) - Len - TLVLen,
 	<<Before:BeforeLen/binary, _:32, After:Len/binary>> = Header,
@@ -519,6 +520,8 @@ parse_tlv(<<16#3, TLVLen:16, CRC32C:32, Rest/bits>>, Len0, Info, Header) when TL
 		_ ->
 			{error, 'Failed CRC32C verification in PROXY protocol binary header. (PP 2.2)'}
 	end;
+parse_tlv(<<16#3, _/bits>>, _, _, _) ->
+	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2)'};
 %% PP2_TYPE_NOOP.
 parse_tlv(<<16#4, TLVLen:16, _:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	parse_tlv(Rest, Len - TLVLen - 3, Info, Header);
@@ -874,6 +877,23 @@ v2_checksum_test() ->
 		dest_port => 23456
 	},
 	{ok, Test, <<>>} = parse(iolist_to_binary(header(Test, #{checksum => crc32c}))),
+	ok.
+
+v2_checksum_short_length_test() ->
+	%% CRC32C TLV is 7 bytes but the remaining length only accounts
+	%% for 6. Rest still contains the full TLV (plus following data).
+	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2)'}
+		= parse(<<
+			13, 10, 13, 10, 0, 13, 10, 81, 85, 73, 84, 10, %% Signature.
+			33, %% Version and command.
+			17, %% Family and protocol.
+			0, 18, %% Length: 12 (addresses) + 6 (one short of CRC32C TLV).
+			127, 0, 0, 1, %% Source address.
+			192, 168, 0, 1, %% Destination address.
+			1, 188, %% Source port.
+			1, 187, %% Destination port.
+			3, 0, 4, 1, 2, 3, 4 %% CRC32C TLV (7 bytes).
+		>>),
 	ok.
 
 v2_padding_test() ->
