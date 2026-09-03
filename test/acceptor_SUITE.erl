@@ -133,32 +133,16 @@ groups() ->
 	]}].
 
 init_per_group(tcp_socket, Config) ->
-	%% The socket backend for inet/gen_tcp was introduced as an experimental
-	%% feature in OTP/23.0, and bugs https://bugs.erlang.org/browse/ERL-1284,
-	%% 1287 and 1293 were solved in OTP/23.1. socket:use_registry/1 first
-	%% appears in this release.
 	%% Due to https://bugs.erlang.org/browse/ERL-1401, the socket backend
 	%% is not working on Windows.
-	case
-		os:type() =/= {win32, nt} andalso
-		code:ensure_loaded(socket) =:= {module, socket} andalso
-		erlang:function_exported(socket, use_registry, 1)
-	of
-		true ->
-			[{socket_opts, [{inet_backend, socket}]}|Config];
-		false ->
-			{skip, "No socket backend support"}
+	case os:type() of
+		{win32, nt} ->
+			{skip, "No socket backend support"};
+		_ ->
+			[{socket_opts, [{inet_backend, socket}]}|Config]
 	end;
 init_per_group(_, Config) ->
-	case
-		code:ensure_loaded(socket) =:= {module, socket} andalso
-		erlang:function_exported(socket, use_registry, 1)
-	of
-		true ->
-			[{socket_opts, [{inet_backend, inet}]}|Config];
-		false ->
-			[{socket_opts, []}|Config]
-	end.
+	[{socket_opts, [{inet_backend, inet}]}|Config].
 
 end_per_group(_, _) ->
 	ok.
