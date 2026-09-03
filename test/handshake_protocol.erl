@@ -9,15 +9,7 @@ start_link(Ref, Transport, Opts) ->
 	{ok, Pid}.
 
 init(Ref, Transport, Opts) ->
-	SniHost = case ranch:handshake(Ref) of
-		%% Due to a bug in ssl (https://bugs.erlang.org/browse/ERL-951,
-		%% fixed in OTP 22.0.3) the value for sni may be {sni, Hostname}
-		%% instead of Hostname.
-		{continue, #{sni := {sni, Hostname}}} ->
-			Hostname;
-		{continue, #{sni := Hostname}} ->
-			Hostname
-	end,
+	{continue, #{sni := SniHost}} = ranch:handshake(Ref),
 	SniHostOpts = maps:get(SniHost, Opts),
 	{ok, Socket} = ranch:handshake_continue(Ref, SniHostOpts),
 	loop(Socket, Transport).
