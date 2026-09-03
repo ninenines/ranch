@@ -1208,10 +1208,7 @@ do_ssl_unsupported_tlsv13_options() ->
 	ok = lists:foreach(
 		fun (CheckOpt) ->
 			Opts1 = Opts ++ [CheckOpt],
-			case ssl:listen(0, Opts1) of
-				{error, {options, dependency, _}} -> ok; %% Before OTP-26.
-				{error, {options, incompatible, _}} -> ok %% OTP-26+.
-			end,
+			{error, {options, incompatible, _}} = ssl:listen(0, Opts1),
 			{ok, _} = ranch:start_listener(Name,
 				ranch_ssl, #{socket_opts => Opts1},
 				echo_protocol, []),
