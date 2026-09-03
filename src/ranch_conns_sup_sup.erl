@@ -29,6 +29,7 @@ start_link(Ref, Transport, Protocol, Logger) ->
 -spec init({ranch:ref(), module(), module(), module()})
 	-> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init({Ref, Transport, Protocol, Logger}) ->
+	proc_lib:set_label({ranch_conns_sup_sup, Ref}),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumConnsSups = maps:get(num_conns_sups, TransOpts, NumAcceptors),

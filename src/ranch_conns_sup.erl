@@ -109,6 +109,7 @@ active_connections(SupPid) ->
 
 -spec init(pid(), ranch:ref(), pos_integer(), module(), any(), module(), module()) -> no_return().
 init(Parent, Ref, Id, Transport, TransOpts, Protocol, Logger) ->
+	proc_lib:set_label({ranch_conns_sup, Ref, Id}),
 	process_flag(trap_exit, true),
 	ok = ranch_server:set_connections_sup(Ref, Id, self()),
 	MaxConns = ranch_server:get_max_connections(Ref),

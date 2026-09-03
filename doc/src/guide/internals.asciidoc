@@ -30,6 +30,9 @@ to improve fault tolerance. This way if the `ranch_server` gen_server
 fails, it doesn't lose any information and the restarted process can
 continue as if nothing happened.
 
+Listener, acceptor and connection supervisor processes set a
+`proc_lib` label that includes the listener ref.
+
 Ranch uses a custom supervisor for managing connections. This supervisor
 keeps track of the number of connections and handles connection limits
 directly. While it is heavily optimized to perform the task of creating

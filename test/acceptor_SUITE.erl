@@ -104,6 +104,7 @@ groups() ->
 		misc_repeated_remove,
 		misc_info,
 		misc_info_embedded,
+		misc_process_labels,
 		misc_metrics,
 		misc_opts_logger,
 		misc_post_listen_callback,
@@ -340,6 +341,30 @@ misc_info_embedded(_) ->
 	%% Stop embedded supervisor.
 	embedded_sup:stop(SupPid),
 	ok.
+
+misc_process_labels(_) ->
+	doc("Ranch processes have proc_lib labels identifying the listener."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 2, num_conns_sups => 2},
+		echo_protocol, []),
+	ListenerSup = ranch_server:get_listener_sup(Name),
+	{ranch_listener_sup, Name} = proc_lib:get_label(ListenerSup),
+	ListenerChildren = supervisor:which_children(ListenerSup),
+	{_, AcceptorsSup, _, _} = lists:keyfind(ranch_acceptors_sup, 1, ListenerChildren),
+	{ranch_acceptors_sup, Name} = proc_lib:get_label(AcceptorsSup),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1, ListenerChildren),
+	{ranch_conns_sup_sup, Name} = proc_lib:get_label(ConnsSupSup),
+	[{{acceptor, AcceptorsSup, 1}, Acceptor1, _, _},
+		{{acceptor, AcceptorsSup, 2}, Acceptor2, _, _}]
+		= lists:sort(supervisor:which_children(AcceptorsSup)),
+	{ranch_acceptor, Name, 1} = proc_lib:get_label(Acceptor1),
+	{ranch_acceptor, Name, 2} = proc_lib:get_label(Acceptor2),
+	[{1, ConnsSup1}, {2, ConnsSup2}]
+		= lists:sort(ranch_server:get_connections_sups(Name)),
+	{ranch_conns_sup, Name, 1} = proc_lib:get_label(ConnsSup1),
+	{ranch_conns_sup, Name, 2} = proc_lib:get_label(ConnsSup2),
+	ok = ranch:stop_listener(Name).
 
 misc_metrics(_) ->
 	doc("Confirm accept/terminate metrics are correct."),

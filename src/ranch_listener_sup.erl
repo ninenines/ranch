@@ -32,6 +32,7 @@ start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 -spec init({ranch:ref(), module(), module(), module()})
 	-> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init({Ref, Transport, Protocol, Logger}) ->
+	proc_lib:set_label({ranch_listener_sup, Ref}),
 	ok = ranch_server:set_listener_sup(Ref, self()),
 	ChildSpecs = [
 		#{
