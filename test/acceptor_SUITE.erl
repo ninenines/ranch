@@ -71,14 +71,10 @@ groups() ->
 		tcp_getopts_capability,
 		tcp_getstat_capability,
 		tcp_upgrade,
-		%% @TODO: Enable when https://github.com/erlang/otp/issues/5122
-		%%        is in an official release, probably 24.1.
-		% tcp_10_acceptors_10_listen_sockets,
-		% tcp_many_listen_sockets_no_reuseport,
-		tcp_error_eaddrinuse
-		%% @TODO: Not working in OTP/24.0 but fixed in current master.
-		%%        Enable when fixed in an official release, probably 24.1.
-		% tcp_error_eacces
+		tcp_10_acceptors_10_listen_sockets,
+		tcp_many_listen_sockets_no_reuseport,
+		tcp_error_eaddrinuse,
+		tcp_error_eacces
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_active_echo,
