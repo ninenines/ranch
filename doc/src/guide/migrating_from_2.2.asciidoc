@@ -1,9 +1,20 @@
 [appendix]
-== Changes since Ranch 2.2
+== Migrating from Ranch 2.2 to Ranch 2.3
 
-The following patch versions were released since Ranch 2.2:
+Ranch 2.3 is a maintenance release containing a small number
+of fixes and improvements.
 
-=== Ranch 2.2.1
+Ranch 2.3 is tested with Erlang/OTP 27.0 onward.
+
+=== Features added
+
+* Support for Erlang/OTP versions below 27.0 was dropped.
+  Ranch will now only support Erlang/OTP versions that
+  receive security patches.
+
+* Ranch processes now have labels.
+
+=== Bugs fixed
 
 * Unnecessary crash logs were sometimes produced during
   PROXY header parsing. This has been addressed.
