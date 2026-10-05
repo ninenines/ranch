@@ -640,19 +640,19 @@ misc_connection_alarms(_) ->
 	},
 	ok = ranch:set_transport_options(Name, TransOpts0#{alarms => Alarms1}),
 	ok = do_flush_connection_alarms(Name),
-	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 100),
+	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 200),
 	ok = do_flush_connection_alarms(Name),
-	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 100),
+	#{test1 := 3, test2 := 3} = do_recv_connection_alarms(Name, 200),
 
 	Conn3 ! stop,
 	timer:sleep(100),
 	ok = do_flush_connection_alarms(Name),
-	#{test1 := 2, test2 := undefined} = do_recv_connection_alarms(Name, 100),
+	#{test1 := 2, test2 := undefined} = do_recv_connection_alarms(Name, 200),
 
 	Conn2 ! stop,
 	timer:sleep(100),
 	ok = do_flush_connection_alarms(Name),
-	#{test1 := undefined, test2 := undefined} = do_recv_connection_alarms(Name, 100),
+	#{test1 := undefined, test2 := undefined} = do_recv_connection_alarms(Name, 200),
 
 	Conn1 ! stop,
 
@@ -660,11 +660,13 @@ misc_connection_alarms(_) ->
 	ok.
 
 do_recv_connection_alarms(Name, Timeout) ->
-	do_recv_connection_alarms(Name, Timeout, #{test1 => undefined, test2 => undefined}).
+	Deadline = erlang:monotonic_time(millisecond) + Timeout,
+	do_recv_connection_alarms(Name, Deadline, #{test1 => undefined, test2 => undefined}).
 
-do_recv_connection_alarms(Name, Timeout, Acc) ->
+do_recv_connection_alarms(Name, Deadline, Acc) ->
+	Timeout = max(0, Deadline - erlang:monotonic_time(millisecond)),
 	receive {connection_alarm, {Name, AlarmName, N}} ->
-		do_recv_connection_alarms(Name, Timeout, Acc#{AlarmName => N})
+		do_recv_connection_alarms(Name, Deadline, Acc#{AlarmName => N})
 	after Timeout ->
 		Acc
 	end.
