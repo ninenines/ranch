@@ -203,12 +203,14 @@ do_upgrade_ranch_one_conn() ->
 		%% Build and start the example release using the previous Ranch version.
 		CommitOrTag = do_use_ranch_previous(Example),
 		do_compile_and_start(Example),
+		%% Update Ranch to master then build a release upgrade.
+		%% This is done before establishing the connection because
+		%% it may take longer than the echo protocol's recv timeout.
+		do_build_relup(Example, CommitOrTag),
 		%% Establish a connection and check that it works.
 		{ok, S1} = gen_tcp:connect("localhost", Port, [{active, false}, binary]),
 		ok = gen_tcp:send(S1, "Hello!"),
 		{ok, <<"Hello!">>} = gen_tcp:recv(S1, 0, 1000),
-		%% Update Ranch to master then build a release upgrade.
-		do_build_relup(Example, CommitOrTag),
 		%% Perform the upgrade, then check that our connection is still up.
 		do_upgrade(Example),
 		ok = gen_tcp:send(S1, "Hello!"),
