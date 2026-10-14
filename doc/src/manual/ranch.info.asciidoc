@@ -72,4 +72,5 @@ Info = ranch:info(example).
 link:man:ranch:get_addr(3)[ranch:get_addr(3)],
 link:man:ranch:get_port(3)[ranch:get_port(3)],
 link:man:ranch:procs(3)[ranch:procs(3)],
+link:man:ranch:trace_acceptors(3)[ranch:trace_acceptors(3)],
 link:man:ranch(3)[ranch(3)]

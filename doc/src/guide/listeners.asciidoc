@@ -389,6 +389,10 @@ of file-descriptors which can be opened by your application. How
 this should be done is operating-system dependent. Please consult
 the documentation of your operating system.
 
+`emfile` and `enfile` are the only accept errors Ranch logs.
+`ranch:trace_acceptors/1,2` samples every reason returned by
+`Transport:accept/2`.
+
 === Using a supervisor for connection processes
 
 Ranch allows you to define the type of process that will be used
@@ -457,7 +461,7 @@ Opts = ranch:get_transport_options(tcp_echo).
 
 === Obtaining information about listeners
 
-Ranch provides two functions for retrieving information about the
+Ranch provides functions for retrieving information about the
 listeners, for reporting and diagnostic purposes.
 
 The `ranch:info/0` function will return detailed information
@@ -477,3 +481,11 @@ ranch:procs(tcp_echo, acceptors).
 .Get all connection processes
 [source,erlang]
 ranch:procs(tcp_echo, connections).
+
+`ranch:trace_acceptors/1,2` samples the `{error, Reason}` tuples
+returned by `Transport:accept/2`. Call it from a shell to see
+why a listener fails to accept connections.
+
+.Sample accept errors
+[source,erlang]
+ranch:trace_acceptors(tcp_echo).
