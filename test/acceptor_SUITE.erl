@@ -115,7 +115,12 @@ groups() ->
 		misc_connection_alarms,
 		misc_stop_unknown_listener,
 		misc_repeated_start_stop,
-		misc_listen_error
+		misc_listen_error,
+		misc_trace_acceptors,
+		misc_trace_acceptors_timeout,
+		misc_trace_acceptors_mailbox,
+		misc_trace_acceptors_suspended,
+		misc_trace_acceptors_caller_down
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
@@ -716,6 +721,111 @@ misc_listen_error(_) ->
 	end,
 	logger:remove_primary_filter(Name),
 	ok.
+
+misc_trace_acceptors(_) ->
+	doc("trace_acceptors returns the raw Transport:accept/2 error."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_accept_error_transport, #{num_acceptors => 1},
+		echo_protocol, []),
+	[Pid] = ranch:procs(Name, acceptors),
+	#{elapsed := Elapsed, errors := Errors} = ranch:trace_acceptors(Name),
+	?assert(is_integer(Elapsed)),
+	?assert(Elapsed >= 0),
+	?assert(Elapsed < 1000000),
+	[{Pid, econnaborted}, {Pid, econnaborted}, {Pid, econnaborted},
+		{Pid, econnaborted}, {Pid, econnaborted}] = Errors,
+	[] = trace_acceptor_sessions(Pid),
+	[] = trace_acceptor_sessions({ranch_accept_error_transport, accept, 2}),
+	ok.
+
+misc_trace_acceptors_timeout(_) ->
+	doc("trace_acceptors returns at the deadline when accept blocks."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_erlang_transport, #{num_acceptors => 1},
+		echo_protocol, []),
+	#{elapsed := Elapsed, errors := []}
+		= ranch:trace_acceptors(Name, #{timeout => 200}),
+	?assert(Elapsed >= 150000),
+	?assert(Elapsed < 2000000),
+	ok.
+
+misc_trace_acceptors_mailbox(_) ->
+	doc("No accept trace messages are left in the caller mailbox."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_accept_error_transport, #{num_acceptors => 10},
+		echo_protocol, []),
+	#{errors := Errors}
+		= ranch:trace_acceptors(Name, #{timeout => 0, limit => 100}),
+	100 = length(Errors),
+	[] = trace_messages(),
+	ok.
+
+trace_messages() ->
+	{messages, Messages} = process_info(self(), messages),
+	[M || M <- Messages, is_tuple(M), element(1, M) =:= trace].
+
+misc_trace_acceptors_suspended(_) ->
+	doc("trace_acceptors on a suspended listener returns no errors."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{}, echo_protocol, []),
+	ok = ranch:suspend_listener(Name),
+	#{elapsed := 0, errors := []} = ranch:trace_acceptors(Name),
+	ok.
+
+misc_trace_acceptors_caller_down(_) ->
+	doc("The tracer stops when its caller is killed."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_erlang_transport, #{num_acceptors => 1},
+		echo_protocol, []),
+	[Acceptor] = ranch:procs(Name, acceptors),
+	Pid = spawn(fun() ->
+		ranch:trace_acceptors(Name, #{timeout => 60000})
+	end),
+	_ = wait_trace_session(Acceptor),
+	true = is_process_alive(Pid),
+	exit(Pid, kill),
+	ok = wait_no_trace_session(Acceptor),
+	ok.
+
+wait_no_trace_session(Acceptor) ->
+	wait_no_trace_session(Acceptor, 50).
+
+wait_no_trace_session(_Acceptor, 0) ->
+	error(traced);
+wait_no_trace_session(Acceptor, Left) ->
+	case trace_acceptor_sessions(Acceptor) of
+		[] ->
+			ok;
+		_ ->
+			timer:sleep(10),
+			wait_no_trace_session(Acceptor, Left - 1)
+	end.
+
+wait_trace_session(Acceptor) ->
+	wait_trace_session(Acceptor, 50).
+
+wait_trace_session(_Acceptor, 0) ->
+	error(no_trace_session);
+wait_trace_session(Acceptor, Left) ->
+	case trace_acceptor_sessions(Acceptor) of
+		[Session] ->
+			Session;
+		[] ->
+			timer:sleep(10),
+			wait_trace_session(Acceptor, Left - 1)
+	end.
+
+trace_acceptor_sessions(Subject) ->
+	case trace:session_info(Subject) of
+		undefined ->
+			[];
+		Sessions ->
+			[S || {ranch_trace_acceptors, _} = S <- Sessions]
+	end.
 
 %% ssl.
 

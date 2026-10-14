@@ -43,6 +43,8 @@
 -export([info/0]).
 -export([info/1]).
 -export([procs/2]).
+-export([trace_acceptors/1]).
+-export([trace_acceptors/2]).
 -export([wait_for_connections/3]).
 -export([wait_for_connections/4]).
 -export([filter_options/4]).
@@ -514,6 +516,140 @@ procs1(ListenerSup, connections) ->
 		supervisor:which_children(SupSupPid)
 	),
 	lists:flatten(Conns).
+
+-spec trace_acceptors(ref()) ->
+	#{elapsed := non_neg_integer(), errors := [{pid(), term()}]}.
+trace_acceptors(Ref) ->
+	trace_acceptors(Ref, #{}).
+
+-spec trace_acceptors(ref(), map()) ->
+	#{elapsed := non_neg_integer(), errors := [{pid(), term()}]}.
+trace_acceptors(_, #{limit := Limit})
+		when not is_integer(Limit); Limit < 1 ->
+	error(badarg);
+trace_acceptors(_, #{timeout := Timeout})
+		when not is_integer(Timeout);
+			not (Timeout >= 0 andalso Timeout =< 16#ffffffff) ->
+	error(badarg);
+trace_acceptors(Ref, Opts) when is_map(Opts) ->
+	trace_acceptors1(Ref,
+		maps:get(limit, Opts, 5),
+		maps:get(timeout, Opts, 1000)).
+
+trace_acceptors1(Ref, Limit, Timeout) ->
+	case [Pid || Pid <- procs(Ref, acceptors), is_pid(Pid)] of
+		%% No acceptor is running.
+		[] ->
+			#{elapsed => 0, errors => []};
+		Pids ->
+			[_, Transport, _, _, _] = ranch_server:get_listener_start_args(Ref),
+			trace_acceptors_run(Transport, Pids, Limit, Timeout)
+	end.
+
+trace_acceptors_run(Transport, Pids, Limit, Timeout) ->
+	Parent = self(),
+	{Tracer, MonRef} = spawn_monitor(fun() ->
+		trace_acceptors_tracer(Parent)
+	end),
+	try
+		Session = trace:session_create(ranch_trace_acceptors, Tracer, []),
+		try
+			_ = trace:function(Session, {Transport, accept, 2},
+				[{'_', [], [{message, false}, {return_trace}]}], []),
+			%% The pid may have exited between the snapshot and this call.
+			_ = [try
+				trace:process(Session, Pid, true, [call, arity])
+			catch error:badarg ->
+				0
+			end || Pid <- Pids],
+			_ = Tracer ! {start, Parent, Limit, Timeout, Session, Transport, Pids},
+			receive
+				{Tracer, Result} ->
+					Result;
+				{'DOWN', MonRef, process, Tracer, Reason} ->
+					exit(Reason)
+			end
+		after
+			_ = trace:session_destroy(Session)
+		end
+	after
+		_ = exit(Tracer, kill),
+		_ = erlang:demonitor(MonRef, [flush])
+	end.
+
+trace_acceptors_tracer(Parent) ->
+	Mon = erlang:monitor(process, Parent),
+	receive
+		{start, Parent, Limit, Timeout, Session, Transport, Pids} ->
+			Start = erlang:monotonic_time(microsecond),
+			Deadline = erlang:monotonic_time(millisecond) + Timeout,
+			trace_acceptors_collect(Parent, Mon, Limit, Start, Deadline,
+				Session, Transport, Pids, []);
+		{'DOWN', Mon, process, Parent, _} ->
+			ok
+	end.
+
+trace_acceptors_collect(Parent, Mon, 0, Start, _Deadline,
+		Session, Transport, Pids, Errors) ->
+	trace_acceptors_finish(Parent, Mon, 0, Start, Session, Transport,
+		Pids, Errors);
+trace_acceptors_collect(Parent, Mon, Limit, Start, Deadline,
+		Session, Transport, Pids, Errors) ->
+	Wait = max(0, Deadline - erlang:monotonic_time(millisecond)),
+	case Wait of
+		0 ->
+			trace_acceptors_finish(Parent, Mon, Limit, Start, Session,
+				Transport, Pids, Errors);
+		_ ->
+			receive
+				{trace, Pid, return_from, {_, accept, 2}, {error, Reason}} ->
+					trace_acceptors_collect(Parent, Mon, Limit - 1, Start,
+						Deadline, Session, Transport, Pids,
+						[{Pid, Reason}|Errors]);
+				{trace, _, call, {_, accept, _}} ->
+					trace_acceptors_collect(Parent, Mon, Limit, Start,
+						Deadline, Session, Transport, Pids, Errors);
+				{trace, _, return_from, {_, accept, 2}, _} ->
+					trace_acceptors_collect(Parent, Mon, Limit, Start,
+						Deadline, Session, Transport, Pids, Errors);
+				{'DOWN', Mon, process, Parent, _} ->
+					ok
+			after Wait ->
+				trace_acceptors_finish(Parent, Mon, Limit, Start, Session,
+					Transport, Pids, Errors)
+			end
+	end.
+
+trace_acceptors_finish(Parent, Mon, Limit, Start, Session, Transport,
+		Pids, Errors) ->
+	_ = trace:function(Session, {Transport, accept, 2}, false, []),
+	_ = [try
+		trace:process(Session, Pid, false, [call, arity])
+	catch error:badarg ->
+		0
+	end || Pid <- Pids],
+	trace_acceptors_drain(Parent, Mon, Limit, Start, Errors).
+
+%% Tracing is stopped. Take errors until limit, then reply.
+trace_acceptors_drain(Parent, _Mon, 0, Start, Errors) ->
+	trace_acceptors_reply(Parent, Start, Errors);
+trace_acceptors_drain(Parent, Mon, Limit, Start, Errors) ->
+	receive
+		{trace, Pid, return_from, {_, accept, 2}, {error, Reason}} ->
+			trace_acceptors_drain(Parent, Mon, Limit - 1, Start,
+				[{Pid, Reason}|Errors]);
+		{'DOWN', Mon, process, Parent, _} ->
+			ok
+	after 0 ->
+		trace_acceptors_reply(Parent, Start, Errors)
+	end.
+
+trace_acceptors_reply(Parent, Start, Errors) ->
+	%% elapsed 0 is reserved for the no-acceptor result. The clock
+	%% can report the same microsecond twice.
+	Elapsed = max(1, erlang:monotonic_time(microsecond) - Start),
+	_ = Parent ! {self(), #{elapsed => Elapsed, errors => lists:reverse(Errors)}},
+	ok.
 
 -spec metrics(ref()) -> #{}.
 metrics(Ref) ->

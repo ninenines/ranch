@@ -1,0 +1,93 @@
+= ranch:trace_acceptors(3)
+
+== Name
+
+ranch:trace_acceptors - Sample accept error reasons
+
+== Description
+
+[source,erlang]
+----
+trace_acceptors(Ref)
+    -> Sample
+
+trace_acceptors(Ref, Opts)
+    -> Sample
+
+Opts :: #{
+    limit   => pos_integer(),
+    timeout => 0..4294967295
+}
+
+Sample :: #{
+    elapsed := Microseconds :: non_neg_integer(),
+    errors  := [{AcceptorPid :: pid(), Reason :: term()}]
+}
+----
+
+Sample the error reasons returned by `Transport:accept/2`.
+
+This function traces the acceptors for a short time and returns
+the raw `{error, Reason}` values, so a stuck listener can be
+identified from the shell.
+
+== Arguments
+
+Ref::
+
+The listener name.
+
+Opts::
+
+A map of options. `limit` is the number of `{error, Reason}`
+results to collect (default 5). `timeout` is how long to trace,
+in milliseconds (default 1000).
+
+== Return value
+
+A map with the following keys:
+
+elapsed::
+
+Time spent collecting, in microseconds, from the monotonic clock.
+A sample that ran reports at least 1. `0` means no acceptor
+was running. A few errors with a very small `elapsed` means
+the acceptor is returning immediately.
+
+errors::
+
+`{AcceptorPid, Reason}` tuples, in the order the transport
+returned them. `Reason` is the raw second element of
+`{error, Reason}`. It may be an atom such as `econnaborted`,
+`einval` or `system_limit`, or a tuple such as
+`{create_accept_socket, emfile}`.
+
+An empty list with `elapsed` of 0 means no acceptor was
+running. The listener may be suspended. An empty list with
+a non-zero `elapsed` means the deadline expired with no
+accept error. The listener may be idle, or its acceptors
+may be waiting because `max_connections` was reached.
+
+== Changelog
+
+* *2.4*: Function introduced.
+
+== Examples
+
+.Collect up to 5 accept errors
+[source,erlang]
+----
+ranch:trace_acceptors(example).
+----
+
+.Collect 20 errors over 5 seconds
+[source,erlang]
+----
+ranch:trace_acceptors(example, #{limit => 20, timeout => 5000}).
+----
+
+== See also
+
+link:man:ranch:info(3)[ranch:info(3)],
+link:man:ranch:procs(3)[ranch:procs(3)],
+link:man:ranch(3)[ranch(3)]
