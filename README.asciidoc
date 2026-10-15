@@ -35,4 +35,4 @@ to close any of the currently opened sockets.
 
 * https://discord.gg/x25nNq2fFE[Discord server]
 * https://github.com/ninenines/ranch/issues[Issues tracker]
-* https://ninenines.eu/services[Commercial Support]
+* https://github.com/sponsors/essen[Sponsor me!]

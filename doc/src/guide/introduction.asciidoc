@@ -22,4 +22,4 @@ modifications but there is no guarantee that it will work as expected.
 
 === Versioning
 
-Ranch uses http://semver.org/[Semantic Versioning 2.0.0]
+Ranch uses https://semver.org/[Semantic Versioning 2.0.0]
