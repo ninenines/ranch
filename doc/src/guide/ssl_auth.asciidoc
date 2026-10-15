@@ -28,13 +28,14 @@ Following are the steps you need to take to create a CAcert.org
 account, generate a certificate and install it in your favorite
 browser.
 
-* Open http://cacert.org in your favorite browser
-* Root Certificate link: install both certificates
+* Open https://www.cacert.org in your favorite browser
+* Root Certificate: install the Class 1 and Class 3 certificates
 * Join (Register an account)
 * Verify your account (check your email inbox!)
 * Log in
 * Client Certificates: New
-* Follow instructions to create the certificate
+* Create the private key and the certificate request locally,
+  then submit the request
 * Install the certificate in your browser
 
 You can optionally save the certificate for later use, for example
@@ -43,8 +44,8 @@ to extract the `IssuerID` information as will be detailed later on.
 === Transport configuration
 
 The SSL transport does not request a client certificate by default.
-You need to specify the `{verify, verify_peer}` option when starting
-the listener to enable this behavior.
+`{verify, verify_peer}` requests one and rejects a certificate that
+does not chain to `cacertfile`.
 
 .Configure a listener for SSL authentication
 
@@ -54,19 +55,20 @@ the listener to enable this behavior.
 		{port, SSLPort},
 		{certfile, PathToCertfile},
 		{cacertfile, PathToCACertfile},
-		{verify, verify_peer}
+		{verify, verify_peer},
+		{fail_if_no_peer_cert, false}
 	]},
 	my_protocol, []
 ).
 
 In this example we set the required `port` and `certfile`, but also
-the `cacertfile` containing the CACert.org root certificate, and
+the `cacertfile` containing the CAcert.org root certificate, and
 the option to request the client certificate.
 
-If you enable the `{verify, verify_peer}` option and the client does
-not have a client certificate configured for your domain, then no
-certificate will be sent. This allows you to use SSL for more than
-just authenticated clients.
+`{fail_if_no_peer_cert, false}`, as in the example, lets the handshake
+complete when the client sends no certificate. `Transport:peercert/1`
+returns `{error, no_peercert}`. This allows you to use SSL for more
+than just authenticated clients.
 
 === Authentication
 
