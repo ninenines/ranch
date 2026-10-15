@@ -43,5 +43,5 @@ init([]) ->
 ----
 
 Embedded listeners cannot be stopped via `ranch:stop_listener/1`. Instead,
-are to be stopped as part of the shutdown of your application's supervison
+are to be stopped as part of the shutdown of your application's supervision
 tree.

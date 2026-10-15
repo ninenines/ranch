@@ -44,6 +44,6 @@ should be compatible with Erlang/OTP 22.0 and above.
 * Ensure that a user crash while stopping a listener does
   not prevent a subsequent attempt to stop it.
 
-* Alarm option `threshold` was mispelled in Ranch 2.1. This
+* Alarm option `threshold` was misspelled in Ranch 2.1. This
   has been corrected. The wrong spelling `treshold` is still
   accepted and will be removed in Ranch 3.0.
