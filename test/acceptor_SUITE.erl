@@ -92,6 +92,7 @@ groups() ->
 		ssl_upgrade_from_tcp,
 		ssl_getopts_capability,
 		ssl_getstat_capability,
+		ssl_peercert,
 		ssl_10_acceptors_10_listen_sockets,
 		ssl_many_listen_sockets_no_reuseport,
 		ssl_error_eaddrinuse,
@@ -1233,6 +1234,34 @@ ssl_getopts_capability(_) ->
 	{ok, <<"OK">>}=ssl:recv(Socket, 0, 1000),
 	ok=ranch:stop_listener(Name),
 	{error, closed}=ssl:recv(Socket, 0, 1000),
+	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
+ssl_peercert(_) ->
+	doc("Ensure ranch_ssl returns the peer certificate and the negotiated protocol."),
+	Name = name(),
+	{_, ClientCert, ClientKey} = ct_helper:make_certs(),
+	Opts = ct_helper:get_certs_from_ets() ++ [
+		{fail_if_no_peer_cert, true},
+		{alpn_preferred_protocols, [<<"ranch">>]}
+	],
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, Opts,
+		ssl_info_protocol, self()),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{cert, ClientCert}, {key, ClientKey},
+		{alpn_advertised_protocols, [<<"ranch">>]},
+		{verify, verify_none}, {versions, ['tlsv1.2']}], 5000),
+	receive
+		{_, {ok, ClientCert}, {ok, <<"ranch">>}} ->
+			ok
+	after 5000 ->
+		error(timeout)
+	end,
+	ok = ssl:close(Socket),
+	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
