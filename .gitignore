@@ -13,5 +13,6 @@ examples/*/ebin
 examples/*/*.bak
 examples/*/*.d
 examples/*/_rel
+lock.mk
 logs
 test/*.beam
