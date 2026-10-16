@@ -111,6 +111,7 @@ groups() ->
 		misc_post_listen_callback_error,
 		misc_set_transport_options,
 		misc_wait_for_connections,
+		misc_suspend_wait_stop,
 		misc_multiple_ip_local_socket_opts,
 		misc_connection_alarms,
 		misc_stop_unknown_listener,
@@ -559,6 +560,31 @@ misc_wait_for_connections(_) ->
 	ok = do_expect_waiter(undefined),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
+	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
+misc_suspend_wait_stop(_) ->
+	doc("Ensure a listener can be suspended, drained and then stopped."),
+	Name = name(),
+	Self = self(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	Pid1 = do_create_waiter(Self, Name, '==', 1),
+	ok = do_expect_waiter(Pid1),
+	ok = ranch:suspend_listener(Name),
+	suspended = ranch:get_status(Name),
+	ok = gen_tcp:send(Socket, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 0, 1000),
+	ok = do_tcp_connect_refused(Port, 10),
+	Pid0 = do_create_waiter(Self, Name, '==', 0),
+	ok = do_expect_waiter(undefined),
+	ok = gen_tcp:close(Socket),
+	ok = do_expect_waiter(Pid0),
+	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
