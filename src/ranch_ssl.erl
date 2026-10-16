@@ -222,7 +222,6 @@ handshake_continue(CSocket, Opts, Timeout) ->
 handshake_cancel(CSocket) ->
 	ok = ssl:handshake_cancel(CSocket).
 
-%% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any())
 	-> {ok, inet:socket()} | {error, atom()}.
@@ -230,7 +229,6 @@ connect(Host, Port, Opts) when is_integer(Port) ->
 	ssl:connect(Host, Port,
 		Opts ++ [binary, {active, false}]).
 
-%% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any(), timeout())
 	-> {ok, inet:socket()} | {error, atom()}.
@@ -286,7 +284,6 @@ sendfile(Socket, File, Offset, Bytes) ->
 sendfile(Socket, File, Offset, Bytes, Opts) ->
 	ranch_transport:sendfile(?MODULE, Socket, File, Offset, Bytes, Opts).
 
-%% @todo Probably filter Opts?
 -spec setopts(ssl:sslsocket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
 	ssl:setopts(Socket, Opts).
