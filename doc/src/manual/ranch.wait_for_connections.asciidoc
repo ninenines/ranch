@@ -26,8 +26,6 @@ This function can be used to gracefully shutdown a listener
 by first suspending the listener and then waiting for
 connections to terminate before finally stopping the listener.
 
-// @todo The suspend/wait/stop pattern should be tested.
-
 == Arguments
 
 Ref::
