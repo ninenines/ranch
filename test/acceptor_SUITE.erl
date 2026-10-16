@@ -849,45 +849,55 @@ ssl_accept_error(_) ->
 	ok = ranch:stop_listener(Name).
 
 ssl_10_acceptors_10_listen_sockets(_) ->
-	case do_os_supports_reuseport() of
-		true ->
-			ok = do_ssl_10_acceptors_10_listen_sockets();
-		false ->
-			{skip, "No SO_REUSEPORT support."}
+	doc("Ensure that we can use 10 listen sockets across 10 acceptors with SSL."),
+	ok = do_ssl_10_acceptors_10_listen_sockets(ssl_10_tries()).
+
+%% Windows ssl:listen can return eacces or eaddrinuse for the
+%% second socket of a port that was just bound. Another attempt
+%% binds a new port. A delay does not make the same port usable.
+ssl_10_tries() ->
+	case os:type() of
+		{win32, nt} -> 10;
+		_ -> 1
 	end.
 
-do_ssl_10_acceptors_10_listen_sockets() ->
-	doc("Ensure that we can use 10 listen sockets across 10 acceptors with SSL."),
+do_ssl_10_acceptors_10_listen_sockets(1) ->
+	do_ssl_10_acceptors_10_listen_sockets_once();
+do_ssl_10_acceptors_10_listen_sockets(N) ->
+	case do_ssl_10_acceptors_10_listen_sockets_once() of
+		ok ->
+			ok;
+		{error, Reason} when Reason =:= eacces; Reason =:= eaddrinuse ->
+			do_ssl_10_acceptors_10_listen_sockets(N - 1)
+	end.
+
+do_ssl_10_acceptors_10_listen_sockets_once() ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, ListenerSupPid} = ranch:start_listener(Name,
+	case ranch:start_listener(Name,
 		ranch_ssl, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => [{raw, 1, 15, <<1:32/native>>}|Opts]},
-		echo_protocol, []),
-	10 = length(do_get_listener_sockets(ListenerSupPid)),
-	ok = ranch:stop_listener(Name),
-	?assertError(badarg, ranch:get_port(Name)),
-	ok.
-
-ssl_many_listen_sockets_no_reuseport(_) ->
-	case do_os_supports_reuseport() of
-		true ->
-			ok = do_ssl_many_listen_sockets_no_reuseport();
-		false ->
-			{skip, "No SO_REUSEPORT support."}
+			socket_opts => [{reuseport, true}|Opts]},
+		echo_protocol, []) of
+		{ok, ListenerSupPid} ->
+			10 = length(do_get_listener_sockets(ListenerSupPid)),
+			ok = ranch:stop_listener(Name),
+			?assertError(badarg, ranch:get_port(Name)),
+			ok;
+		{error, Reason} ->
+			{error, Reason}
 	end.
 
-do_ssl_many_listen_sockets_no_reuseport() ->
-	doc("Confirm that ranch:start_listener/5 fails when SO_REUSEPORT is not available with SSL."),
+ssl_many_listen_sockets_no_reuseport(_) ->
+	doc("Confirm that ranch:start_listener/5 fails when reuseport is disabled with SSL."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{error, eaddrinuse} = ranch:start_listener(Name,
 		ranch_ssl, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => [{raw, 1, 15, <<0:32/native>>}|Opts]},
+			socket_opts => [{reuseport, false}|Opts]},
 		echo_protocol, []),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
@@ -1367,11 +1377,11 @@ do_ssl_unsupported_tlsv13_options() ->
 %% tcp.
 
 tcp_10_acceptors_10_listen_sockets(Config) ->
-	case do_os_supports_reuseport() of
+	case do_backend_honors_reuseport(config(socket_opts, Config)) of
 		true ->
 			ok = do_tcp_10_acceptors_10_listen_sockets(Config);
 		false ->
-			{skip, "No SO_REUSEPORT support."}
+			{skip, "Socket backend ignores reuseport before OTP 29."}
 	end.
 
 do_tcp_10_acceptors_10_listen_sockets(Config) ->
@@ -1384,7 +1394,7 @@ do_tcp_10_acceptors_10_listen_sockets(Config) ->
 		ranch_tcp, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => SockOpts ++ [{raw, 1, 15, <<1:32/native>>}],
+			socket_opts => SockOpts ++ [{reuseport, true}],
 			post_listen_callback => fun (LSocket) -> Self ! {Tag, LSocket}, ok end},
 		echo_protocol, []),
 	LSockets = [receive {Tag, LSocket} -> LSocket after 1000 -> error(timeout) end
@@ -1396,22 +1406,22 @@ do_tcp_10_acceptors_10_listen_sockets(Config) ->
 	ok.
 
 tcp_many_listen_sockets_no_reuseport(Config) ->
-	case do_os_supports_reuseport() of
+	case do_backend_honors_reuseport(config(socket_opts, Config)) of
 		true ->
 			ok = do_tcp_many_listen_sockets_no_reuseport(Config);
 		false ->
-			{skip, "No SO_REUSEPORT support."}
+			{skip, "Socket backend ignores reuseport before OTP 29."}
 	end.
 
 do_tcp_many_listen_sockets_no_reuseport(Config) ->
-	doc("Confirm that ranch:start_listener/5 fails when SO_REUSEPORT is not available with TCP."),
+	doc("Confirm that ranch:start_listener/5 fails when reuseport is disabled with TCP."),
 	Name = name(),
 	SockOpts = config(socket_opts, Config),
 	{error, eaddrinuse} = ranch:start_listener(Name,
 		ranch_tcp, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => SockOpts ++ [{raw, 1, 15, <<0:32/native>>}]},
+			socket_opts => SockOpts ++ [{reuseport, false}]},
 		echo_protocol, []),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
@@ -2189,11 +2199,14 @@ do_tcp_connect_refused(Port, N) ->
 			do_tcp_connect_refused(Port, N - 1)
 	end.
 
-do_os_supports_reuseport() ->
-	case {os:type(), os:version()} of
-		{{unix, linux}, {Major, _, _}} when Major > 3 -> true;
-		{{unix, linux}, {3, Minor, _}} when Minor >= 9 -> true;
-		_ -> false
+%% gen_tcp with {inet_backend, socket} rejected reuseport
+%% until OTP 29.
+do_backend_honors_reuseport(SockOpts) ->
+	case lists:keyfind(inet_backend, 1, SockOpts) of
+		{_, socket} ->
+			list_to_integer(erlang:system_info(otp_release)) >= 29;
+		_ ->
+			true
 	end.
 
 do_os_supports_local_sockets() ->
