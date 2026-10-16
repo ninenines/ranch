@@ -231,8 +231,6 @@ do_upgrade_ranch_one_conn() ->
 		do_remove(Example)
 	end.
 
-%% @todo upgrade_ranch_max_conn
-
 do_exec_log(Cmd) ->
 	ct:log("Command: ~s~n", [Cmd]),
 	Out=os:cmd(Cmd),

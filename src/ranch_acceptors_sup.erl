@@ -112,13 +112,11 @@ hide_socket_opts([SocketOpt|SocketOpts]) ->
 %% Handling of no_cert really should be done in ranch_ssl. We leave it here for
 %% backwards compatibility with possibly existing custom transports without a
 %% format_error/1 implementation that may rely on this module handling it.
-%% TODO: Remove in Ranch 3.0
 format_error(_, no_cert) ->
 	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
 format_error(_, reuseport_local) ->
 	"num_listen_sockets must be set to 1 for local sockets";
 format_error(Transport, Reason) ->
-	%% TODO: Required callback in Ranch 3.0
 	case erlang:function_exported(Transport, format_error, 1) of
 		true ->
 			Transport:format_error(Reason);

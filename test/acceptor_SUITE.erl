@@ -19,7 +19,6 @@
 -compile(nowarn_export_all).
 
 -dialyzer({nowarn_function, misc_wait_for_connections/1}).
-%% @todo Remove when specs in ssl are updated to accept local addresses.
 -dialyzer({nowarn_function, do_ssl_local_echo/0}).
 
 -import(ct_helper, [config/2]).
@@ -616,7 +615,6 @@ misc_connection_alarms(_) ->
 	end,
 	Alarm1 = #{type => num_connections, threshold => 2, cooldown => 0, callback => AlarmCallback},
 	%% The test2 alarm uses the misspelled treshold key to test for backwards compatibility.
-	%% @todo: Change to use the proper spelling when treshold gets removed in Ranch 3.0.
 	Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback},
 	Alarms0 = #{
 		test1 => Alarm1,
