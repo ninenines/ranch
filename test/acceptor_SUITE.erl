@@ -1523,8 +1523,9 @@ tcp_graceful(Config) ->
 	ok = gen_tcp:send(Socket1, <<"TCP with suspended listener">>),
 	{ok, <<"TCP with suspended listener">>} = gen_tcp:recv(Socket1, 27, 1000),
 	%% Make sure new connections are refused on the suspended listener.
-	{error, econnrefused} = gen_tcp:connect("localhost", Port,
-		[binary, {active, false}, {packet, raw}]),
+	%% With inet_backend socket the listen socket is closed asynchronously
+	%% so we may need to retry a few times before getting econnrefused.
+	ok = do_tcp_connect_refused(Port, 10),
 	%% Make sure transport options can be changed when listener is suspended.
 	ok = ranch:set_transport_options(Name, [{port, Port}]),
 	%% Resume listener, make sure connections can be established again.
@@ -2172,6 +2173,21 @@ do_conns_count_children(Name) ->
 		[supervisor:count_children(ConnsSup) ||
 			{_, ConnsSup} <- ranch_server:get_connections_sups(Name)]
 	).
+
+do_tcp_connect_refused(_, 0) ->
+	error(connect_not_refused);
+do_tcp_connect_refused(Port, N) ->
+	case gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]) of
+		{error, econnrefused} ->
+			ok;
+		{ok, Socket} ->
+			gen_tcp:close(Socket),
+			timer:sleep(10),
+			do_tcp_connect_refused(Port, N - 1);
+		{error, _} ->
+			timer:sleep(10),
+			do_tcp_connect_refused(Port, N - 1)
+	end.
 
 do_os_supports_reuseport() ->
 	case {os:type(), os:version()} of
