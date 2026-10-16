@@ -281,12 +281,28 @@ do_acceptors(ListenerSup, F) ->
 	case lists:keyfind(ranch_acceptors_sup, 1, ListenerChildren) of
 		{_, AcceptorsSup, _, _} when is_pid(AcceptorsSup) ->
 			AcceptorChildren = supervisor:which_children(AcceptorsSup),
-			%% @todo What about errors?
-			_ = [supervisor:F(AcceptorsSup, AcceptorId)
+			_ = [ok = do_acceptor(AcceptorsSup, AcceptorId, F)
 				|| {AcceptorId, _, _, _} <- AcceptorChildren],
 			ok;
 		{_, Atom, _, _} ->
 			{error, Atom}
+	end.
+
+do_acceptor(AcceptorsSup, AcceptorId, terminate_child) ->
+	case supervisor:terminate_child(AcceptorsSup, AcceptorId) of
+		ok ->
+			ok;
+		Error ->
+			error(Error)
+	end;
+do_acceptor(AcceptorsSup, AcceptorId, restart_child) ->
+	case supervisor:restart_child(AcceptorsSup, AcceptorId) of
+		{ok, _} ->
+			ok;
+		{ok, _, _} ->
+			ok;
+		Error ->
+			error(Error)
 	end.
 
 -spec child_spec(ref(), module(), opts(), module(), any())
