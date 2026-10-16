@@ -194,6 +194,35 @@ name() -> Name :: atom()
 
 Return the name of the transport.
 
+=== negotiated_protocol
+
+[source,erlang]
+----
+negotiated_protocol(Socket :: socket())
+    -> {ok, Protocol :: binary()}
+     | {error, any()}
+----
+
+Return the application protocol selected for this connection,
+for example through ALPN.
+
+This callback is optional. A transport that cannot negotiate
+an application protocol omits it.
+
+=== peercert
+
+[source,erlang]
+----
+peercert(Socket :: socket())
+    -> {ok, Cert :: public_key:der_encoded()}
+     | {error, any()}
+----
+
+Return the DER-encoded certificate presented by the peer.
+
+This callback is optional. A transport that has no peer
+certificate omits it.
+
 === peername
 
 [source,erlang]
@@ -354,6 +383,8 @@ The exact type will vary depending on the transport module.
 
 == Changelog
 
+* *2.4*: The optional callbacks `peercert/1` and
+         `negotiated_protocol/1` were added.
 * *2.2*: The callback `format_error/1` was added.
 * *2.0*: The callback `listen/1` has changed to accept a map of
          transport options instead of socket options.

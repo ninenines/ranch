@@ -64,6 +64,10 @@
 	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
 -callback sockname(socket())
 	-> {ok, {inet:ip_address(), inet:port_number()} | {local, binary()}} | {error, atom()}.
+-callback peercert(socket())
+	-> {ok, public_key:der_encoded()} | {error, any()}.
+-callback negotiated_protocol(socket())
+	-> {ok, binary()} | {error, any()}.
 -callback shutdown(socket(), read | write | read_write)
 	-> ok | {error, atom()}.
 -callback close(socket()) -> ok.
@@ -72,6 +76,8 @@
 
 %% TODO: Required callback in Ranch 3.0
 -optional_callbacks([format_error/1]).
+
+-optional_callbacks([negotiated_protocol/1, peercert/1]).
 
 %% A fallback for transports that don't have a native sendfile implementation.
 %% Note that the ordering of arguments is different from file:sendfile/5 and

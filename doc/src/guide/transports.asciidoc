@@ -180,3 +180,6 @@ It is highly recommended for a custom transport handler to implement the
 optional `format_error/1` callback, in order to provide a human-readable
 diagnostic string. Implementing this callback will become mandatory in
 Ranch 3.0.
+
+The `peercert/1` and `negotiated_protocol/1` callbacks are optional,
+as they only apply to TLS.

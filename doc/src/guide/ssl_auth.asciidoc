@@ -93,9 +93,8 @@ Erlang term can be stored and retrieved.
 
 To retrieve the `IssuerID` from a running connection, you need to first
 retrieve the client certificate and then extract this information from
-it. Ranch does not provide a function to retrieve the client certificate.
-Instead you can use the `ssl:peercert/1` function. Once you have the
-certificate, you can again use the `public_key:pkix_issuer_id/2` to
+it. Call `Transport:peercert/1`. Once you have the
+certificate, you can again use `public_key:pkix_issuer_id/2` to
 extract the `IssuerID` value.
 
 The following function returns the `IssuerID` or `false` if no client
@@ -106,8 +105,8 @@ protocol code.
 
 [source,erlang]
 ----
-socket_to_issuer_id(Socket) ->
-	case ssl:peercert(Socket) of
+socket_to_issuer_id(Transport, Socket) ->
+	case Transport:peercert(Socket) of
 		{error, no_peercert} ->
 			false;
 		{ok, Cert} ->
