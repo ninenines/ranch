@@ -131,6 +131,8 @@ groups() ->
 		supervisor_changed_options_restart,
 		supervisor_clean_child_restart,
 		supervisor_clean_restart,
+		supervisor_restart_acceptors,
+		supervisor_suspended_acceptors,
 		supervisor_conns_alive,
 		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
@@ -1861,6 +1863,58 @@ do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
 	{100, Pids} = receive_loop(connected, 1000),
 	100 = ranch_server:count_connections(Name),
 	ok = terminate_loop(stop, Pids),
+	ok = ranch:stop_listener(Name),
+	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
+supervisor_restart_acceptors(_) ->
+	doc("Ensure that restarting acceptors fails when they are running "
+		"and succeeds after they were stopped."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 2},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	{ok, Socket1} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	%% The protocol must own the socket before acceptors are killed.
+	%% brutal_kill drops a socket still held by an acceptor.
+	ok = gen_tcp:send(Socket1, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket1, 0, 1000),
+	%% Acceptors are running. Restart must fail and leave them in place.
+	?assertError({error, running}, ranch:restart_all_acceptors()),
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	ok = ranch:stop_all_acceptors(),
+	[] = [Pid || Pid <- ranch:procs(Name, acceptors), is_pid(Pid)],
+	ok = ranch:restart_all_acceptors(),
+	2 = length([Pid || Pid <- ranch:procs(Name, acceptors), is_pid(Pid)]),
+	ok = gen_tcp:send(Socket1, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket1, 0, 1000),
+	{ok, Socket2} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	ok = gen_tcp:send(Socket2, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket2, 0, 1000),
+	ok = ranch:stop_listener(Name),
+	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
+supervisor_suspended_acceptors(_) ->
+	doc("Ensure that stopping or restarting acceptors skips a suspended listener."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1},
+		echo_protocol, []),
+	ok = ranch:suspend_listener(Name),
+	suspended = ranch:get_status(Name),
+	ok = ranch:stop_all_acceptors(),
+	suspended = ranch:get_status(Name),
+	ok = ranch:restart_all_acceptors(),
+	suspended = ranch:get_status(Name),
+	ok = ranch:resume_listener(Name),
+	running = ranch:get_status(Name),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	ok = gen_tcp:send(Socket, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 0, 1000),
 	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
