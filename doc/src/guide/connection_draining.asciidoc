@@ -1,10 +1,13 @@
 == Connection draining
 
-Stopping a Ranch listener via `ranch:stop_listener/1` will invariably kill
-all connection processes the listener hosts. However, you may want to stop
-a listener in a graceful fashion, ie by not accepting any new connections,
-but allowing the existing connection processes to exit by themselves instead
-of being killed.
+Stopping a Ranch listener via `ranch:stop_listener/1` closes the
+listening socket and then stops its connection processes. They
+receive a shutdown signal and are killed if still running after
+the `shutdown` transport option, which defaults to 5000 ms.
+`brutal_kill` kills them immediately. However, you may want to stop
+a listener in a graceful fashion, i.e. by not accepting any new
+connections, but allowing the existing connection processes to exit
+by themselves instead of being killed.
 
 For this purpose, you should first suspend the listener you wish to
 stop gracefully, and then wait for its connection count to drop to

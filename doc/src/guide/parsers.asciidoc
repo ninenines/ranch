@@ -78,9 +78,9 @@ The general idea stays the same though.
 .Using binary pattern matching to split frames
 
 [source,erlang]
-<< Size:32, _/bits >> = Buffer,
 case Buffer of
-	<< Frame:Size/binary, Rest/bits >> ->
+	<< Size:32, _/bits >> when byte_size(Buffer) >= Size ->
+		<< Frame:Size/binary, Rest/bits >> = Buffer,
 		handle_frame(Frame, Rest);
 	_ ->
 		get_more_data(Buffer)

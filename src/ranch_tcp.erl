@@ -68,6 +68,7 @@
 	| {priority, integer()}
 	| {raw, non_neg_integer(), non_neg_integer(), binary()}
 	| {recbuf, non_neg_integer()}
+	| {reuseport, boolean()}
 	| {send_timeout, timeout()}
 	| {send_timeout_close, boolean()}
 	| {sndbuf, non_neg_integer()}

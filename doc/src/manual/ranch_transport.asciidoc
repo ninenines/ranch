@@ -26,6 +26,19 @@ Use the listening socket returned by `listen/1`
 to accept a new connection. The timeout is specified
 in milliseconds.
 
+=== cleanup
+
+[source,erlang]
+----
+cleanup(TransportOpts :: ranch:transport_opts(any())) -> ok
+----
+
+Clean up after a listener has been stopped.
+
+Ranch calls this function from `ranch:stop_listener/1`.
+`ranch_tcp` and `ranch_ssl` delete the socket file when
+the listen address is `{local, _}`.
+
 === close
 
 [source,erlang]
@@ -228,16 +241,16 @@ certificate omits it.
 [source,erlang]
 ----
 peername(Socket :: socket())
-    -> {ok, {inet:ip_address(), inet:port_number()}}
-     | {local, binary()} | {error, atom()}.
+    -> {ok, {inet:ip_address(), inet:port_number()}
+            | {local, binary()}}
+     | {error, atom()}.
 ----
 
 Return the address and port number for the other end of
 the connection.
 
-For UNIX Domain sockets the return value will be
-`{local, PeerSocket}`, with `PeerSocket` typically
-an empty binary.
+For UNIX Domain sockets the address is `{local, PeerSocket}`,
+with `PeerSocket` typically an empty binary.
 
 === recv
 
@@ -263,6 +276,19 @@ it is highly discouraged as it could cause your process
 to get stuck waiting for data that will never come. This may
 happen when a socket becomes half-open due to a crash of the
 remote endpoint. Wi-Fi going down is another common culprit.
+
+=== recv_proxy_header
+
+[source,erlang]
+----
+recv_proxy_header(Socket  :: socket(),
+                  Timeout :: timeout())
+    -> {ok, ProxyInfo :: ranch_proxy_header:proxy_info()}
+     | {error, closed | atom()}
+     | {error, protocol_error, atom()}
+----
+
+Receive a PROXY protocol header from the socket.
 
 === secure
 
@@ -338,15 +364,15 @@ Close the socket for reading and/or writing.
 [source,erlang]
 ----
 sockname(Socket :: socket())
-    -> {ok, {inet:ip_address(), inet:port_number()}}
+    -> {ok, {inet:ip_address(), inet:port_number()}
+            | {local, binary()}}
      | {error, atom()}.
 ----
 
 Return the address and port number for the local end
 of the connection.
 
-For UNIX Domain sockets the return value will be
-`{local, SocketFile}`.
+For UNIX Domain sockets the address is `{local, SocketFile}`.
 
 == Exports
 

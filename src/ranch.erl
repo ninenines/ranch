@@ -512,7 +512,8 @@ listener_info(Ref, Pid) ->
 		metrics => metrics(Ref)
 	}.
 
--spec procs(ref(), acceptors | connections) -> [pid()].
+-spec procs(ref(), acceptors | connections) ->
+	[pid() | undefined | restarting].
 procs(Ref, Type) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
 	procs1(ListenerSup, Type).

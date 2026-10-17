@@ -8,7 +8,7 @@ ranch:start_listener - Start a listener
 
 [source,erlang]
 ----
-start_listener(Ref       :: ranch_ref(),
+start_listener(Ref       :: ranch:ref(),
                Transport :: module(),
                TransOpts :: ranch:opts(),
                Protocol  :: module(),
@@ -45,8 +45,8 @@ link:man:ranch_transport(3)[ranch_transport(3)] manual.
 TransportOpts::
 
 Transport options include the Ranch-specific options
-and the socket options. The listener's port number must
-be defined in the socket options.
+and the socket options. The port may be omitted or set
+to 0 to listen on a random port.
 +
 Socket options may be given directly if there are no
 Ranch-specific options.

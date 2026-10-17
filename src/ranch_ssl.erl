@@ -54,17 +54,18 @@
 	| {anti_replay, '10k' | '100k' | {integer(), integer(), integer()}}
 	| {beast_mitigation, one_n_minus_one | zero_n | disabled}
 	| {cacertfile, file:filename()}
-	| {cacerts, [public_key:der_encoded()]}
-	| {cert, public_key:der_encoded()}
-	| {certs_keys, [#{cert => public_key:der_encoded(),
+	| {cacerts, [public_key:der_encoded()] | [public_key:combined_cert()]}
+	| {cert, public_key:der_encoded() | [public_key:der_encoded()]}
+	| {certs_keys, [#{cert => public_key:der_encoded()
+				| [public_key:der_encoded()],
 			  key => ssl:key(),
 			  certfile => file:filename(),
 			  keyfile => file:filename(),
-			  key_pem_password => iodata() | fun(() -> iodata())}]}
+			  password => iodata() | fun(() -> iodata())}]}
 	| {certfile, file:filename()}
 	| {ciphers, ssl:ciphers()}
 	| {client_renegotiation, boolean()}
-	| {crl_cache, [any()]}
+	| {crl_cache, {atom(), {internal | term(), [any()]}}}
 	| {crl_check, boolean() | peer | best_effort}
 	| {depth, integer()}
 	| {dh, binary()}
@@ -79,23 +80,25 @@
 	| {key_update_at, pos_integer()}
 	| {keyfile, file:filename()}
 	| {log_alert, boolean()}
-	| {log_level, logger:level()}
+	| {log_level, logger:level() | none | all}
 	| {max_handshake_size, integer()}
 	| {middlebox_comp_mode, boolean()}
 	| {next_protocols_advertised, [binary()]}
 	| {padding_check, boolean()}
 	| {partial_chain, fun()}
-	| {password, string()}
+	| {password, iodata() | fun(() -> iodata())}
 	| {protocol, tls | dtls}
 	| {psk_identity, string()}
 	| {reuse_session, fun()}
 	| {reuse_sessions, boolean()}
 	| {secure_renegotiate, boolean()}
-	| {session_tickets, disabled | stateful | stateless}
-	| {signature_algs, [{ssl:hash(), ssl:sign_algo()}]}
+	| {session_tickets, disabled | stateful | stateless
+		| stateful_with_cert | stateless_with_cert}
+	| {signature_algs, ssl:signature_algs()}
 	| {signature_algs_cert, [ssl:sign_scheme()]}
 	| {sni_fun, fun()}
-	| {sni_hosts, [{string(), ssl_opt()}]}
+	| {sni_hosts, [{inet:hostname(), [ssl_opt()]}]}
+	| {stateless_tickets_seed, binary()}
 	| {supported_groups, [ssl:group()]}
 	| {user_lookup_fun, {fun(), any()}}
 	| {verify, verify_none | verify_peer}
@@ -348,7 +351,7 @@ cleanup(_) ->
 
 -spec format_error({error, ssl:reason()} | ssl:reason()) -> string().
 format_error(no_cert) ->
-	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
+	"no certificate provided; see cert, certfile, certs_keys, sni_fun, sni_hosts or user_lookup_fun options";
 format_error(Reason) ->
 	ssl:format_error(Reason).
 

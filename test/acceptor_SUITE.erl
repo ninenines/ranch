@@ -1911,7 +1911,7 @@ supervisor_restart_acceptors(_) ->
 	?assertError({error, running}, ranch:restart_all_acceptors()),
 	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
 	ok = ranch:stop_all_acceptors(),
-	[] = [Pid || Pid <- ranch:procs(Name, acceptors), is_pid(Pid)],
+	[undefined, undefined] = lists:sort(ranch:procs(Name, acceptors)),
 	ok = ranch:restart_all_acceptors(),
 	2 = length([Pid || Pid <- ranch:procs(Name, acceptors), is_pid(Pid)]),
 	ok = gen_tcp:send(Socket1, <<"Hello!">>),
