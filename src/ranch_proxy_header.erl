@@ -298,7 +298,10 @@ parse_v2(<<_:4, Command:4, _/bits>>) when Command > 1 ->
 parse_v2(<<_:8, Family:4, _/bits>>) when Family > 3 ->
 	{error, 'Invalid address family in the PROXY protocol binary header. (PP 2.2)'};
 parse_v2(<<_:12, Protocol:4, _/bits>>) when Protocol > 2 ->
-	{error, 'Invalid transport protocol in the PROXY protocol binary header. (PP 2.2)'}.
+	{error, 'Invalid transport protocol in the PROXY protocol binary header. (PP 2.2)'};
+%% Fewer than 4 bytes: the version block is incomplete.
+parse_v2(_) ->
+	{error, 'Missing data in the PROXY protocol binary header. (PP 2.2)'}.
 
 parse_family(0) -> undefined;
 parse_family(1) -> ipv4;
@@ -496,6 +499,17 @@ parse_v2_regression_test() ->
 		56, 100, 50, 98, 102, 49, 53, 102, 97, 99, 53, 48, 48, 49, 99,
 		57, 4, 0, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>),
+	ok.
+
+parse_v2_truncated_test() ->
+	Sig = <<"\r\n\r\n\0\r\nQUIT\n">>,
+	{error, _} = parse(Sig),
+	{error, _} = parse(<<Sig/binary, 16#21>>),
+	{error, _} = parse(<<Sig/binary, 16#21, 16#11>>),
+	{error, _} = parse(<<Sig/binary, 16#21, 16#11, 0>>),
+	{error, _} = parse(<<Sig/binary, 16#20>>),
+	{error, _} = parse(<<Sig/binary, 16#10>>),
+	{error, _} = parse(<<Sig/binary, 16#22>>),
 	ok.
 -endif.
 
