@@ -50,8 +50,17 @@
 
 %% API.
 
--spec start_link(ranch:ref(), pos_integer(), module(), any(), module(), module()) -> {ok, pid()}.
-start_link(Ref, Id, Transport, TransOpts, Protocol, Logger) ->
+%% A 2.3.0 child spec still passes the options map.
+%% A restart must not store that map as connection_type.
+-spec start_link(ranch:ref(), pos_integer(), module(), map(), module(), module()) -> {ok, pid()};
+	(ranch:ref(), pos_integer(), module(), conn_type(), module(), module()) -> {ok, pid()}.
+start_link(Ref, Id, Transport, TransOpts, Protocol, Logger) when is_map(TransOpts) ->
+	ConnType = maps:get(connection_type, TransOpts, worker),
+	start_link(Ref, Id, Transport, ConnType, Protocol, Logger);
+start_link(Ref, Id, Transport, ConnType, Protocol, Logger) when is_atom(ConnType) ->
+	TransOpts0 = ranch_server:get_transport_options(Ref),
+	%% connection_type changes only when the listener restarts.
+	TransOpts = TransOpts0#{connection_type => ConnType},
 	proc_lib:start_link(?MODULE, init,
 		[self(), Ref, Id, Transport, TransOpts, Protocol, Logger]).
 

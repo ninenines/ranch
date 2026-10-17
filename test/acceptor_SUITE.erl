@@ -139,7 +139,8 @@ groups() ->
 		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
-		supervisor_unexpected_message
+		supervisor_unexpected_message,
+		supervisor_conns_sup_old_spec
 	]}].
 
 init_per_group(tcp_socket, Config) ->
@@ -749,6 +750,17 @@ misc_listen_error(_) ->
 	end,
 	logger:remove_primary_filter(Name),
 	ok.
+
+contains_term(Term, Term) ->
+	true;
+contains_term([Head|Tail], Secret) ->
+	contains_term(Head, Secret) orelse contains_term(Tail, Secret);
+contains_term(Term, Secret) when is_tuple(Term) ->
+	contains_term(tuple_to_list(Term), Secret);
+contains_term(Term, Secret) when is_map(Term) ->
+	contains_term(maps:to_list(Term), Secret);
+contains_term(_, _) ->
+	false.
 
 misc_trace_acceptors(_) ->
 	doc("trace_acceptors returns the raw Transport:accept/2 error."),
@@ -2204,6 +2216,28 @@ supervisor_unexpected_message(_) ->
 	%% Make sure the listener stopped.
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
+
+supervisor_conns_sup_old_spec(_) ->
+	doc("A 2.3.0 connection supervisor spec restarts without keeping transport options."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, ranch_erlang_transport,
+		#{num_acceptors => 1, num_conns_sups => 1},
+		echo_protocol, []),
+	Secret = <<"ranch-conns-secret">>,
+	Old = #{
+		socket_opts => [{key, Secret}],
+		connection_type => supervisor
+	},
+	{ok, Pid} = ranch_conns_sup:start_link(Name, 99, ranch_erlang_transport,
+		Old, echo_protocol, logger),
+	unlink(Pid),
+	{State, _, _, _} = sys:get_state(Pid),
+	supervisor = element(5, State),
+	false = contains_term(State, Secret),
+	false = contains_term(supervisor:count_children(Pid), Secret),
+	false = contains_term(supervisor:which_children(Pid), Secret),
+	exit(Pid, kill),
+	ok = ranch:stop_listener(Name).
 
 connect_loop(_, 0, _) ->
 	ok;

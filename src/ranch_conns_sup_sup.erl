@@ -35,9 +35,13 @@ init({Ref, Transport, Protocol, Logger}) ->
 	NumConnsSups = maps:get(num_conns_sups, TransOpts, NumAcceptors),
 	StatsCounters = counters:new(2*NumConnsSups, []),
 	ok = ranch_server:set_stats_counters(Ref, StatsCounters),
+	%% The supervisor logs this MFA. connection_type is fixed until the
+	%% listener restarts. Other options are read from ranch_server.
+	ConnType = maps:get(connection_type, TransOpts, worker),
 	ChildSpecs = [#{
 		id => {ranch_conns_sup, N},
-		start => {ranch_conns_sup, start_link, [Ref, N, Transport, TransOpts, Protocol, Logger]},
+		start => {ranch_conns_sup, start_link,
+			[Ref, N, Transport, ConnType, Protocol, Logger]},
 		type => supervisor
 	} || N <- lists:seq(1, NumConnsSups)],
 	{ok, {#{intensity => 1 + ceil(math:log2(NumConnsSups))}, ChildSpecs}}.
