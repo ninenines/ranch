@@ -463,6 +463,9 @@ set_transport_options(Ref, TransOpts0) ->
 	end.
 
 apply_transport_options(Ref, TransOpts) ->
+	%% A restarted connection supervisor reads this row.
+	MaxConns = maps:get(max_connections, TransOpts, 1024),
+	ok = ranch_server:set_max_connections(Ref, MaxConns),
 	_ = [ConnsSup ! {set_transport_options, TransOpts}
 		|| {_, ConnsSup} <- ranch_server:get_connections_sups(Ref)],
 	ok.

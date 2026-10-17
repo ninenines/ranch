@@ -110,6 +110,7 @@ groups() ->
 		misc_post_listen_callback,
 		misc_post_listen_callback_error,
 		misc_set_transport_options,
+		misc_set_transport_options_max_connections,
 		misc_wait_for_connections,
 		misc_suspend_wait_stop,
 		misc_multiple_ip_local_socket_opts,
@@ -509,6 +510,38 @@ misc_set_transport_options(_) ->
 	2 = length(ranch:procs(Name, acceptors)),
 	LSocket = do_get_listener_socket(ListenerSupPid),
 	{ok, [{send_timeout, 5002}]} = ranch_tcp:getopts(LSocket, [send_timeout]),
+	ok = ranch:stop_listener(Name).
+
+misc_set_transport_options_max_connections(_) ->
+	doc("set_transport_options stores the new max_connections."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{
+		max_connections => 10,
+		num_acceptors => 1,
+		num_conns_sups => 1
+	}, echo_protocol, []),
+	ok = ranch:set_transport_options(Name, #{
+		max_connections => 20,
+		num_acceptors => 1,
+		num_conns_sups => 1
+	}),
+	20 = ranch:get_max_connections(Name),
+	#{max_connections := 20} = ranch:info(Name),
+	ListenerSup = ranch_server:get_listener_sup(Name),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
+		supervisor:which_children(ListenerSup)),
+	[{Id, _, _, _}] = supervisor:which_children(ConnsSupSup),
+	ok = supervisor:terminate_child(ConnsSupSup, Id),
+	{ok, ConnsSup} = supervisor:restart_child(ConnsSupSup, Id),
+	{State, _, _, _} = sys:get_state(ConnsSup),
+	20 = element(11, State),
+	ok = ranch:set_transport_options(Name, #{
+		num_acceptors => 1,
+		num_conns_sups => 1
+	}),
+	1024 = ranch:get_max_connections(Name),
+	{State1, _, _, _} = sys:get_state(ConnsSup),
+	1024 = element(11, State1),
 	ok = ranch:stop_listener(Name).
 
 misc_wait_for_connections(_) ->
