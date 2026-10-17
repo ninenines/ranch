@@ -2205,8 +2205,6 @@ supervisor_unexpected_message(_) ->
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
-%% Utility functions.
-
 connect_loop(_, 0, _) ->
 	ok;
 connect_loop(Port, N, Sleep) ->

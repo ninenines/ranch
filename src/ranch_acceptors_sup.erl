@@ -17,6 +17,7 @@
 -behaviour(supervisor).
 
 -export([start_link/3]).
+-export([get_listen_socket/1]).
 -export([init/1]).
 
 -spec start_link(ranch:ref(), module(), module())
@@ -24,26 +25,34 @@
 start_link(Ref, Transport, Logger) ->
 	supervisor:start_link(?MODULE, [Ref, Transport, Logger]).
 
+%% ranch_acceptor:start_link/5 runs in this process. The listen
+%% sockets are kept in its dictionary so they stay out of the
+%% acceptor child spec.
+-spec get_listen_socket(pos_integer()) -> inet:socket().
+get_listen_socket(LSocketId) ->
+	{_, LSocket} = lists:keyfind(LSocketId, 1, get(lsockets)),
+	LSocket.
+
 -spec init([term()]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([Ref, Transport, Logger]) ->
 	proc_lib:set_label({ranch_acceptors_sup, Ref}),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumListenSockets = maps:get(num_listen_sockets, TransOpts, 1),
-	LSockets = case get(lsockets) of
+	case get(lsockets) of
 		undefined ->
-			LSockets1 = start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts, Logger),
-			put(lsockets, LSockets1),
-			LSockets1;
-		LSockets1 ->
-			LSockets1
+			put(lsockets, start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts, Logger));
+		_ ->
+			ok
 	end,
+	%% The supervisor logs this MFA when an acceptor exits.
+	%% The listen socket stays in the process dictionary.
 	Procs = [begin
 		LSocketId = (AcceptorId rem NumListenSockets) + 1,
-		{_, LSocket} = lists:keyfind(LSocketId, 1, LSockets),
 		#{
 			id => {acceptor, self(), AcceptorId},
-			start => {ranch_acceptor, start_link, [Ref, AcceptorId, LSocket, Transport, Logger]},
+			start => {ranch_acceptor, start_link,
+				[Ref, AcceptorId, LSocketId, Transport, Logger]},
 			shutdown => brutal_kill
 		}
 	end || AcceptorId <- lists:seq(1, NumAcceptors)],
