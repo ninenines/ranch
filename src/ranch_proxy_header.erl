@@ -60,7 +60,19 @@
 parse(<<"\r\n\r\n\0\r\nQUIT\n", Rest/bits>>) ->
 	parse_v2(Rest);
 parse(<<"PROXY ", Rest/bits>>) ->
-	parse_v1(Rest);
+	case binary:split(Rest, <<"\r\n">>) of
+		[_Line] ->
+			{error, 'Malformed or incomplete PROXY protocol header line. (PP 2.1)'};
+		[Line, _] when byte_size(Line) + 8 > 107 ->
+			{error, 'The PROXY protocol header line exceeds 107 bytes. (PP 2.1)'};
+		[Line, Rest1] ->
+			case parse_v1(Line) of
+				{ok, Info} ->
+					{ok, Info, Rest1};
+				{error, Reason} ->
+					{error, Reason}
+			end
+	end;
 parse(_) ->
 	{error, 'The PROXY protocol header signature was not recognized. (PP 2.1, PP 2.2)'}.
 
@@ -71,29 +83,25 @@ parse_unrecognized_header_test() ->
 -endif.
 
 %% Human-readable header format (Version 1).
+%% The CRLF and any bytes after it have already been removed.
 parse_v1(<<"TCP4 ", Rest/bits>>) ->
 	parse_v1(Rest, ipv4);
 parse_v1(<<"TCP6 ", Rest/bits>>) ->
 	parse_v1(Rest, ipv6);
-parse_v1(<<"UNKNOWN\r\n", Rest/bits>>) ->
+parse_v1(<<"UNKNOWN">>) ->
 	{ok, #{
 		version => 1,
 		command => proxy,
 		transport_family => undefined,
 		transport_protocol => undefined
-	}, Rest};
-parse_v1(<<"UNKNOWN ", Rest0/bits>>) ->
-	case binary:split(Rest0, <<"\r\n">>) of
-		[_, Rest] ->
-			{ok, #{
-				version => 1,
-				command => proxy,
-				transport_family => undefined,
-				transport_protocol => undefined
-			}, Rest};
-		[_] ->
-			{error, 'Malformed or incomplete PROXY protocol header line. (PP 2.1)'}
-	end;
+	}};
+parse_v1(<<"UNKNOWN ", _/bits>>) ->
+	{ok, #{
+		version => 1,
+		command => proxy,
+		transport_family => undefined,
+		transport_protocol => undefined
+	}};
 parse_v1(_) ->
 	{error, 'The INET protocol and family string was not recognized. (PP 2.1)'}.
 
@@ -102,8 +110,7 @@ parse_v1(Rest0, Family) ->
 		{ok, SrcAddr, Rest1} = parse_ip(Rest0, Family),
 		{ok, DestAddr, Rest2} = parse_ip(Rest1, Family),
 		{ok, SrcPort, Rest3} = parse_port(Rest2, $\s),
-		{ok, DestPort, Rest4} = parse_port(Rest3, $\r),
-		<<"\n", Rest/bits>> = Rest4,
+		{ok, DestPort, <<>>} = parse_port(Rest3),
 		{ok, #{
 			version => 1,
 			command => proxy,
@@ -113,7 +120,7 @@ parse_v1(Rest0, Family) ->
 			src_port => SrcPort,
 			dest_address => DestAddr,
 			dest_port => DestPort
-		}, Rest}
+		}}
 	catch
 		throw:parse_ipv4_error ->
 			{error, 'Failed to parse an IPv4 address in the PROXY protocol header line. (PP 2.1)'};
@@ -156,6 +163,11 @@ parse_port(<<Port:3/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
 parse_port(<<Port:4/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
 parse_port(<<Port:5/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
 parse_port(_, _) -> throw(parse_port_error).
+
+parse_port(Port) when byte_size(Port) >= 1, byte_size(Port) =< 5 ->
+	parse_port1(Port, <<>>);
+parse_port(_) ->
+	throw(parse_port_error).
 
 parse_port1(Port0, Rest) ->
 	try binary_to_integer(Port0) of
@@ -264,6 +276,41 @@ parse_v1_test() ->
 		transport_family := undefined,
 		transport_protocol := undefined
 	}, <<"GET / HTTP/1.1\r">>} = parse(<<"PROXY UNKNOWN\r\nGET / HTTP/1.1\r">>),
+	ok.
+
+%% PP 2.1: the CRLF must occur in the first 107 bytes. The worst case
+%% in the spec is 107 including CRLF; one more byte is invalid.
+parse_v1_unknown_length_test() ->
+	Worst = <<"PROXY UNKNOWN "
+		"ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff "
+		"ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff 65535 65535\r\n">>,
+	107 = byte_size(Worst),
+	{ok, #{
+		version := 1,
+		command := proxy,
+		transport_family := undefined,
+		transport_protocol := undefined
+	}, <<>>} = parse(Worst),
+	<<Prefix:105/binary, "\r\n">> = Worst,
+	TooLong = <<Prefix/binary, "x\r\n">>,
+	108 = byte_size(TooLong),
+	{error, _} = parse(TooLong),
+	{error, _} = parse(<<Prefix/binary, "xx">>),
+	{error, _} = parse(Prefix),
+	ok.
+
+%% inet:parse_ipv6strict_address accepts an IPv4-tailed form longer
+%% than the 39-character hex form in the PP 2.1 length table.
+parse_v1_tcp6_length_test() ->
+	Addr = <<"ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255">>,
+	Line = <<"PROXY TCP6 ", Addr/binary, " ", Addr/binary,
+		" 65535 65535\r\n">>,
+	116 = byte_size(Line),
+	{error, _} = parse(Line),
+	{error, _} = parse(<<"PROXY TCP6 ", (binary:copy(<<"a">>, 200))/binary,
+		" ::1 1 2\r\n">>),
+	{ok, #{transport_family := ipv6}, <<"GET">>}
+		= parse(<<"PROXY TCP6 ::1 ::1 1 2\r\nGET">>),
 	ok.
 -endif.
 
