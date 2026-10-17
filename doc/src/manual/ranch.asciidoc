@@ -142,7 +142,7 @@ callback:::
 The alarm function, which takes the listener name, the alarm
 name, the pid of the connection supervisor and a list of pids
 as arguments. The list contains the connections still counted
-toward `max_connections`. `ranch:remove_connection/1` drops a
+toward `max_connections`. `ranch:remove_connection/1,2` drops a
 connection from this list. The return value is ignored.
 
 cooldown (5000):::

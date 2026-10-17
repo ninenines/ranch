@@ -272,11 +272,18 @@ much resources and can safely be removed from the count.
 To remove the connection from the count, you must call the
 `ranch:remove_connection/1` from within the connection process,
 with the name of the listener as the only argument.
+When the socket belongs to a child of the supervised process,
+call `ranch:remove_connection/2` with that parent pid instead.
 
 .Removing a connection from the count of connections
 
 [source,erlang]
 ranch:remove_connection(Ref).
+
+.Removing a supervised connection from the count
+
+[source,erlang]
+ranch:remove_connection(Ref, Parent).
 
 As seen in the chapter covering protocols, this reference is received
 as the first argument of the protocol's `start_link/3` callback.
@@ -412,6 +419,10 @@ will receive the socket).
 
 Instead of returning `{ok, ConnPid}`, simply return
 `{ok, SupPid, ConnPid}`.
+
+The count is stored under `SupPid`. The protocol process
+removes that connection from the count by calling
+`ranch:remove_connection(Ref, SupPid)`.
 
 It is very important that the connection process be created
 under the supervisor process so that everything works as intended.

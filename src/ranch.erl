@@ -31,6 +31,7 @@
 -export([handshake_cancel/1]).
 -export([recv_proxy_header/2]).
 -export([remove_connection/1]).
+-export([remove_connection/2]).
 -export([get_status/1]).
 -export([get_addr/1]).
 -export([get_port/1]).
@@ -389,10 +390,14 @@ recv_proxy_header(Ref, Timeout) ->
 
 -spec remove_connection(ref()) -> ok.
 remove_connection(Ref) ->
+	remove_connection(Ref, self()).
+
+-spec remove_connection(ref(), pid()) -> ok.
+remove_connection(Ref, Pid) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
 	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
 		supervisor:which_children(ListenerSup)),
-	_ = [ConnsSup ! {remove_connection, Ref, self()} ||
+	_ = [ConnsSup ! {remove_connection, Ref, Pid} ||
 		{_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
 	ok.
 
