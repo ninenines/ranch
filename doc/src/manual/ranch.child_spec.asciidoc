@@ -8,7 +8,7 @@ ranch:child_spec - Build child specifications for a new listener
 
 [source,erlang]
 ----
-child_spec(Ref       :: ranch_ref(),
+child_spec(Ref       :: ranch:ref(),
            Transport :: module(),
            TransOpts :: ranch:opts(),
            Protocol  :: module(),
@@ -46,8 +46,8 @@ link:man:ranch_transport(3)[ranch_transport(3)] manual.
 TransportOpts::
 
 Transport options include the Ranch-specific options
-and the socket options. The listener's port number must
-be defined in the socket options.
+and the socket options. The port may be omitted or set
+to 0 to listen on a random port.
 +
 The available options for the built-in Ranch transports
 are documented in the link:man:ranch_tcp(3)[ranch_tcp(3)]

@@ -8,7 +8,7 @@ ranch:resume_listener - Resume a suspended listener
 
 [source,erlang]
 ----
-resume_listener(Ref :: ranch_ref())
+resume_listener(Ref :: ranch:ref())
     -> ok | {error, any()}
 ----
 

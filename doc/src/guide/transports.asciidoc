@@ -164,7 +164,9 @@ used via the `ranch_ssl` transport.
 
 A transport handler is a module implementing the `ranch_transport` behavior.
 It defines a certain number of callbacks that must be written in order to
-allow transparent usage of the transport handler.
+allow transparent usage of the transport handler. The required callbacks
+include `cleanup/1`, called from `ranch:stop_listener/1`, and
+`recv_proxy_header/2`.
 
 The behavior doesn't define the socket options available when opening a
 socket. These do not need to be common to all transports as it's easy enough

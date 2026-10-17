@@ -43,6 +43,7 @@ opt() = {backlog, non_neg_integer()}
       | {priority, integer()}
       | {raw, non_neg_integer(), non_neg_integer(), binary()}
       | {recbuf, non_neg_integer()}
+      | {reuseport, boolean()}
       | {send_timeout, timeout()}
       | {send_timeout_close, boolean()}
       | {sndbuf, non_neg_integer()}
@@ -113,10 +114,10 @@ Interface to listen on. Listen on all network interfaces by default.
 On UNIX systems, it is also possible to use a UNIX Domain
 socket file by specifying `{local, SocketFile}`.
 
-ipv6_v6only (false)::
+ipv6_v6only::
 
 Listen on IPv4 and IPv6 (false) or only on IPv6 (true).
-Use with inet6.
+Use with inet6. See the `inet` manual for the default.
 
 keepalive (false)::
 
@@ -153,6 +154,14 @@ recbuf::
 
 Minimum size of the socket's receive buffer.
 Default is system-dependent.
+
+reuseport (false)::
+
+Allow multiple sockets to listen on the same address
+and port. `num_listen_sockets` above 1 requires this
+option. On Windows the inet driver sets `SO_REUSEADDR`
+only when `reuseport` is also true. Ranch already
+forces `{reuseaddr, true}`.
 
 send_timeout (30000)::
 

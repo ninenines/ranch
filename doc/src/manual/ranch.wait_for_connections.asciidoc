@@ -13,6 +13,12 @@ wait_for_connections(Ref      :: ranch:ref(),
                      NumConns :: non_neg_integer())
     -> ok
 
+wait_for_connections(Ref      :: ranch:ref(),
+                     Operator,
+                     NumConns :: non_neg_integer(),
+                     Interval :: non_neg_integer())
+    -> ok
+
 Operator :: '>' | '>=' | '==' | '=<' | '<'
 ----
 
@@ -40,12 +46,19 @@ NumConns::
 
 The number of connections to reach.
 
+Interval (1000)::
+
+Poll interval, in milliseconds. `wait_for_connections/3`
+uses 1000.
+
 == Return value
 
 The atom `ok` is always returned. It can be safely ignored.
 
 == Changelog
 
+* *2.4*: The `wait_for_connections/4` arity is now documented.
+         The `Interval` argument defaults to 1000 milliseconds.
 * *1.6*: Function introduced.
 
 == Examples

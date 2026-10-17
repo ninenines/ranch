@@ -43,17 +43,18 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {anti_replay, '10k' | '100k' | {integer(), integer(), integer()}}
           | {beast_mitigation, one_n_minus_one | zero_n | disabled}
           | {cacertfile, file:filename()}
-          | {cacerts, [public_key:der_encoded()]}
-          | {cert, public_key:der_encoded()}
-          | {certs_keys, [#{cert => public_key:der_encoded(),
+          | {cacerts, [public_key:der_encoded()] | [public_key:combined_cert()]}
+          | {cert, public_key:der_encoded() | [public_key:der_encoded()]}
+          | {certs_keys, [#{cert => public_key:der_encoded()
+                               | [public_key:der_encoded()],
                             key => ssl:key(),
                             certfile => file:filename(),
                             keyfile => file:filename(),
-                            key_pem_password => iodata() | fun(() -> iodata())}]}
+                            password => iodata() | fun(() -> iodata())}]}
           | {certfile, file:filename()}
           | {ciphers, ssl:ciphers()}
           | {client_renegotiation, boolean()}
-          | {crl_cache, [any()]}
+          | {crl_cache, {atom(), {internal | term(), [any()]}}}
           | {crl_check, boolean() | peer | best_effort}
           | {depth, integer()}
           | {dh, binary()}
@@ -68,23 +69,25 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {key_update_at, pos_integer()}
           | {keyfile, file:filename()}
           | {log_alert, boolean()}
-          | {log_level, logger:level()}
+          | {log_level, logger:level() | none | all}
           | {max_handshake_size, integer()}
           | {middlebox_comp_mode, boolean()}
           | {next_protocols_advertised, [binary()]}
           | {padding_check, boolean()}
           | {partial_chain, fun()}
-          | {password, string()}
+          | {password, iodata() | fun(() -> iodata())}
           | {protocol, tls | dtls}
           | {psk_identity, string()}
           | {reuse_session, fun()}
           | {reuse_sessions, boolean()}
           | {secure_renegotiate, boolean()}
-          | {session_tickets, disabled | stateful | stateless}
-          | {signature_algs, [{ssl:hash(), ssl:sign_algo()}]}
+          | {session_tickets, disabled | stateful | stateless
+                            | stateful_with_cert | stateless_with_cert}
+          | {signature_algs, ssl:signature_algs()}
           | {signature_algs_cert, [ssl:sign_scheme()]}
           | {sni_fun, fun()}
-          | {sni_hosts, [{string(), ssl_opt()}]}
+          | {sni_hosts, [{inet:hostname(), [ssl_opt()]}]}
+          | {stateless_tickets_seed, binary()}
           | {supported_groups, [ssl:group()]}
           | {user_lookup_fun, {fun(), any()}}
           | {verify, verify_none | verify_peer}
@@ -94,9 +97,10 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
 
 SSL-specific listen options.
 
-Specifying a certificate is mandatory, either through the `cert`
-or `certfile` option, or by configuring SNI. None of the other
-options are required.
+Specifying a certificate is mandatory, through the `cert`,
+`certfile`, `certs_keys`, `sni_fun`, `sni_hosts` or
+`user_lookup_fun` option. None of the other options are
+required.
 
 The default value is given next to the option name:
 
@@ -110,10 +114,13 @@ anti_replay::
 Configures the server's built-in anti replay feature based on
 Bloom filters.
 
-beast_mitigation (one_n_minus_one)::
+beast_mitigation (disabled)::
 
 Change the BEAST mitigation strategy for SSL-3.0 and TLS-1.0
 to interoperate with legacy software.
++
+The default is `one_n_minus_one` when the oldest enabled
+version is TLS 1.0.
 
 cacertfile::
 
@@ -156,7 +163,7 @@ crl_check (false)::
 Whether to perform CRL check on all certificates in the chain
 during validation.
 
-depth (1)::
+depth (10)::
 
 Maximum of intermediate certificates allowed in the
 certification path.
@@ -173,24 +180,27 @@ eccs::
 
 List of named ECC curves.
 
-fail_if_no_peer_cert (false)::
+fail_if_no_peer_cert::
 
 Whether to refuse the connection if the client sends an
 empty certificate.
++
+When `verify` is `verify_peer`, the server default is
+`true` since OTP 26. With the default `verify_none`
+the option has no effect.
 
 handshake (full)::
 
 If `hello` is specified for this option, the handshake is
 paused after receiving the client hello message. The handshake
-can then be resumed via `handshake_continue/3`, or cancelled
-via `handshake_cancel/1`.
-+
-This option cannot be given to `ranch:handshake/1,2`.
+can then be resumed via `ranch:handshake_continue/1,2`, or cancelled
+via `ranch:handshake_cancel/1`.
 
-hibernate_after (undefined)::
+hibernate_after (infinity)::
 
 Time in ms after which SSL socket processes go into
-hibernation to reduce memory usage.
+hibernation to reduce memory usage. When omitted, the
+process never goes into hibernation.
 
 honor_cipher_order (false)::
 
@@ -220,9 +230,10 @@ log_alert (true)::
 
 If false, error reports will not be displayed.
 
-log_level::
+log_level (notice)::
 
-Specifies the log level for TLS/DTLS.
+Specifies the log level for TLS/DTLS. `none` disables TLS
+alert reports. `all` enables every level.
 
 max_handshake_size (256*1024)::
 
@@ -265,18 +276,20 @@ reuse_session::
 
 Custom policy to decide whether a session should be reused.
 
-reuse_sessions (false)::
+reuse_sessions (true)::
 
 Whether to allow session reuse.
 
-secure_renegotiate (false)::
+secure_renegotiate (true)::
 
 Whether to reject renegotiation attempts that do not conform
-to RFC5746.
+to RFC5746. OTP 29 rejects the value `false`.
 
-session_tickets::
+session_tickets (disabled)::
 
-Configures the session ticket functionality.
+Configures TLS 1.3 session tickets. Allowed values are
+`disabled`, `stateful`, `stateless`, `stateful_with_cert`
+and `stateless_with_cert`.
 
 signature_algs::
 
@@ -300,8 +313,16 @@ sni_hosts::
 Options to apply for the host that matches what the client
 requested with Server Name Indication.
 
-supported_groups([x25519, x448, secp256r1, secp384r1])::
+stateless_tickets_seed::
 
+Binary used to encrypt stateless session tickets.
+When omitted, `ssl` generates a random seed.
+
+supported_groups::
+
+List of groups the server is willing to use. The default
+is `ssl:groups(default)`.
++
 TLS 1.3 introduces the `supported_groups` extension that is
 used for negotiating the Diffie-Hellman parameters in a
 TLS 1.3 handshake. Both client and server can specify a list

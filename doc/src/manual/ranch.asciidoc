@@ -103,6 +103,7 @@ transport_opts(SocketOpts) = #{
     logger               => module(),
     num_acceptors        => pos_integer(),
     num_conns_sups       => pos_integer(),
+    num_listen_sockets   => pos_integer(),
     post_listen_callback => fun((term()) -> ok | {error, term()}),
     shutdown             => timeout() | brutal_kill,
     socket_opts          => SocketOpts
@@ -139,9 +140,10 @@ the function defined in the `callback` key (see below).
 callback:::
 
 The alarm function, which takes the listener name, the alarm
-name, the pid of the connection supervisor and a list of the pids
-of all connection processes under that supervisor as arguments.
-The return value is ignored.
+name, the pid of the connection supervisor and a list of pids
+as arguments. The list contains the connections still counted
+toward `max_connections`. `ranch:remove_connection/1` drops a
+connection from this list. The return value is ignored.
 
 cooldown (5000):::
 
@@ -174,6 +176,14 @@ num_conns_sups - see below::
 Number of processes that supervise connection processes.
 If not specified, defaults to be equal to `num_acceptors`.
 
+num_listen_sockets (1)::
+
+Number of listen sockets to open for this listener.
+Must be less than or equal to `num_acceptors`.
+A value above 1 requires `{reuseport, true}` in
+`socket_opts`. A local socket (`{local, _}`)
+accepts only 1.
+
 post_listen_callback (fun(_ListenSock) -> ok end)::
 
 A function which will be called after a listen socket has been successfully
@@ -195,12 +205,14 @@ documentation of the transport module you are using for more details.
 
 == Changelog
 
+* *2.4*: The `num_listen_sockets` option was added to
+         the `transport_opts()` type.
 * *2.1*: The `post_listen_callback` transport option was added.
 * *2.0*: The type `transport_opts(SocketOpts)` was added.
 * *2.0*: The function `ranch:accept_ack/1` was removed in favor of
          link:man:ranch:handshake(3)[ranch:handshake(3)].
 * *2.0*: The option `max_connections` is now per connection supervisor.
-* *2.0*: The `num_conns_sup` option was added.
+* *2.0*: The `num_conns_sups` option was added.
 * *2.0*: The `socket` option was removed.
 * *2.0*: The `logger` option is no longer experimental. It now defaults
          to `logger` instead of `error_logger`.

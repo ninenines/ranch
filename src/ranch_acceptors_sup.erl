@@ -113,7 +113,7 @@ hide_socket_opts([SocketOpt|SocketOpts]) ->
 %% backwards compatibility with possibly existing custom transports without a
 %% format_error/1 implementation that may rely on this module handling it.
 format_error(_, no_cert) ->
-	"no certificate provided; see cert, certfile, sni_fun or sni_hosts options";
+	"no certificate provided; see cert, certfile, certs_keys, sni_fun, sni_hosts or user_lookup_fun options";
 format_error(_, reuseport_local) ->
 	"num_listen_sockets must be set to 1 for local sockets";
 format_error(Transport, Reason) ->

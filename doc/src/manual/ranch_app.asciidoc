@@ -45,8 +45,8 @@ application. To start Ranch and all dependencies at once:
 
 == Environment
 
-The `ranch` application defines one application environment
-configuration parameter.
+The `ranch` application defines the following application
+environment configuration parameters.
 
 profile (false)::
 
@@ -55,6 +55,20 @@ When enabled, Ranch will start `eprof` profiling automatically.
 You can use the `ranch_app:profile_output/0` function to stop
 profiling and output the results to the files 'procs.profile'
 and 'total.profile'. Do not use in production.
+
+ranch_sup_intensity (1)::
+
+Maximum number of restarts allowed for the `ranch_sup`
+supervisor during `ranch_sup_period` seconds.
+
+ranch_sup_period (5)::
+
+Time window, in seconds, for the `ranch_sup` restart intensity.
+
+== Changelog
+
+* *2.4*: The `ranch_sup_intensity` and `ranch_sup_period`
+         application environment parameters were documented.
 
 == See also
 

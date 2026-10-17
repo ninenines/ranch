@@ -21,12 +21,10 @@ to cancel a paused handshake.
 Ref::
 
 The listener name.
-+
-Allowed options depend on the transport module.
 
 == Return value
 
-The return value depends on the transport module.
+The atom `ok` is returned.
 
 == Changelog
 
