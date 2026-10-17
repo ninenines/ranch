@@ -10,7 +10,7 @@ ranch:procs - Retrieve pids from a listener
 ----
 procs(Ref  :: ranch:ref(),
       Type :: acceptors | connections)
-    -> Pids :: [pid()]
+    -> [pid() | undefined | restarting]
 ----
 
 Retrieve pids from a listener.
@@ -27,7 +27,9 @@ The type of process that will be returned.
 
 == Return value
 
-A list of pids is returned.
+A list of pids is returned. The atom `undefined` is included
+for a child whose process is down. The atom `restarting` is
+included while that child is restarting.
 
 == Examples
 

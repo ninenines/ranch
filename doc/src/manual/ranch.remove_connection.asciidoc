@@ -9,6 +9,8 @@ ranch:remove_connection - Remove connection from the count
 [source,erlang]
 ----
 remove_connection(Ref :: ranch:ref()) -> ok
+
+remove_connection(Ref :: ranch:ref(), Pid :: pid()) -> ok
 ----
 
 Remove connection from the count.
@@ -19,6 +21,12 @@ mixed environment where some connections are active and others
 are passive. Passive connections spend most of their time idling 
 and are not consuming much resources.
 
+`remove_connection/1` removes the calling process.
+`remove_connection/2` removes `Pid`. When `connection_type`
+is `supervisor` and the socket belongs to a child of the
+supervised process, call `remove_connection/2` with that
+parent pid. The count is stored under the supervised pid.
+
 This function may only be called from a connection process.
 
 == Arguments
@@ -27,9 +35,18 @@ Ref::
 
 The listener name.
 
+Pid::
+
+The pid to remove from the count. `remove_connection/1`
+removes the calling process.
+
 == Return value
 
 The atom `ok` is always returned. It can be safely ignored.
+
+== Changelog
+
+* *2.4*: The `remove_connection/2` arity was added.
 
 == Examples
 
@@ -37,6 +54,12 @@ The atom `ok` is always returned. It can be safely ignored.
 [source,erlang]
 ----
 ranch:remove_connection(example).
+----
+
+.Remove a child of the supervised process from the count
+[source,erlang]
+----
+ranch:remove_connection(example, Parent).
 ----
 
 == See also

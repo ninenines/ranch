@@ -68,6 +68,7 @@
 	| {priority, integer()}
 	| {raw, non_neg_integer(), non_neg_integer(), binary()}
 	| {recbuf, non_neg_integer()}
+	| {reuseport, boolean()}
 	| {send_timeout, timeout()}
 	| {send_timeout_close, boolean()}
 	| {sndbuf, non_neg_integer()}
@@ -141,7 +142,6 @@ handshake_continue(_, _, _) ->
 handshake_cancel(_) ->
 	error(not_supported).
 
-%% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any())
 	-> {ok, inet:socket()} | {error, atom()}.
@@ -149,7 +149,6 @@ connect(Host, Port, Opts) when is_integer(Port) ->
 	gen_tcp:connect(Host, Port,
 		Opts ++ [binary, {active, false}]).
 
-%% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any(), timeout())
 	-> {ok, inet:socket()} | {error, atom()}.
@@ -234,7 +233,6 @@ sendfile(Socket, RawFile, Offset, Bytes, Opts) ->
 			{error, closed}
 	end.
 
-%% @todo Probably filter Opts?
 -spec setopts(inet:socket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
 	inet:setopts(Socket, Opts).

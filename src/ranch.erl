@@ -31,6 +31,7 @@
 -export([handshake_cancel/1]).
 -export([recv_proxy_header/2]).
 -export([remove_connection/1]).
+-export([remove_connection/2]).
 -export([get_status/1]).
 -export([get_addr/1]).
 -export([get_port/1]).
@@ -281,12 +282,28 @@ do_acceptors(ListenerSup, F) ->
 	case lists:keyfind(ranch_acceptors_sup, 1, ListenerChildren) of
 		{_, AcceptorsSup, _, _} when is_pid(AcceptorsSup) ->
 			AcceptorChildren = supervisor:which_children(AcceptorsSup),
-			%% @todo What about errors?
-			_ = [supervisor:F(AcceptorsSup, AcceptorId)
+			_ = [ok = do_acceptor(AcceptorsSup, AcceptorId, F)
 				|| {AcceptorId, _, _, _} <- AcceptorChildren],
 			ok;
 		{_, Atom, _, _} ->
 			{error, Atom}
+	end.
+
+do_acceptor(AcceptorsSup, AcceptorId, terminate_child) ->
+	case supervisor:terminate_child(AcceptorsSup, AcceptorId) of
+		ok ->
+			ok;
+		Error ->
+			error(Error)
+	end;
+do_acceptor(AcceptorsSup, AcceptorId, restart_child) ->
+	case supervisor:restart_child(AcceptorsSup, AcceptorId) of
+		{ok, _} ->
+			ok;
+		{ok, _, _} ->
+			ok;
+		Error ->
+			error(Error)
 	end.
 
 -spec child_spec(ref(), module(), opts(), module(), any())
@@ -373,10 +390,14 @@ recv_proxy_header(Ref, Timeout) ->
 
 -spec remove_connection(ref()) -> ok.
 remove_connection(Ref) ->
+	remove_connection(Ref, self()).
+
+-spec remove_connection(ref(), pid()) -> ok.
+remove_connection(Ref, Pid) ->
 	ListenerSup = ranch_server:get_listener_sup(Ref),
 	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
 		supervisor:which_children(ListenerSup)),
-	_ = [ConnsSup ! {remove_connection, Ref, self()} ||
+	_ = [ConnsSup ! {remove_connection, Ref, Pid} ||
 		{_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
 	ok.
 

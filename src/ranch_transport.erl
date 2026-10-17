@@ -74,7 +74,6 @@
 -callback cleanup(ranch:transport_opts(any())) -> ok.
 -callback format_error(term()) -> string().
 
-%% TODO: Required callback in Ranch 3.0
 -optional_callbacks([format_error/1]).
 
 -optional_callbacks([negotiated_protocol/1, peercert/1]).

@@ -95,14 +95,12 @@ handshake_continue(CSocket, Opts, Timeout) ->
 handshake_cancel(CSocket) ->
 	ranch_tcp:handshake_cancel(CSocket).
 
-%% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any())
 	-> {ok, inet:socket()} | {error, atom()}.
 connect(Host, Port, Opts) when is_integer(Port) ->
 	ranch_tcp:connect(Host, Port, Opts).
 
-%% @todo Probably filter Opts?
 -spec connect(inet:ip_address() | inet:hostname(),
 	inet:port_number(), any(), timeout())
 	-> {ok, inet:socket()} | {error, atom()}.
@@ -142,7 +140,6 @@ sendfile(Socket, File, Offset, Bytes) ->
 sendfile(Socket, Filename, Offset, Bytes, Opts) ->
 	ranch_tcp:sendfile(Socket, Filename, Offset, Bytes, Opts).
 
-%% @todo Probably filter Opts?
 -spec setopts(inet:socket(), list()) -> ok | {error, atom()}.
 setopts(Socket, Opts) ->
 	ranch_tcp:setopts(Socket, Opts).

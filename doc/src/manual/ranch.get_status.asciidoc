@@ -8,7 +8,7 @@ ranch:get_status - Get a listener's running state
 
 [source,erlang]
 ----
-get_status(Ref :: ranch_ref()) -> running | suspended
+get_status(Ref :: ranch:ref()) -> running | suspended
 ----
 
 Get a listener's running state.

@@ -56,13 +56,13 @@ ProxyInfo = #{
     dest_address => {192, 168, 1, 42},
     dest_port    => 443
 },
-Data = ranch_proxy_header:parse(ProxyInfo).
+Data = ranch_proxy_header:header(ProxyInfo).
 ----
 
 .Build a PROXY protocol header with checksum and padding
 [source,erlang]
 ----
-Data = ranch_proxy_header:parse(ProxyInfo, #{
+Data = ranch_proxy_header:header(ProxyInfo, #{
     checksum => crc32c,
     padding  => 7
 }).
@@ -70,6 +70,6 @@ Data = ranch_proxy_header:parse(ProxyInfo, #{
 
 == See also
 
-link:man:ranch_proxy_header:header(3)[ranch_proxy_header:header(3)],
+link:man:ranch_proxy_header:parse(3)[ranch_proxy_header:parse(3)],
 link:man:ranch_proxy_header(3)[ranch_proxy_header(3)]
 

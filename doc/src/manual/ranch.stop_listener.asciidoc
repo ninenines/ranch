@@ -8,7 +8,7 @@ ranch:stop_listener - Stop a listener
 
 [source,erlang]
 ----
-stop_listener(Ref :: ranch_ref())
+stop_listener(Ref :: ranch:ref())
     -> ok | {error, not_found}
 ----
 

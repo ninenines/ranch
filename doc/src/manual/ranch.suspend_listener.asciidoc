@@ -8,7 +8,7 @@ ranch:suspend_listener - Suspend a running listener
 
 [source,erlang]
 ----
-suspend_listener(Ref :: ranch_ref())
+suspend_listener(Ref :: ranch:ref())
     -> ok | {error, any()}
 ----
 

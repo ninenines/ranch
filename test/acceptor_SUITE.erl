@@ -19,7 +19,6 @@
 -compile(nowarn_export_all).
 
 -dialyzer({nowarn_function, misc_wait_for_connections/1}).
-%% @todo Remove when specs in ssl are updated to accept local addresses.
 -dialyzer({nowarn_function, do_ssl_local_echo/0}).
 
 -import(ct_helper, [config/2]).
@@ -112,6 +111,7 @@ groups() ->
 		misc_post_listen_callback_error,
 		misc_set_transport_options,
 		misc_wait_for_connections,
+		misc_suspend_wait_stop,
 		misc_multiple_ip_local_socket_opts,
 		misc_connection_alarms,
 		misc_stop_unknown_listener,
@@ -125,6 +125,7 @@ groups() ->
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
+		connection_type_supervisor_remove_connection,
 		supervisor_10_acceptors_1_conns_sup,
 		supervisor_9_acceptors_4_conns_sups,
 		supervisor_10_acceptors_10_conns_sups,
@@ -132,11 +133,13 @@ groups() ->
 		supervisor_changed_options_restart,
 		supervisor_clean_child_restart,
 		supervisor_clean_restart,
+		supervisor_restart_acceptors,
 		supervisor_conns_alive,
 		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
-		supervisor_unexpected_message
+		supervisor_unexpected_message,
+		supervisor_acceptor_spec_socket_id
 	]}].
 
 init_per_group(tcp_socket, Config) ->
@@ -561,6 +564,31 @@ misc_wait_for_connections(_) ->
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
+misc_suspend_wait_stop(_) ->
+	doc("Ensure a listener can be suspended, drained and then stopped."),
+	Name = name(),
+	Self = self(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port,
+		[binary, {active, false}, {packet, raw}]),
+	Pid1 = do_create_waiter(Self, Name, '==', 1),
+	ok = do_expect_waiter(Pid1),
+	ok = ranch:suspend_listener(Name),
+	suspended = ranch:get_status(Name),
+	ok = gen_tcp:send(Socket, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 0, 1000),
+	ok = do_tcp_connect_refused(Port, 10),
+	Pid0 = do_create_waiter(Self, Name, '==', 0),
+	ok = do_expect_waiter(undefined),
+	ok = gen_tcp:close(Socket),
+	ok = do_expect_waiter(Pid0),
+	ok = ranch:stop_listener(Name),
+	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
 do_create_waiter(ReplyTo, Ref, Op, NumConns) ->
 	spawn(fun () -> ok = ranch:wait_for_connections(Ref, Op, NumConns, 100),
 		ReplyTo ! {wait_connections, self()} end).
@@ -616,7 +644,6 @@ misc_connection_alarms(_) ->
 	end,
 	Alarm1 = #{type => num_connections, threshold => 2, cooldown => 0, callback => AlarmCallback},
 	%% The test2 alarm uses the misspelled treshold key to test for backwards compatibility.
-	%% @todo: Change to use the proper spelling when treshold gets removed in Ranch 3.0.
 	Alarm2 = #{type => num_connections, treshold => 3, cooldown => 0, callback => AlarmCallback},
 	Alarms0 = #{
 		test1 => Alarm1,
@@ -849,45 +876,55 @@ ssl_accept_error(_) ->
 	ok = ranch:stop_listener(Name).
 
 ssl_10_acceptors_10_listen_sockets(_) ->
-	case do_os_supports_reuseport() of
-		true ->
-			ok = do_ssl_10_acceptors_10_listen_sockets();
-		false ->
-			{skip, "No SO_REUSEPORT support."}
+	doc("Ensure that we can use 10 listen sockets across 10 acceptors with SSL."),
+	ok = do_ssl_10_acceptors_10_listen_sockets(ssl_10_tries()).
+
+%% Windows ssl:listen can return eacces or eaddrinuse for the
+%% second socket of a port that was just bound. Another attempt
+%% binds a new port. A delay does not make the same port usable.
+ssl_10_tries() ->
+	case os:type() of
+		{win32, nt} -> 10;
+		_ -> 1
 	end.
 
-do_ssl_10_acceptors_10_listen_sockets() ->
-	doc("Ensure that we can use 10 listen sockets across 10 acceptors with SSL."),
+do_ssl_10_acceptors_10_listen_sockets(1) ->
+	do_ssl_10_acceptors_10_listen_sockets_once();
+do_ssl_10_acceptors_10_listen_sockets(N) ->
+	case do_ssl_10_acceptors_10_listen_sockets_once() of
+		ok ->
+			ok;
+		{error, Reason} when Reason =:= eacces; Reason =:= eaddrinuse ->
+			do_ssl_10_acceptors_10_listen_sockets(N - 1)
+	end.
+
+do_ssl_10_acceptors_10_listen_sockets_once() ->
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
-	{ok, ListenerSupPid} = ranch:start_listener(Name,
+	case ranch:start_listener(Name,
 		ranch_ssl, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => [{raw, 1, 15, <<1:32/native>>}|Opts]},
-		echo_protocol, []),
-	10 = length(do_get_listener_sockets(ListenerSupPid)),
-	ok = ranch:stop_listener(Name),
-	?assertError(badarg, ranch:get_port(Name)),
-	ok.
-
-ssl_many_listen_sockets_no_reuseport(_) ->
-	case do_os_supports_reuseport() of
-		true ->
-			ok = do_ssl_many_listen_sockets_no_reuseport();
-		false ->
-			{skip, "No SO_REUSEPORT support."}
+			socket_opts => [{reuseport, true}|Opts]},
+		echo_protocol, []) of
+		{ok, ListenerSupPid} ->
+			10 = length(do_get_listener_sockets(ListenerSupPid)),
+			ok = ranch:stop_listener(Name),
+			?assertError(badarg, ranch:get_port(Name)),
+			ok;
+		{error, Reason} ->
+			{error, Reason}
 	end.
 
-do_ssl_many_listen_sockets_no_reuseport() ->
-	doc("Confirm that ranch:start_listener/5 fails when SO_REUSEPORT is not available with SSL."),
+ssl_many_listen_sockets_no_reuseport(_) ->
+	doc("Confirm that ranch:start_listener/5 fails when reuseport is disabled with SSL."),
 	Name = name(),
 	Opts = ct_helper:get_certs_from_ets(),
 	{error, eaddrinuse} = ranch:start_listener(Name,
 		ranch_ssl, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => [{raw, 1, 15, <<0:32/native>>}|Opts]},
+			socket_opts => [{reuseport, false}|Opts]},
 		echo_protocol, []),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
@@ -1367,11 +1404,11 @@ do_ssl_unsupported_tlsv13_options() ->
 %% tcp.
 
 tcp_10_acceptors_10_listen_sockets(Config) ->
-	case do_os_supports_reuseport() of
+	case do_backend_honors_reuseport(config(socket_opts, Config)) of
 		true ->
 			ok = do_tcp_10_acceptors_10_listen_sockets(Config);
 		false ->
-			{skip, "No SO_REUSEPORT support."}
+			{skip, "Socket backend ignores reuseport before OTP 29."}
 	end.
 
 do_tcp_10_acceptors_10_listen_sockets(Config) ->
@@ -1384,7 +1421,7 @@ do_tcp_10_acceptors_10_listen_sockets(Config) ->
 		ranch_tcp, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => SockOpts ++ [{raw, 1, 15, <<1:32/native>>}],
+			socket_opts => SockOpts ++ [{reuseport, true}],
 			post_listen_callback => fun (LSocket) -> Self ! {Tag, LSocket}, ok end},
 		echo_protocol, []),
 	LSockets = [receive {Tag, LSocket} -> LSocket after 1000 -> error(timeout) end
@@ -1396,22 +1433,22 @@ do_tcp_10_acceptors_10_listen_sockets(Config) ->
 	ok.
 
 tcp_many_listen_sockets_no_reuseport(Config) ->
-	case do_os_supports_reuseport() of
+	case do_backend_honors_reuseport(config(socket_opts, Config)) of
 		true ->
 			ok = do_tcp_many_listen_sockets_no_reuseport(Config);
 		false ->
-			{skip, "No SO_REUSEPORT support."}
+			{skip, "Socket backend ignores reuseport before OTP 29."}
 	end.
 
 do_tcp_many_listen_sockets_no_reuseport(Config) ->
-	doc("Confirm that ranch:start_listener/5 fails when SO_REUSEPORT is not available with TCP."),
+	doc("Confirm that ranch:start_listener/5 fails when reuseport is disabled with TCP."),
 	Name = name(),
 	SockOpts = config(socket_opts, Config),
 	{error, eaddrinuse} = ranch:start_listener(Name,
 		ranch_tcp, #{
 			num_acceptors => 10,
 			num_listen_sockets => 10,
-			socket_opts => SockOpts ++ [{raw, 1, 15, <<0:32/native>>}]},
+			socket_opts => SockOpts ++ [{reuseport, false}]},
 		echo_protocol, []),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
@@ -1817,6 +1854,28 @@ connection_type_supervisor_separate_from_connection(_) ->
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
+connection_type_supervisor_remove_connection(_) ->
+	doc("The socket owner removes a supervised connection via its parent pid."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{
+			connection_type => supervisor,
+			max_connections => 1,
+			num_acceptors => 1,
+			num_conns_sups => 1
+		},
+		supervisor_separate_remove, [{remove, 5, infinity}]),
+	Port = ranch:get_port(Name),
+	Opts = [binary, {active, false}, {packet, raw}],
+	{ok, Socket1} = gen_tcp:connect("localhost", Port, Opts),
+	{ok, Socket2} = gen_tcp:connect("localhost", Port, Opts),
+	receive after 500 -> ok end,
+	0 = ranch_server:count_connections(Name),
+	2 = maps:get(all_connections, ranch:info(Name)),
+	ok = gen_tcp:close(Socket1),
+	ok = gen_tcp:close(Socket2),
+	ok = ranch:stop_listener(Name).
+
 supervisor_10_acceptors_1_conns_sup(_) ->
 	doc("Ensure that using 10 acceptors and 1 connection supervisor works."),
 	ok = do_supervisor_n_acceptors_m_conns_sups(10, 1).
@@ -1866,6 +1925,37 @@ do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
 	{100, Pids} = receive_loop(connected, 1000),
 	100 = ranch_server:count_connections(Name),
 	ok = terminate_loop(stop, Pids),
+	ok = ranch:stop_listener(Name),
+	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
+supervisor_restart_acceptors(_) ->
+	doc("Ensure that restarting acceptors fails when they are running "
+		"and succeeds after they were stopped."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 2},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	2 = length(Acceptors),
+	{ok, Socket1} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	%% The protocol must own the socket before acceptors are killed.
+	%% brutal_kill drops a socket still held by an acceptor.
+	ok = gen_tcp:send(Socket1, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket1, 0, 1000),
+	%% Acceptors are running. Restart must fail and leave them in place.
+	?assertError({error, running}, ranch:restart_all_acceptors()),
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	ok = ranch:stop_all_acceptors(),
+	[] = [Pid || Pid <- ranch:procs(Name, acceptors), is_pid(Pid)],
+	ok = ranch:restart_all_acceptors(),
+	2 = length([Pid || Pid <- ranch:procs(Name, acceptors), is_pid(Pid)]),
+	ok = gen_tcp:send(Socket1, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket1, 0, 1000),
+	{ok, Socket2} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	ok = gen_tcp:send(Socket2, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket2, 0, 1000),
 	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
@@ -2107,7 +2197,28 @@ supervisor_unexpected_message(_) ->
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
-%% Utility functions.
+supervisor_acceptor_spec_socket_id(_) ->
+	doc("The acceptor child spec carries a socket id, not the listen socket."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 2},
+		echo_protocol, []),
+	ListenerSup = ranch_server:get_listener_sup(Name),
+	{_, AcceptorsSup, _, _} = lists:keyfind(ranch_acceptors_sup, 1,
+		supervisor:which_children(ListenerSup)),
+	Specs = [begin
+		{ok, #{start := Start}} = supervisor:get_childspec(AcceptorsSup, Id),
+		Start
+	end || {{acceptor, _, _} = Id, _, _, _} <- supervisor:which_children(AcceptorsSup)],
+	[{ranch_acceptor, start_link, [Name, 1, 1, ranch_tcp, logger]},
+		{ranch_acceptor, start_link, [Name, 2, 1, ranch_tcp, logger]}]
+		= lists:sort(Specs),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	ok = gen_tcp:close(Socket).
 
 connect_loop(_, 0, _) ->
 	ok;
@@ -2189,11 +2300,14 @@ do_tcp_connect_refused(Port, N) ->
 			do_tcp_connect_refused(Port, N - 1)
 	end.
 
-do_os_supports_reuseport() ->
-	case {os:type(), os:version()} of
-		{{unix, linux}, {Major, _, _}} when Major > 3 -> true;
-		{{unix, linux}, {3, Minor, _}} when Minor >= 9 -> true;
-		_ -> false
+%% gen_tcp with {inet_backend, socket} rejected reuseport
+%% until OTP 29.
+do_backend_honors_reuseport(SockOpts) ->
+	case lists:keyfind(inet_backend, 1, SockOpts) of
+		{_, socket} ->
+			list_to_integer(erlang:system_info(otp_release)) >= 29;
+		_ ->
+			true
 	end.
 
 do_os_supports_local_sockets() ->

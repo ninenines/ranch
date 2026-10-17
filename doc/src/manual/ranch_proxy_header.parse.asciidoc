@@ -40,7 +40,7 @@ error.
 .Parse the PROXY protocol header
 [source,erlang]
 ----
-{ok ProxyInfo, Rest} = ranch_proxy_header:parse(Data).
+{ok, ProxyInfo, Rest} = ranch_proxy_header:parse(Data).
 ----
 
 == See also

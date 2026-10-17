@@ -35,7 +35,7 @@ application is started.
 ok = application:start(ranch).
 
 You are then ready to start a listener. Let's call it `tcp_echo`. It will
-have a pool of 100 acceptors, use a TCP transport and forward connections
+have a pool of 10 acceptors, use a TCP transport and forward connections
 to the `echo_protocol` handler.
 
 .Starting a listener for TCP connections on port 5555
@@ -121,12 +121,14 @@ by calling `ranch:get_status/1` with the listener name as argument.
 === Default transport options
 
 By default the socket will be set to return `binary` data, with the
-options `{active, false}`, `{packet, raw}`, `{reuseaddr, true}` set.
+options `{active, false}` and `{reuseaddr, true}` set.
 These values can't be overridden when starting the listener, but
 they can be overridden using `Transport:setopts/2` in the protocol.
 
-It will also set `{backlog, 1024}` and `{nodelay, true}`, which
-can be overridden at listener startup.
+It will also set `{backlog, 1024}`, `{nodelay, true}`,
+`{send_timeout, 30000}` and `{send_timeout_close, true}`, which
+can be overridden at listener startup. These four options are not
+applied for DTLS.
 
 === Listening on a random port
 
@@ -163,8 +165,7 @@ solutions is however out of the scope of this guide.
 
 On UNIX systems, it is also possible to use Ranch to listen on a UNIX
 domain socket by specifying `{local, SocketFile}` for the `ip` socket
-option. In this case, the port must be set to 0 or omitted. The given
-file must not exist: Ranch must be able to create it.
+option. In this case, the port must be set to 0 or omitted.
 
 .Starting a listener for TCP connections on a UNIX Domain socket
 
@@ -251,15 +252,16 @@ You can disable this limit by setting its value to the atom `infinity`.
     echo_protocol, []
 ).
 
-The maximum number of connections is a soft limit. In practice, it
-can reach `max_connections` + the number of acceptors.
+The maximum number of connections is a soft limit per connection
+supervisor. In practice, it can reach `max_connections` plus the
+number of acceptors assigned to that supervisor.
 
 When the maximum number of connections is reached, Ranch will stop
-accepting connections. This will not result in further connections
-being rejected, as the kernel option allows queueing incoming
-connections. The size of this queue is determined by the `backlog`
-option and defaults to 1024. Ranch does not know about the number
-of connections that are in the backlog.
+accepting connections. The kernel queues incoming connections until
+the queue is full. The size of this queue is determined by the
+`backlog` option and defaults to 1024. Once the queue is full, the
+kernel drops or rejects further connections. Ranch does not know
+about the number of connections that are in the backlog.
 
 You may not always want connections to be counted when checking for
 `max_connections`. For example you might have a protocol where both
@@ -270,11 +272,18 @@ much resources and can safely be removed from the count.
 To remove the connection from the count, you must call the
 `ranch:remove_connection/1` from within the connection process,
 with the name of the listener as the only argument.
+When the socket belongs to a child of the supervised process,
+call `ranch:remove_connection/2` with that parent pid instead.
 
 .Removing a connection from the count of connections
 
 [source,erlang]
 ranch:remove_connection(Ref).
+
+.Removing a supervised connection from the count
+
+[source,erlang]
+ranch:remove_connection(Ref, Parent).
 
 As seen in the chapter covering protocols, this reference is received
 as the first argument of the protocol's `start_link/3` callback.
@@ -311,8 +320,10 @@ measure to find the best value for your application.
 === Customizing the number of connection supervisors
 
 By default Ranch will use one connection supervisor for each
-acceptor process (but not vice versa). Their task is to
-supervise the connection processes started by an acceptor.
+acceptor process. An acceptor has only one connection supervisor,
+but a connection supervisor can have more than one acceptor.
+Their task is to supervise the connection processes started by
+an acceptor.
 The number of connection supervisors can be tweaked.
 
 Note that the association between the individual acceptors and
@@ -343,7 +354,7 @@ Alarm options include the alarm type and a threshold that, when reached,
 triggers the given callback. A cooldown prevents the alarm from being
 triggered too often.
 
-.Log warnings when the number of connections exceeds 100
+.Log warnings when the number of connections is at or above 100
 
 [source,erlang]
 ----
@@ -351,11 +362,10 @@ Alarms = #{
     my_alarm => #{
         type => num_connections,
         threshold => 100,
-        callback => fun(Ref, Name, ConnSup, ConnPids]) ->
-            logger:warning("Warning (~s): "
-                    "Supervisor ~s of listener ~s "
-                    "has ~b connections",
-                [Name, Ref, ConnSup, length(ConnPids)])
+        callback => fun(Ref, AlarmName, ConnSup, ConnPids) ->
+            logger:warning("Alarm ~0tp: listener ~0tp "
+                    "supervisor ~0tp has ~b connections",
+                [AlarmName, Ref, ConnSup, length(ConnPids)])
         end
     }
 },
@@ -368,8 +378,8 @@ Alarms = #{
 In the example code, an alarm named `my_alarm` is defined, which will
 call the given function when the number of connections tracked
 by the connection supervisor reaches or exceeds 100. When the number of
-connections is still (or again) above 100 after the default cooldown
-period of 5 seconds, the alarm will trigger again.
+connections is still (or again) at or above 100 after the default
+cooldown period of 5 seconds, the alarm will trigger again.
 
 === When running out of file descriptors
 
@@ -380,7 +390,6 @@ accept rate of the listener will be automatically reduced, and a
 warning message will be logged.
 
 ----
-=ERROR REPORT==== 13-Jan-2016::12:24:38 ===
 Ranch acceptor reducing accept rate: out of file descriptors
 ----
 
@@ -410,6 +419,10 @@ will receive the socket).
 
 Instead of returning `{ok, ConnPid}`, simply return
 `{ok, SupPid, ConnPid}`.
+
+The count is stored under `SupPid`. The protocol process
+removes that connection from the count by calling
+`ranch:remove_connection(Ref, SupPid)`.
 
 It is very important that the connection process be created
 under the supervisor process so that everything works as intended.
@@ -445,6 +458,17 @@ Opts = ranch:get_protocol_options(tcp_echo).
 Ranch allows you to change the transport options of a listener with
 the `ranch:set_transport_options/2` function, for example to change the
 number of acceptors or to make it listen on a different port.
+See `ranch:set_transport_options(3)` for when each option takes effect.
+
+The number of acceptors and the socket options, including the port,
+apply only after the listener is suspended and resumed.
+
+.Suspending, changing transport options and resuming
+
+[source,erlang]
+ok = ranch:suspend_listener(tcp_echo),
+ok = ranch:set_transport_options(tcp_echo, NewOpts),
+ok = ranch:resume_listener(tcp_echo).
 
 .Changing the transport options
 
@@ -471,7 +495,7 @@ about all listeners.
 [source,erlang]
 ranch:info().
 
-The `ranch:procs/2` function will return all acceptor or listener
+The `ranch:procs/2` function will return all acceptor or connection
 processes for a given listener.
 
 .Get all acceptor processes

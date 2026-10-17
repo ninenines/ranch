@@ -42,6 +42,6 @@ init([]) ->
 	{ok, {#{}, [ListenerSpec]}}.
 ----
 
-Embedded listeners cannot be stopped via `ranch:stop_listener/1`. Instead,
-are to be stopped as part of the shutdown of your application's supervision
-tree.
+Embedded listeners cannot be stopped via `ranch:stop_listener/1`.
+Instead, they are to be stopped as part of the shutdown of your
+application's supervision tree.
