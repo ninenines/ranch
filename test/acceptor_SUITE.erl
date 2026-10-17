@@ -138,7 +138,8 @@ groups() ->
 		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
-		supervisor_unexpected_message
+		supervisor_unexpected_message,
+		supervisor_acceptor_spec_socket_id
 	]}].
 
 init_per_group(tcp_socket, Config) ->
@@ -2196,7 +2197,28 @@ supervisor_unexpected_message(_) ->
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
-%% Utility functions.
+supervisor_acceptor_spec_socket_id(_) ->
+	doc("The acceptor child spec carries a socket id, not the listen socket."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 2},
+		echo_protocol, []),
+	ListenerSup = ranch_server:get_listener_sup(Name),
+	{_, AcceptorsSup, _, _} = lists:keyfind(ranch_acceptors_sup, 1,
+		supervisor:which_children(ListenerSup)),
+	Specs = [begin
+		{ok, #{start := Start}} = supervisor:get_childspec(AcceptorsSup, Id),
+		Start
+	end || {{acceptor, _, _} = Id, _, _, _} <- supervisor:which_children(AcceptorsSup)],
+	[{ranch_acceptor, start_link, [Name, 1, 1, ranch_tcp, logger]},
+		{ranch_acceptor, start_link, [Name, 2, 1, ranch_tcp, logger]}]
+		= lists:sort(Specs),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ok = ranch:stop_listener(Name),
+	ok = gen_tcp:close(Socket).
 
 connect_loop(_, 0, _) ->
 	ok;

@@ -18,9 +18,11 @@
 -export([init/6]).
 -export([loop/5]).
 
--spec start_link(ranch:ref(), pos_integer(), inet:socket(), module(), module())
+-spec start_link(ranch:ref(), pos_integer(), pos_integer(), module(), module())
 	-> {ok, pid()}.
-start_link(Ref, AcceptorId, LSocket, Transport, Logger) ->
+start_link(Ref, AcceptorId, LSocketId, Transport, Logger) ->
+	%% Runs in the acceptors supervisor, which holds the sockets.
+	{_, LSocket} = lists:keyfind(LSocketId, 1, get(lsockets)),
 	ConnsSup = ranch_server:get_connections_sup(Ref, AcceptorId),
 	Pid = spawn_link(?MODULE, init, [Ref, AcceptorId, LSocket, Transport, Logger, ConnsSup]),
 	{ok, Pid}.
