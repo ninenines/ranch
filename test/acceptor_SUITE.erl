@@ -125,6 +125,7 @@ groups() ->
 	]}, {supervisor, [
 		connection_type_supervisor,
 		connection_type_supervisor_separate_from_connection,
+		connection_type_supervisor_remove_connection,
 		supervisor_10_acceptors_1_conns_sup,
 		supervisor_9_acceptors_4_conns_sups,
 		supervisor_10_acceptors_10_conns_sups,
@@ -1839,6 +1840,28 @@ connection_type_supervisor_separate_from_connection(_) ->
 	%% Make sure the listener stopped.
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
+
+connection_type_supervisor_remove_connection(_) ->
+	doc("The socket owner removes a supervised connection via its parent pid."),
+	Name = name(),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{
+			connection_type => supervisor,
+			max_connections => 1,
+			num_acceptors => 1,
+			num_conns_sups => 1
+		},
+		supervisor_separate_remove, [{remove, 5, infinity}]),
+	Port = ranch:get_port(Name),
+	Opts = [binary, {active, false}, {packet, raw}],
+	{ok, Socket1} = gen_tcp:connect("localhost", Port, Opts),
+	{ok, Socket2} = gen_tcp:connect("localhost", Port, Opts),
+	receive after 500 -> ok end,
+	0 = ranch_server:count_connections(Name),
+	2 = maps:get(all_connections, ranch:info(Name)),
+	ok = gen_tcp:close(Socket1),
+	ok = gen_tcp:close(Socket2),
+	ok = ranch:stop_listener(Name).
 
 supervisor_10_acceptors_1_conns_sup(_) ->
 	doc("Ensure that using 10 acceptors and 1 connection supervisor works."),
