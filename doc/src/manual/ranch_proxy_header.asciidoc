@@ -46,6 +46,7 @@ proxy_info() = #{
         cipher   => binary(), %% US-ASCII.
         sig_alg  => binary(), %% US-ASCII.
         key_alg  => binary(), %% US-ASCII.
+        group    => binary(), %% US-ASCII.
         cn       => binary()  %% UTF-8.
     },
 
@@ -152,6 +153,11 @@ key_alg:::
 The US-ASCII string name of the algorithm used to generate
 the key of the certificate provided by the client.
 
+group:::
+
+The US-ASCII string name of the key exchange group used
+for the original TLS connection.
+
 cn:::
 
 The UTF-8 string representation of the Common Name field
@@ -163,6 +169,7 @@ The non-standard TLVs that Ranch was not able to parse.
 
 == Changelog
 
+* *2.4*: The `group` SSL TLV subtype was added.
 * *2.2*: The `unique_id` TLV was added.
 * *1.7*: Module introduced.
 

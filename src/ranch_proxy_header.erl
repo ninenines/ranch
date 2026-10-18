@@ -41,6 +41,7 @@
 		cipher => binary(), %% US-ASCII.
 		sig_alg => binary(), %% US-ASCII.
 		key_alg => binary(), %% US-ASCII.
+		group => binary(), %% US-ASCII.
 		cn => binary() %% UTF-8.
 	},
 	netns => binary(), %% US-ASCII.
@@ -654,6 +655,7 @@ ssl_subtype(16#22) -> cn;
 ssl_subtype(16#23) -> cipher;
 ssl_subtype(16#24) -> sig_alg;
 ssl_subtype(16#25) -> key_alg;
+ssl_subtype(16#26) -> group;
 ssl_subtype(_) -> undefined.
 
 %% Building.
@@ -787,7 +789,8 @@ ssl_tlv(#{ssl := Info=#{client := Client0, verified := Verify0}}) ->
 		binary_tlv(Info, cn, 16#22),
 		binary_tlv(Info, cipher, 16#23),
 		binary_tlv(Info, sig_alg, 16#24),
-		binary_tlv(Info, key_alg, 16#25)
+		binary_tlv(Info, key_alg, 16#25),
+		binary_tlv(Info, group, 16#26)
 	],
 	Len = iolist_size(TLVs) + 5,
 	[<<16#20, Len:16, Client, Verify:32>>, TLVs];
@@ -908,6 +911,7 @@ v2_tlvs_test() ->
 		cipher => <<"ECDHE-RSA-AES128-GCM-SHA256">>,
 		sig_alg => <<"SHA256">>,
 		key_alg => <<"RSA2048">>,
+		group => <<"secp256r1">>,
 		cn => <<"example.com">>
 	}},
 	{ok, Test4, <<>>} = parse(iolist_to_binary(header(Test4))),
