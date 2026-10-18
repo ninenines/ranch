@@ -168,6 +168,8 @@ for the original TLS connection.
 client_cert:::
 
 The X.509 client certificate in ASN.1 DER form.
+A certificate larger than roughly 60 KB may not fit
+in the version 2 header.
 
 cn:::
 

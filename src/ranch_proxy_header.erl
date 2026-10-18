@@ -14,6 +14,10 @@
 
 -module(ranch_proxy_header).
 
+-ifdef(TEST).
+-include_lib("stdlib/include/assert.hrl").
+-endif.
+
 -export([parse/1]).
 -export([header/1]).
 -export([header/2]).
@@ -686,6 +690,7 @@ header(ProxyInfo=#{version := 2, command := proxy,
 		_ -> 0
 	end,
 	Len = iolist_size(Addresses) + iolist_size(TLVs) + ExtraLen,
+	Len > 65535 andalso error(badarg),
 	Header = [
 		<<"\r\n\r\n\0\r\nQUIT\n", 2:4, 1:4>>,
 		<<(family(Family)):4, (protocol(Protocol)):4>>,
@@ -937,6 +942,13 @@ v2_tlvs_test() ->
 	{ok, Test5Out, <<>>} = parse(iolist_to_binary(header(Test5In))),
 	Test6 = Common#{unique_id => rand:bytes(rand:uniform(128))},
 	{ok, Test6, <<>>} = parse(iolist_to_binary(header(Test6))),
+	%% IPv4 addresses are 12 bytes and the SSL TLV adds 11 bytes
+	%% around the certificate. 12 + 11 + 65512 = 65535.
+	CertInfo = #{client => [ssl, cert_conn], verified => true},
+	MaxCert = Common#{ssl => CertInfo#{client_cert => binary:copy(<<$a>>, 65512)}},
+	{ok, MaxCert, <<>>} = parse(iolist_to_binary(header(MaxCert))),
+	OverCert = Common#{ssl => CertInfo#{client_cert => binary:copy(<<$a>>, 65513)}},
+	?assertError(badarg, header(OverCert)),
 	ok.
 
 v2_checksum_test() ->
