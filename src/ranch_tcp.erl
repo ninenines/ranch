@@ -16,6 +16,8 @@
 -module(ranch_tcp).
 -behaviour(ranch_transport).
 
+-include_lib("kernel/include/file.hrl").
+
 -export([name/0]).
 -export([secure/0]).
 -export([messages/0]).
@@ -275,10 +277,13 @@ close(Socket) ->
 
 -spec cleanup(ranch:transport_opts(opts())) -> ok.
 cleanup(#{socket_opts:=SocketOpts}) ->
-	case lists:keyfind(ip, 1, lists:reverse(SocketOpts)) of
-		{ip, {local, SockFile}} ->
-			_ = file:delete(SockFile),
-			ok;
+	%% Only a socket (or FIFO) has type other. A regular file,
+	%% directory, symlink, or device is left in place.
+	maybe
+		{ip, {local, SockFile}} ?= lists:keyfind(ip, 1, lists:reverse(SocketOpts)),
+		{ok, #file_info{type = other}} ?= file:read_link_info(SockFile),
+		ok ?= file:delete(SockFile)
+	else
 		_ ->
 			ok
 	end;

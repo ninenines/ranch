@@ -165,7 +165,11 @@ solutions is however out of the scope of this guide.
 
 On UNIX systems, it is also possible to use Ranch to listen on a UNIX
 domain socket by specifying `{local, SocketFile}` for the `ip` socket
-option. In this case, the port must be set to 0 or omitted.
+option. In this case, the port must be set to 0 or omitted. Before
+listening, and again from `ranch:stop_listener/1`, Ranch deletes a
+socket or FIFO at that path.
+A regular file, directory, symlink, or device is left in place and
+must not already exist.
 
 .Starting a listener for TCP connections on a UNIX Domain socket
 

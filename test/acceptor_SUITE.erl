@@ -114,6 +114,7 @@ groups() ->
 		misc_wait_for_connections,
 		misc_suspend_wait_stop,
 		misc_multiple_ip_local_socket_opts,
+		misc_cleanup_local_socket,
 		misc_connection_alarms,
 		misc_stop_unknown_listener,
 		misc_repeated_start_stop,
@@ -666,6 +667,48 @@ do_misc_multiple_ip_local_socket_opts() ->
 	%% is removed.
 	{error, enoent} = file:read_file_info(SockFile2),
 	ok.
+
+misc_cleanup_local_socket(_) ->
+	case do_os_supports_local_sockets() of
+		true ->
+			do_misc_cleanup_local_socket();
+		false ->
+			{skip, "No local socket support."}
+	end.
+
+do_misc_cleanup_local_socket() ->
+	doc("Ensure cleanup deletes a UNIX socket file and leaves other files."),
+	File = do_tempname(),
+	Link = do_tempname(),
+	Sock = do_tempname(),
+	ok = file:write_file(File, <<"keep">>),
+	ok = file:make_symlink(File, Link),
+	try
+		ok = do_cleanup_local(ranch_tcp, File),
+		ok = do_cleanup_local(ranch_ssl, File),
+		ok = do_cleanup_local(ranch_tcp, Link),
+		ok = do_cleanup_local(ranch_ssl, Link),
+		{ok, <<"keep">>} = file:read_file(File),
+		{ok, _} = file:read_link(Link),
+		ok = do_listen_local(Sock),
+		ok = do_cleanup_local(ranch_tcp, Sock),
+		{error, enoent} = file:read_link_info(Sock),
+		ok = do_listen_local(Sock),
+		ok = do_cleanup_local(ranch_ssl, Sock),
+		{error, enoent} = file:read_link_info(Sock),
+		ok
+	after
+		_ = file:delete(Link),
+		_ = file:delete(File),
+		_ = file:delete(Sock)
+	end.
+
+do_cleanup_local(Transport, Path) ->
+	Transport:cleanup(#{socket_opts => [{ip, {local, Path}}]}).
+
+do_listen_local(Path) ->
+	{ok, LSock} = gen_tcp:listen(0, [{ip, {local, Path}}]),
+	gen_tcp:close(LSock).
 
 misc_connection_alarms(_) ->
 	doc("Ensure that connection alarms work."),
