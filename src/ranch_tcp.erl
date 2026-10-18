@@ -169,23 +169,58 @@ recv(Socket, Length, Timeout) ->
 	| {error, closed | atom()}
 	| {error, protocol_error, atom()}.
 recv_proxy_header(Socket, Timeout) ->
-	case recv(Socket, 0, Timeout) of
-		{ok, Data} ->
-			case ranch_proxy_header:parse(Data) of
-				{ok, ProxyInfo, <<>>} ->
+	Timer = inet:start_timer(Timeout),
+	try
+		case recv(Socket, 0, inet:timeout(Timer)) of
+			{ok, Data} ->
+				case recv_proxy_rest(Socket, Timer, Data) of
+					{ok, Full} ->
+						parse_proxy_header(Socket, Full);
+					Error ->
+						Error
+				end;
+			Error ->
+				Error
+		end
+	after
+		_ = inet:stop_timer(Timer)
+	end.
+
+%% A version 2 header's length is in its first 16 bytes. A client
+%% certificate can make the header larger than one segment, so the
+%% remainder is read with one counted recv. A version 1 line fits
+%% in one segment.
+recv_proxy_rest(Socket, Timer, Data) ->
+	case proxy_v2_need(Data) of
+		0 ->
+			{ok, Data};
+		Need ->
+			case recv(Socket, Need, inet:timeout(Timer)) of
+				{ok, Rest} ->
+					{ok, <<Data/binary, Rest/binary>>};
+				Error ->
+					Error
+			end
+	end.
+
+proxy_v2_need(<<"\r\n\r\n\0\r\nQUIT\n", _:2/binary, Len:16, _/binary>> = Data) ->
+	max(0, 16 + Len - byte_size(Data));
+proxy_v2_need(_) ->
+	0.
+
+parse_proxy_header(Socket, Data) ->
+	case ranch_proxy_header:parse(Data) of
+		{ok, ProxyInfo, <<>>} ->
+			{ok, ProxyInfo};
+		{ok, ProxyInfo, Rest} ->
+			case gen_tcp:unrecv(Socket, Rest) of
+				ok ->
 					{ok, ProxyInfo};
-				{ok, ProxyInfo, Rest} ->
-					case gen_tcp:unrecv(Socket, Rest) of
-						ok ->
-							{ok, ProxyInfo};
-						Error ->
-							Error
-					end;
-				{error, HumanReadable} ->
-					{error, protocol_error, HumanReadable}
+				Error ->
+					Error
 			end;
-		Error ->
-			Error
+		{error, HumanReadable} ->
+			{error, protocol_error, HumanReadable}
 	end.
 
 -spec send(inet:socket(), iodata()) -> ok | {error, atom()}.

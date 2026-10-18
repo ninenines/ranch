@@ -230,3 +230,41 @@ do_proxy_header_ssl(Name, ProxyInfo, Data1, Data2) ->
 	{ok, <<Data1:Len1/binary, Data2/binary>>} = ssl:recv(Socket, Len1 + Len2, 1000),
 	ok = ranch:stop_listener(Name),
 	ok.
+
+recv_v2_split(_) ->
+	doc("A version 2 header larger than the minimum TCP payload "
+		"is reassembled and the following bytes stay buffered."),
+	%% 536 bytes is the smallest TCP payload: a 576-byte IPv4 MTU
+	%% minus 40 bytes of IP and TCP headers.
+	Cert = binary:copy(<<$a>>, 600),
+	ProxyInfo = #{
+		version => 2,
+		command => proxy,
+		transport_family => ipv4,
+		transport_protocol => stream,
+		src_address => {127, 0, 0, 1},
+		src_port => 444,
+		dest_address => {192, 168, 0, 1},
+		dest_port => 443,
+		ssl => #{
+			client => [ssl, cert_conn],
+			verified => true,
+			client_cert => Cert
+		}
+	},
+	Header = iolist_to_binary(ranch_proxy_header:header(ProxyInfo)),
+	<<Part1:536/binary, Part2/binary>> = Header,
+	{ok, Listen} = gen_tcp:listen(0, [binary, {active, false}, {ip, {127, 0, 0, 1}}]),
+	{ok, Port} = inet:port(Listen),
+	{ok, Client} = gen_tcp:connect("127.0.0.1", Port, [binary, {active, false}]),
+	{ok, Server} = gen_tcp:accept(Listen, 1000),
+	ok = gen_tcp:close(Listen),
+	ok = gen_tcp:send(Client, Part1),
+	_ = spawn(fun () ->
+		timer:sleep(200),
+		ok = gen_tcp:send(Client, [Part2, <<"NEXT">>])
+	end),
+	{ok, ProxyInfo} = ranch_tcp:recv_proxy_header(Server, 1000),
+	{ok, <<"NEXT">>} = gen_tcp:recv(Server, 4, 1000),
+	ok = gen_tcp:close(Client),
+	ok = gen_tcp:close(Server).

@@ -48,6 +48,7 @@ proxy_info() = #{
         key_alg     => binary(), %% US-ASCII.
         group       => binary(), %% US-ASCII.
         sig_scheme  => binary(), %% US-ASCII.
+        client_cert => binary(), %% ASN.1 DER.
         cn          => binary()  %% UTF-8.
     },
 
@@ -164,6 +165,10 @@ sig_scheme:::
 The US-ASCII string name of the signature scheme used
 for the original TLS connection.
 
+client_cert:::
+
+The X.509 client certificate in ASN.1 DER form.
+
 cn:::
 
 The UTF-8 string representation of the Common Name field
@@ -175,7 +180,7 @@ The non-standard TLVs that Ranch was not able to parse.
 
 == Changelog
 
-* *2.4*: The `group` and `sig_scheme` SSL TLV subtypes were added.
+* *2.4*: The `group`, `sig_scheme` and `client_cert` SSL TLV subtypes were added.
 * *2.2*: The `unique_id` TLV was added.
 * *1.7*: Module introduced.
 
