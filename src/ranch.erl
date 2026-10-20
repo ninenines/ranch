@@ -71,6 +71,11 @@
 
 -type alarm_num_connections() :: alarm(num_connections, fun((ref(), term(), pid(), [pid()]) -> any())).
 
+-type trusted_proxy() ::
+	{inet:ip4_address(), 0..32} |
+	{inet:ip6_address(), 0..128}.
+-export_type([trusted_proxy/0]).
+
 -type transport_opts(SocketOpts) :: #{
 	alarms => #{term() => alarm_num_connections()},
 	connection_type => worker | supervisor,
@@ -82,6 +87,7 @@
 	num_listen_sockets => pos_integer(),
 	post_listen_callback => fun((term()) -> ok | {error, term()}),
 	shutdown => timeout() | brutal_kill,
+	trusted_proxies => [trusted_proxy()],
 	socket_opts => SocketOpts
 }.
 -export_type([transport_opts/1]).
@@ -170,7 +176,35 @@ validate_transport_opt(shutdown, Value, _) ->
 	is_integer(Value) andalso Value >= 0;
 validate_transport_opt(socket_opts, _, _) ->
 	true;
+validate_transport_opt(trusted_proxies, Value, _) ->
+	validate_trusted_proxies(Value);
 validate_transport_opt(_, _, _) ->
+	false.
+
+validate_trusted_proxies([]) ->
+	true;
+validate_trusted_proxies([Proxy|Tail]) ->
+	case validate_trusted_proxy(Proxy) of
+		true ->
+			validate_trusted_proxies(Tail);
+		false ->
+			false
+	end;
+validate_trusted_proxies(_) ->
+	false.
+
+%% IPv4-mapped IPv6 is not allowed.
+validate_trusted_proxy({{0, 0, 0, 0, 0, 16#ffff, _, _}, _}) ->
+	false;
+validate_trusted_proxy({Addr, Len})
+		when tuple_size(Addr) =:= 4, is_integer(Len),
+			Len >= 0, Len =< 32 ->
+	inet:is_ipv4_address(Addr);
+validate_trusted_proxy({Addr, Len})
+		when tuple_size(Addr) =:= 8, is_integer(Len),
+			Len >= 0, Len =< 128 ->
+	inet:is_ipv6_address(Addr);
+validate_trusted_proxy(_) ->
 	false.
 
 validate_alarm(Alarm = #{type := num_connections, threshold := Threshold,
@@ -388,8 +422,81 @@ get_peer_info(Transport, Socket, Default) ->
 recv_proxy_header(Ref, Timeout) ->
 	receive HandshakeState={handshake, Ref, Transport, CSocket, _} ->
 		self() ! HandshakeState,
-		Transport:recv_proxy_header(CSocket, Timeout)
+		case check_proxy_peer(Ref, Transport, CSocket) of
+			ok ->
+				Transport:recv_proxy_header(CSocket, Timeout);
+			Error ->
+				Error
+		end
 	end.
+
+check_proxy_peer(Ref, Transport, Socket) ->
+	case ranch_server:get_transport_options(Ref) of
+		#{trusted_proxies := Trusted} = TransOpts ->
+			check_proxy_peer(Transport, Socket, Trusted,
+				maps:get(logger, TransOpts, logger));
+		_ ->
+			ok
+	end.
+
+check_proxy_peer(Transport, Socket, Trusted, Logger) ->
+	case Transport:peername(Socket) of
+		{ok, Peer} ->
+			case peer_trusted(Peer, Trusted) of
+				true ->
+					ok;
+				false ->
+					log(warning,
+						"Ranch rejected a PROXY protocol connection "
+						"from untrusted peer ~0p~n",
+						[Peer], Logger),
+					{error, protocol_error,
+						'The PROXY protocol connection from an untrusted peer was rejected.'}
+			end;
+		{error, Reason} ->
+			{error, Reason}
+	end.
+
+%% ::ffff:a.b.c.d is an IPv4 peer accepted on an IPv6 socket.
+%% Compare it only to IPv4 entries.
+peer_trusted({{A, B, C, D}, _}, Trusted) when is_integer(A) ->
+	ipv4_trusted({A, B, C, D}, Trusted);
+peer_trusted({{0, 0, 0, 0, 0, 16#ffff, AB, CD}, _}, Trusted)
+		when is_integer(AB), is_integer(CD) ->
+	ipv4_trusted({AB bsr 8, AB band 16#ff, CD bsr 8, CD band 16#ff},
+		Trusted);
+peer_trusted({{_, _, _, _, _, _, _, _} = Addr, _}, Trusted) ->
+	ipv6_trusted(Addr, Trusted);
+peer_trusted(_, _) ->
+	false.
+
+ipv4_trusted(Addr, Trusted) ->
+	lists:any(fun (Entry) -> ipv4_cidr(Addr, Entry) end, Trusted).
+
+ipv6_trusted(Addr, Trusted) ->
+	lists:any(fun (Entry) -> ipv6_cidr(Addr, Entry) end, Trusted).
+
+ipv4_cidr(Addr, {Net, Len}) when tuple_size(Net) =:= 4 ->
+	Mask = cidr_mask(32, Len),
+	(ip4_int(Addr) band Mask) =:= (ip4_int(Net) band Mask);
+ipv4_cidr(_, _) ->
+	false.
+
+ipv6_cidr(Addr, {Net, Len}) when tuple_size(Net) =:= 8 ->
+	Mask = cidr_mask(128, Len),
+	(ip6_int(Addr) band Mask) =:= (ip6_int(Net) band Mask);
+ipv6_cidr(_, _) ->
+	false.
+
+cidr_mask(Width, Len) ->
+	((1 bsl Width) - 1) bxor ((1 bsl (Width - Len)) - 1).
+
+ip4_int({A, B, C, D}) ->
+	(A bsl 24) bor (B bsl 16) bor (C bsl 8) bor D.
+
+ip6_int({A, B, C, D, E, F, G, H}) ->
+	(A bsl 112) bor (B bsl 96) bor (C bsl 80) bor (D bsl 64)
+		bor (E bsl 48) bor (F bsl 32) bor (G bsl 16) bor H.
 
 -spec remove_connection(ref()) -> ok.
 remove_connection(Ref) ->

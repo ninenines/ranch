@@ -37,13 +37,18 @@ on success.
 
 An `error` 2-tuple is returned when a socket error occurs.
 
-An `error` 3-tuple is returned when a protocol error occurs
-and Ranch was not able to parse the PROXY header information.
+An `error` 3-tuple is returned when a protocol error occurs.
 The third element contains a human-readable description of
 the error.
 
+An `error` 3-tuple is also returned when the `trusted_proxies`
+peer address check failed.
+
 == Changelog
 
+* *2.4*: The `trusted_proxies` transport option rejects
+         connections from untrusted peers before reading
+         the header.
 * *1.7*: Function introduced.
 
 == Examples

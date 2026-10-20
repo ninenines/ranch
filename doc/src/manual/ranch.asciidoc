@@ -84,6 +84,20 @@ ref() = any()
 
 Unique name used to refer to a listener.
 
+=== trusted_proxy()
+
+[source,erlang]
+----
+trusted_proxy() = {inet:ip4_address(), 0..32}
+                | {inet:ip6_address(), 0..128}
+----
+
+Address and prefix length of an immediate peer allowed
+to send a PROXY protocol header. An exact host is a
+prefix of 32 or 128.
+
+An IPv4-mapped IPv6 address is not a valid entry.
+
 === transport_opts(SocketOpts)
 
 [source,erlang]
@@ -106,6 +120,7 @@ transport_opts(SocketOpts) = #{
     num_listen_sockets   => pos_integer(),
     post_listen_callback => fun((term()) -> ok | {error, term()}),
     shutdown             => timeout() | brutal_kill,
+    trusted_proxies      => [trusted_proxy()],
     socket_opts          => SocketOpts
 }
 ----
@@ -197,6 +212,26 @@ shutdown (5000)::
 
 Maximum allowed time for children to stop on listener shutdown.
 
+trusted_proxies::
+
+Immediate peers allowed to send a PROXY protocol header.
+Each entry is an address and a prefix length,
+`{inet:ip4_address(), 0..32}` or `{inet:ip6_address(), 0..128}`.
+An exact host is a prefix of 32 or 128. A bare address, a
+string or an IPv4-mapped IPv6 address is rejected when the
+listener starts.
++
+`ranch:recv_proxy_header/2` compares the list to the socket
+peer, not to the source address in the header. An IPv4 peer
+is compared to IPv4 entries. An IPv4-mapped IPv6 peer
+(`::ffff:a.b.c.d`) is compared to IPv4 entries only. Any
+other IPv6 peer is compared to IPv6 entries. A peer that is
+not an IP address matches nothing.
++
+When this option is absent, any immediate peer may send a
+header. An empty list rejects every header. Ranch logs a
+warning on match failure and returns a protocol error.
+
 socket_opts::
 
 Socket options to be used by `Transport:listen/1`. Please refer to the
@@ -204,6 +239,7 @@ documentation of the transport module you are using for more details.
 
 == Changelog
 
+* *2.4*: The `trusted_proxies` transport option was added.
 * *2.4*: The `num_listen_sockets` transport option was documented.
 * *2.1*: The `post_listen_callback` transport option was added.
 * *2.0*: The type `transport_opts(SocketOpts)` was added.
