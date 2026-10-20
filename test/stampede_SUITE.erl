@@ -17,7 +17,6 @@
 -compile(nowarn_export_all).
 
 -import(ct_helper, [doc/1]).
--import(ct_helper, [name/0]).
 
 %% ct.
 
@@ -86,7 +85,7 @@ stampede_tcp(Config) ->
 	doc("Start a TCP listener, establish a hundred connections, "
 		"run stampede, confirm we can still connect."),
 	%% Start a TCP listener.
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = do_get_sockopts(Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -110,7 +109,7 @@ stampede_ssl(_) ->
 	doc("Start a SSL listener, establish a hundred connections, "
 		"run stampede, confirm we can still connect."),
 	%% Start a TCP listener.
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, ct_helper:get_certs_from_ets(),
 		echo_protocol, []),
@@ -137,7 +136,7 @@ stampede_embedded(Config) ->
 	doc("Start an embedded TCP listener, establish a hundred connections, "
 		"run stampede, confirm we can still connect."),
 	%% Start embedded listener.
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = do_get_sockopts(Config),
 	{ok, SupPid} = embedded_sup:start_link(),
 	{ok, _} = embedded_sup:start_listener(SupPid, Name,

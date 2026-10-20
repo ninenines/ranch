@@ -23,7 +23,6 @@
 
 -import(ct_helper, [config/2]).
 -import(ct_helper, [doc/1]).
--import(ct_helper, [name/0]).
 
 -include_lib("stdlib/include/assert.hrl").
 
@@ -356,7 +355,7 @@ misc_info_embedded(_) ->
 
 misc_process_labels(_) ->
 	doc("Ranch processes have proc_lib labels identifying the listener."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{num_acceptors => 2, num_conns_sups => 2},
 		echo_protocol, []),
@@ -380,7 +379,7 @@ misc_process_labels(_) ->
 
 misc_metrics(_) ->
 	doc("Confirm accept/terminate metrics are correct."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{},
 		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
@@ -423,7 +422,7 @@ do_accumulate_metrics(Metrics) ->
 misc_opts_logger(_) ->
 	doc("Confirm that messages are sent via the configured logger module."),
 	register(misc_opts_logger, self()),
-	{ok, _} = ranch:start_listener(name(),
+	{ok, _} = ranch:start_listener(?FUNCTION_NAME,
 		ranch_tcp, #{logger => ?MODULE, socket_opts => [<<"garbage">>]},
 		echo_protocol, []),
 	receive
@@ -438,7 +437,7 @@ warning(Format, Args) ->
 
 misc_post_listen_callback(_) ->
 	doc("Ensure that the post-listen callback works."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Self = self(),
 	Ref = make_ref(),
 	PostListenCb = fun (LSock) ->
@@ -469,7 +468,7 @@ misc_post_listen_callback(_) ->
 
 misc_post_listen_callback_error(_) ->
 	doc("Ensure that starting a listener fails when the post-listen callback returns an error."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	PostListenCb = fun (_) -> {error, test} end,
 	{error, _} = ranch:start_listener(Name,
 		ranch_tcp, #{post_listen_callback => PostListenCb},
@@ -479,7 +478,7 @@ misc_post_listen_callback_error(_) ->
 
 misc_repeated_remove(_) ->
 	doc("Ensure repeated removal of connection does not crash the connection supervisor."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{},
 		remove_conn_and_wait_protocol, [{remove, 5, 0}]),
@@ -493,7 +492,7 @@ misc_repeated_remove(_) ->
 
 misc_set_transport_options(_) ->
 	doc(""),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, ListenerSupPid} = ranch:start_listener(Name, ranch_tcp, #{max_connections => 10,
 		handshake_timeout => 5000, shutdown => 1000, num_acceptors => 1,
 		socket_opts => [{send_timeout, 5000}]}, echo_protocol, []),
@@ -515,7 +514,7 @@ misc_set_transport_options(_) ->
 
 misc_set_transport_options_max_connections(_) ->
 	doc("set_transport_options stores the new max_connections."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{
 		max_connections => 10,
 		num_acceptors => 1,
@@ -547,7 +546,7 @@ misc_set_transport_options_max_connections(_) ->
 
 misc_wait_for_connections(_) ->
 	doc("Ensure wait for connections works."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Self = self(),
 	%% Ensure invalid arguments are rejected.
 	?assertError(badarg, ranch:wait_for_connections(Name, 'foo', 0)),
@@ -601,7 +600,7 @@ misc_wait_for_connections(_) ->
 
 misc_suspend_wait_stop(_) ->
 	doc("Ensure a listener can be suspended, drained and then stopped."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Self = self(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{num_acceptors => 1},
@@ -653,7 +652,7 @@ misc_multiple_ip_local_socket_opts(_) ->
 
 do_misc_multiple_ip_local_socket_opts() ->
 	doc("Ensure that a listener uses the expected ip option if multiple are given."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockFile1 = do_tempname(),
 	SockFile2 = do_tempname(),
 	Opts = [{ip, {local, SockFile1}}, {ip, {local, SockFile2}}],
@@ -712,7 +711,7 @@ do_listen_local(Path) ->
 
 misc_connection_alarms(_) ->
 	doc("Ensure that connection alarms work."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 
 	Self = self(),
 	TransOpts0 = #{num_conns_sups => 1},
@@ -793,7 +792,7 @@ misc_stop_unknown_listener(_) ->
 
 misc_repeated_start_stop(_) ->
 	doc("Ensure that repeated starts and stops of a listener works."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	lists:foreach(
 		fun(_) ->
 			{ok, _} = ranch:start_listener(Name, ranch_tcp, #{}, echo_protocol, []),
@@ -807,7 +806,7 @@ misc_repeated_start_stop(_) ->
 
 misc_listen_error(_) ->
 	doc("Ensure Transport:format_error/1 gets called on Transport:listen/1 error."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Self = self(),
 	logger:add_primary_filter(Name, {fun(Event, _Args) -> Self ! {Name, Event}, ignore end, undefined}),
 	{error, _} = ranch:start_listener(Name,
@@ -827,20 +826,9 @@ misc_listen_error(_) ->
 	logger:remove_primary_filter(Name),
 	ok.
 
-contains_term(Term, Term) ->
-	true;
-contains_term([Head|Tail], Secret) ->
-	contains_term(Head, Secret) orelse contains_term(Tail, Secret);
-contains_term(Term, Secret) when is_tuple(Term) ->
-	contains_term(tuple_to_list(Term), Secret);
-contains_term(Term, Secret) when is_map(Term) ->
-	contains_term(maps:to_list(Term), Secret);
-contains_term(_, _) ->
-	false.
-
 misc_trace_acceptors(_) ->
 	doc("trace_acceptors returns the raw Transport:accept/2 error."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_accept_error_transport, #{num_acceptors => 1},
 		echo_protocol, []),
@@ -857,7 +845,7 @@ misc_trace_acceptors(_) ->
 
 misc_trace_acceptors_timeout(_) ->
 	doc("trace_acceptors returns at the deadline when accept blocks."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_erlang_transport, #{num_acceptors => 1},
 		echo_protocol, []),
@@ -869,7 +857,7 @@ misc_trace_acceptors_timeout(_) ->
 
 misc_trace_acceptors_mailbox(_) ->
 	doc("No accept trace messages are left in the caller mailbox."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_accept_error_transport, #{num_acceptors => 10},
 		echo_protocol, []),
@@ -885,7 +873,7 @@ trace_messages() ->
 
 misc_trace_acceptors_suspended(_) ->
 	doc("trace_acceptors on a suspended listener returns no errors."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{}, echo_protocol, []),
 	ok = ranch:suspend_listener(Name),
 	#{elapsed := 0, errors := []} = ranch:trace_acceptors(Name),
@@ -893,7 +881,7 @@ misc_trace_acceptors_suspended(_) ->
 
 misc_trace_acceptors_caller_down(_) ->
 	doc("The tracer stops when its caller is killed."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_erlang_transport, #{num_acceptors => 1},
 		echo_protocol, []),
@@ -947,7 +935,7 @@ trace_acceptor_sessions(Subject) ->
 
 ssl_accept_error(_) ->
 	doc("Acceptor must not crash if client disconnects in the middle of SSL handshake."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_ssl, #{num_acceptors => 1, socket_opts => Opts},
@@ -973,7 +961,7 @@ ssl_10_acceptors_10_listen_sockets(_) ->
 
 do_ssl_10_acceptors_10_listen_sockets() ->
 	doc("Ensure that we can use 10 listen sockets across 10 acceptors with SSL."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, ListenerSupPid} = ranch:start_listener(Name,
 		ranch_ssl, #{
@@ -988,7 +976,7 @@ do_ssl_10_acceptors_10_listen_sockets() ->
 
 ssl_many_listen_sockets_no_reuseport(_) ->
 	doc("Confirm that ranch:start_listener/5 fails when reuseport is disabled with SSL."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{error, eaddrinuse} = ranch:start_listener(Name,
 		ranch_ssl, #{
@@ -1001,7 +989,7 @@ ssl_many_listen_sockets_no_reuseport(_) ->
 
 ssl_active_echo(_) ->
 	doc("Ensure that active mode works with SSL transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, Opts ++ [{verify, verify_none}],
@@ -1028,7 +1016,7 @@ ssl_active_n_echo(_) ->
 
 do_ssl_active_n_echo() ->
 	doc("Ensure that active N mode works with SSL transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, Opts ++ [{verify, verify_none}],
@@ -1052,7 +1040,7 @@ do_ssl_active_n_echo() ->
 
 ssl_echo(_) ->
 	doc("Ensure that passive mode works with SSL transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, Opts ++ [{verify, verify_none}],
@@ -1071,7 +1059,7 @@ ssl_echo(_) ->
 
 ssl_dtls_echo(_) ->
 	doc("Ensure that passive mode works with SSL transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	%% We are using DTLS so the version should be 'dtlsv1.2'.
 	%% But since we don't really need it we simply don't set 'versions'.
 	Opts = ct_helper:get_certs_from_ets() -- [{versions, ['tlsv1.2']}],
@@ -1092,7 +1080,7 @@ ssl_dtls_echo(_) ->
 
 ssl_handshake(_) ->
 	doc("Ensure that multiple steps handshake works with SSL transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{CaCert1, Cert1, Key1} = ct_helper:make_certs(),
 	{CaCert2, Cert2, Key2} = ct_helper:make_certs(),
 	Opts1 = [{cert, Cert1}, {key, Key1}, {cacerts, [CaCert1]},
@@ -1127,7 +1115,7 @@ ssl_handshake(_) ->
 
 ssl_handshake_error(_) ->
 	doc("Acceptor must not crash if client disconnects in the middle of SSL handshake."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, #{num_acceptors => 1, socket_opts => Opts},
@@ -1163,7 +1151,7 @@ do_ssl_local_echo() ->
 	doc("Ensure that listening on a local socket works with SSL transport."),
 	SockFile = do_tempname(),
 	try
-		Name = name(),
+		Name = ?FUNCTION_NAME,
 		Opts = ct_helper:get_certs_from_ets(),
 		{ok, _} = ranch:start_listener(Name,
 			ranch_ssl, #{socket_opts => [{ip, {local, SockFile}}|Opts] ++ [{verify, verify_none}]},
@@ -1187,7 +1175,7 @@ do_ssl_local_echo() ->
 
 ssl_sni_echo(_) ->
 	doc("Ensure that SNI works with SSL transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, [{sni_hosts, [{"localhost", Opts ++ [{verify, verify_none}]}]}],
@@ -1206,7 +1194,7 @@ ssl_sni_echo(_) ->
 
 ssl_sni_fail(_) ->
 	doc("Ensure that connection fails when host is not in SNI list."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, [{sni_hosts, [{"pouet", Opts}]}],
@@ -1222,7 +1210,7 @@ ssl_sni_fail(_) ->
 
 ssl_tls_psk(_) ->
 	doc("Ensure that TLS-PSK works without certificate."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Ciphers = [#{cipher => aes_256_gcm, key_exchange => psk, mac => aead, prf => sha384}],
 	LookupFun = {fun psk_lookup_helper/3, <<"shared_secret">>},
 	{ok, _} = ranch:start_listener(Name,
@@ -1243,7 +1231,7 @@ ssl_tls_psk(_) ->
 
 ssl_tls_psk_fail(_) ->
 	doc("Ensure that TLS-PSK filed for different shared keys."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Ciphers = [#{cipher => aes_256_gcm, key_exchange => psk, mac => aead, prf => sha384}],
 	ServerLookupFun = {fun psk_lookup_helper/3, <<"server_secret">>},
 	ClientLookupFun = {fun psk_lookup_helper/3, <<"client_secret">>},
@@ -1265,7 +1253,7 @@ psk_lookup_helper(psk, _PskIdentity, UserState) ->
 
 ssl_upgrade_from_tcp(_) ->
 	doc("Ensure a TCP socket can be upgraded to SSL"),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{},
 		ssl_upgrade_protocol, []),
@@ -1288,7 +1276,7 @@ ssl_upgrade_from_tcp(_) ->
 
 ssl_graceful(_) ->
 	doc("Ensure suspending and resuming of listeners does not kill active connections."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, Opts ++ [{verify, verify_none}],
@@ -1328,7 +1316,7 @@ ssl_graceful(_) ->
 
 ssl_getopts_capability(_) ->
 	doc("Ensure getopts/2 capability."),
-	Name=name(),
+	Name=?FUNCTION_NAME,
 	Opts=ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, Opts ++ [{verify, verify_none}],
@@ -1346,7 +1334,7 @@ ssl_getopts_capability(_) ->
 
 ssl_peercert(_) ->
 	doc("Ensure ranch_ssl returns the peer certificate and the negotiated protocol."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{_, ClientCert, ClientKey} = ct_helper:make_certs(),
 	Opts = ct_helper:get_certs_from_ets() ++ [
 		{fail_if_no_peer_cert, true},
@@ -1374,7 +1362,7 @@ ssl_peercert(_) ->
 
 ssl_getstat_capability(_) ->
 	doc("Ensure getstat/1,2 capability."),
-	Name=name(),
+	Name=?FUNCTION_NAME,
 	Opts=ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, Opts ++ [{verify, verify_none}],
@@ -1394,7 +1382,7 @@ ssl_getstat_capability(_) ->
 
 ssl_error_eaddrinuse(_) ->
 	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets(),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_ssl, Opts,
@@ -1410,7 +1398,7 @@ ssl_error_eaddrinuse(_) ->
 
 ssl_error_no_cert(_) ->
 	doc("Ensure that failure due to missing certificate returns a compact readable error."),
-	{error, no_cert} = ranch:start_listener(name(),
+	{error, no_cert} = ranch:start_listener(?FUNCTION_NAME,
 		ranch_ssl, #{},
 		active_echo_protocol, []),
 	ok.
@@ -1423,7 +1411,7 @@ ssl_error_eacces(_) ->
 			{skip, "No privileged ports."};
 		_ ->
 			doc("Ensure that failure due to an eacces returns a compact readable error."),
-			Name = name(),
+			Name = ?FUNCTION_NAME,
 			Opts = ct_helper:get_certs_from_ets(),
 			{error, eacces} = ranch:start_listener(Name,
 				ranch_ssl, [{port, 283}|Opts],
@@ -1456,7 +1444,7 @@ do_ssl_unsupported_tlsv13_options() ->
 		{reuse_sessions, true},
 		{user_lookup_fun, {fun (_, _, _) -> error end, <<"dummy">>}}
 	],
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts = ct_helper:get_certs_from_ets() ++ [{versions, ['tlsv1.3']}],
 	ok = lists:foreach(
 		fun (CheckOpt) ->
@@ -1488,7 +1476,7 @@ tcp_10_acceptors_10_listen_sockets(Config) ->
 
 do_tcp_10_acceptors_10_listen_sockets(Config) ->
 	doc("Ensure that we can use 10 listen sockets across 10 acceptors with TCP."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	Self = self(),
 	Tag = make_ref(),
@@ -1517,7 +1505,7 @@ tcp_many_listen_sockets_no_reuseport(Config) ->
 
 do_tcp_many_listen_sockets_no_reuseport(Config) ->
 	doc("Confirm that ranch:start_listener/5 fails when reuseport is disabled with TCP."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{error, eaddrinuse} = ranch:start_listener(Name,
 		ranch_tcp, #{
@@ -1530,7 +1518,7 @@ do_tcp_many_listen_sockets_no_reuseport(Config) ->
 
 tcp_active_echo(Config) ->
 	doc("Ensure that active mode works with TCP transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1547,7 +1535,7 @@ tcp_active_echo(Config) ->
 
 tcp_active_n_echo(Config) ->
 	doc("Ensure that active N mode works with TCP transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1569,7 +1557,7 @@ tcp_active_n_echo(Config) ->
 
 tcp_echo(Config) ->
 	doc("Ensure that passive mode works with TCP transport."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1596,7 +1584,7 @@ do_tcp_local_echo() ->
 	doc("Ensure that listening on a local socket works with TCP transport."),
 	SockFile = do_tempname(),
 	try
-		Name = name(),
+		Name = ?FUNCTION_NAME,
 		{ok, _} = ranch:start_listener(Name,
 			ranch_tcp, #{socket_opts => [{ip, {local, SockFile}}]},
 			echo_protocol, []),
@@ -1617,7 +1605,7 @@ do_tcp_local_echo() ->
 
 tcp_graceful(Config) ->
 	doc("Ensure suspending and resuming of listeners does not kill active connections."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1655,7 +1643,7 @@ tcp_graceful(Config) ->
 
 tcp_inherit_options(Config) ->
 	doc("Ensure TCP options are inherited in the protocol."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	Opts0 = config(socket_opts, Config),
 	Opts1 = [{nodelay, false}, {send_timeout_close, false}],
 	{ok, _} = ranch:start_listener(Name,
@@ -1669,7 +1657,7 @@ tcp_inherit_options(Config) ->
 
 tcp_max_connections(Config) ->
 	doc("Ensure the max_connections option actually limits connections."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
@@ -1685,7 +1673,7 @@ tcp_max_connections(Config) ->
 
 tcp_max_connections_and_beyond(Config) ->
 	doc("Ensure the max_connections option works when connections are removed from the count."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
@@ -1713,7 +1701,7 @@ tcp_max_connections_and_beyond(Config) ->
 
 tcp_max_connections_infinity(Config) ->
 	doc("Set the max_connections option from 10 to infinity and back to 10."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
@@ -1736,7 +1724,7 @@ tcp_max_connections_infinity(Config) ->
 
 tcp_remove_connections(Config) ->
 	doc("Ensure that removed connections are only removed once."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1749,7 +1737,7 @@ tcp_remove_connections(Config) ->
 
 tcp_remove_connections_acceptor_wakeup(Config) ->
 	doc("Ensure that removed connections wake up acceptors."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 1, num_acceptors => 1, socket_opts => SockOpts},
@@ -1768,7 +1756,7 @@ tcp_remove_connections_acceptor_wakeup(Config) ->
 
 tcp_set_max_connections(Config) ->
 	doc("Ensure that changing the max_connections option to a larger value allows for more connections."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 10, num_acceptors => 1, socket_opts => SockOpts},
@@ -1786,7 +1774,7 @@ tcp_set_max_connections(Config) ->
 
 tcp_set_max_connections_clean(Config) ->
 	doc("Ensure that setting max_connections does not crash any process."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, ListSupPid} = ranch:start_listener(Name,
 		ranch_tcp, #{max_connections => 4, socket_opts => SockOpts},
@@ -1813,7 +1801,7 @@ tcp_set_max_connections_clean(Config) ->
 
 tcp_getopts_capability(Config) ->
 	doc("Ensure getopts/2 capability."),
-	Name=name(),
+	Name=?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _}=ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1829,7 +1817,7 @@ tcp_getopts_capability(Config) ->
 
 tcp_getstat_capability(Config) ->
 	doc("Ensure getstat/1,2 capability."),
-	Name=name(),
+	Name=?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _}=ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1847,7 +1835,7 @@ tcp_getstat_capability(Config) ->
 
 tcp_upgrade(Config) ->
 	doc("Ensure that protocol options can be updated."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1863,7 +1851,7 @@ tcp_upgrade(Config) ->
 
 tcp_error_eaddrinuse(Config) ->
 	doc("Ensure that failure due to an eaddrinuse returns a compact readable error."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	SockOpts = config(socket_opts, Config),
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{socket_opts => SockOpts},
@@ -1885,7 +1873,7 @@ tcp_error_eacces(Config) ->
 			{skip, "No privileged ports."};
 		_ ->
 			doc("Ensure that failure due to an eacces returns a compact readable error."),
-			Name = name(),
+			Name = ?FUNCTION_NAME,
 			SockOpts = config(socket_opts, Config),
 			{error, eacces} = ranch:start_listener(Name,
 				ranch_tcp, #{socket_opts => SockOpts ++ [{port, 283}]},
@@ -1897,7 +1885,7 @@ tcp_error_eacces(Config) ->
 
 connection_type_supervisor(_) ->
 	doc("The supervisor connection type must be reflected in the specifications."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{connection_type => supervisor},
 		echo_protocol, []),
@@ -1914,7 +1902,7 @@ connection_type_supervisor(_) ->
 
 connection_type_supervisor_separate_from_connection(_) ->
 	doc("The supervisor connection type allows separate supervised and connection processes."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{connection_type => supervisor},
 		supervisor_separate, []),
@@ -1931,7 +1919,7 @@ connection_type_supervisor_separate_from_connection(_) ->
 
 connection_type_supervisor_remove_connection(_) ->
 	doc("The socket owner removes a supervised connection via its parent pid."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{
 			connection_type => supervisor,
@@ -1968,7 +1956,7 @@ supervisor_1_acceptor_10_conns_sups(_) ->
 	ok = do_supervisor_n_acceptors_m_conns_sups(1, 10).
 
 do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, Pid} = ranch:start_listener(Name,
 		ranch_tcp, #{num_conns_sups => NumConnsSups, num_acceptors => NumAcceptors},
 		notify_and_wait_protocol, #{pid => self()}),
@@ -2007,7 +1995,7 @@ do_supervisor_n_acceptors_m_conns_sups(NumAcceptors, NumConnsSups) ->
 supervisor_restart_acceptors(_) ->
 	doc("Ensure that restarting acceptors fails when they are running "
 		"and succeeds after they were stopped."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{num_acceptors => 2},
 		echo_protocol, []),
@@ -2036,7 +2024,7 @@ supervisor_restart_acceptors(_) ->
 
 supervisor_suspended_acceptors(_) ->
 	doc("Ensure that stopping or restarting acceptors skips a suspended listener."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{num_acceptors => 1},
 		echo_protocol, []),
@@ -2058,7 +2046,7 @@ supervisor_suspended_acceptors(_) ->
 
 supervisor_changed_options_restart(_) ->
 	doc("Ensure that a listener is restarted with changed transport options."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	%% Start a listener using send_timeout as option change marker.
 	{ok, ListenerSupPid1} = ranch:start_listener(Name,
 		ranch_tcp, [{send_timeout, 300000}],
@@ -2102,7 +2090,7 @@ supervisor_changed_options_restart(_) ->
 supervisor_clean_child_restart(_) ->
 	doc("Verify that only the relevant parts of the supervision tree restarted "
 		"when the listening socket is closed."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	%% Trace socket allocations.
 	{module, ranch_tcp} = code:ensure_loaded(ranch_tcp),
 	_ = erlang:trace(new, true, [call]),
@@ -2143,7 +2131,7 @@ supervisor_clean_child_restart(_) ->
 supervisor_clean_restart(_) ->
 	doc("Verify that killing ranch_conns_sup does not crash everything "
 		"and that it restarts properly."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	NumAcc = 4,
 	{ok, Pid} = ranch:start_listener(Name,
 		ranch_tcp, #{num_acceptors => NumAcc},
@@ -2177,7 +2165,7 @@ supervisor_clean_restart(_) ->
 
 supervisor_conns_alive(_) ->
 	doc("Ensure that active connections stay open when the listening socket gets closed."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{module, ranch_tcp} = code:ensure_loaded(ranch_tcp),
 	_ = erlang:trace(new, true, [call]),
 	1 = erlang:trace_pattern({ranch_tcp, listen, 1},
@@ -2208,7 +2196,7 @@ supervisor_conns_alive(_) ->
 
 supervisor_embedded_ranch_server_crash(_) ->
 	doc("Ensure that restarting ranch_server also restarts embedded listeners."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, SupPid} = embedded_sup:start_link(),
 	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
 		ranch_tcp, #{},
@@ -2230,7 +2218,7 @@ supervisor_embedded_ranch_server_crash(_) ->
 
 supervisor_protocol_start_link_crash(_) ->
 	doc("Ensure a protocol start crash does not kill all connections."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{},
 		crash_protocol, []),
@@ -2244,7 +2232,7 @@ supervisor_protocol_start_link_crash(_) ->
 supervisor_server_recover_state(_) ->
 	doc("Ensure that when ranch_server crashes and restarts, it recovers "
 		"its state and continues monitoring the same processes."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	_ = erlang:trace(new, true, [call]),
 	1 = erlang:trace_pattern({ranch_server, init, 1},
 		[{'_', [], [{return_trace}]}], [global]),
@@ -2274,7 +2262,7 @@ supervisor_server_recover_state(_) ->
 supervisor_unexpected_message(_) ->
 	doc("Ensure the connections supervisor stays alive when it receives "
 		"an unexpected message."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{},
 		echo_protocol, []),
@@ -2295,7 +2283,7 @@ supervisor_unexpected_message(_) ->
 
 supervisor_conns_sup_old_spec(_) ->
 	doc("A 2.3.0 connection supervisor spec restarts without keeping transport options."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name, ranch_erlang_transport,
 		#{num_acceptors => 1, num_conns_sups => 1},
 		echo_protocol, []),
@@ -2314,6 +2302,19 @@ supervisor_conns_sup_old_spec(_) ->
 	false = contains_term(supervisor:which_children(Pid), Secret),
 	exit(Pid, kill),
 	ok = ranch:stop_listener(Name).
+
+%% Utility functions.
+
+contains_term(Term, Term) ->
+	true;
+contains_term([Head|Tail], Secret) ->
+	contains_term(Head, Secret) orelse contains_term(Tail, Secret);
+contains_term(Term, Secret) when is_tuple(Term) ->
+	contains_term(tuple_to_list(Term), Secret);
+contains_term(Term, Secret) when is_map(Term) ->
+	contains_term(maps:to_list(Term), Secret);
+contains_term(_, _) ->
+	false.
 
 connect_loop(_, 0, _) ->
 	ok;

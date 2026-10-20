@@ -17,7 +17,6 @@
 -compile(nowarn_export_all).
 
 -import(ct_helper, [doc/1]).
--import(ct_helper, [name/0]).
 
 %% ct.
 
@@ -28,7 +27,7 @@ all() ->
 
 recv_v1_proxy_header_tcp(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 1,
 		command => proxy,
@@ -44,7 +43,7 @@ recv_v1_proxy_header_tcp(_) ->
 recv_v1_proxy_header_tcp_extra_data(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection "
 		"and that the extra data in the first packet can be read afterwards."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 1,
 		command => proxy,
@@ -59,7 +58,7 @@ recv_v1_proxy_header_tcp_extra_data(_) ->
 
 recv_v2_proxy_header_tcp(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => proxy,
@@ -75,7 +74,7 @@ recv_v2_proxy_header_tcp(_) ->
 recv_v2_proxy_header_tcp_extra_data(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection "
 		"and that the extra data in the first packet can be read afterwards."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => proxy,
@@ -90,7 +89,7 @@ recv_v2_proxy_header_tcp_extra_data(_) ->
 
 recv_v2_local_header_tcp(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => local
@@ -100,7 +99,7 @@ recv_v2_local_header_tcp(_) ->
 recv_v2_local_header_tcp_extra_data(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection "
 		"and that the extra data in the first packet can be read afterwards."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => local
@@ -129,7 +128,7 @@ do_proxy_header_tcp(Name, ProxyInfo, Data1, Data2) ->
 
 recv_v1_proxy_header_ssl(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 1,
 		command => proxy,
@@ -145,7 +144,7 @@ recv_v1_proxy_header_ssl(_) ->
 recv_v1_proxy_header_ssl_extra_data(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection "
 		"and that the extra data in the first packet can be read afterwards."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 1,
 		command => proxy,
@@ -160,7 +159,7 @@ recv_v1_proxy_header_ssl_extra_data(_) ->
 
 recv_v2_proxy_header_ssl(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => proxy,
@@ -176,7 +175,7 @@ recv_v2_proxy_header_ssl(_) ->
 recv_v2_proxy_header_ssl_extra_data(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection "
 		"and that the extra data in the first packet can be read afterwards."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => proxy,
@@ -191,7 +190,7 @@ recv_v2_proxy_header_ssl_extra_data(_) ->
 
 recv_v2_local_header_ssl(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => local
@@ -201,7 +200,7 @@ recv_v2_local_header_ssl(_) ->
 recv_v2_local_header_ssl_extra_data(_) ->
 	doc("Confirm we can read the proxy header at the start of the connection "
 		"and that the extra data in the first packet can be read afterwards."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	ProxyInfo = #{
 		version => 2,
 		command => local

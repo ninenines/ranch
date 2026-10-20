@@ -17,7 +17,6 @@
 -compile(nowarn_export_all).
 
 -import(ct_helper, [doc/1]).
--import(ct_helper, [name/0]).
 
 %% ct.
 
@@ -28,7 +27,7 @@ all() ->
 
 brutal_kill(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to brutal_kill."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, #{shutdown => brutal_kill},
 		echo_protocol, []),
@@ -47,7 +46,7 @@ brutal_kill(_) ->
 
 infinity(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to infinity."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, #{shutdown => infinity},
 		echo_protocol, []),
@@ -68,7 +67,7 @@ infinity_trap_exit(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to infinity "
 		"and protocol process trapping exits. The listener must not stop "
 		"until the protocol process terminates."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, #{shutdown => infinity},
 		trap_exit_protocol, []),
@@ -96,7 +95,7 @@ infinity_trap_exit(_) ->
 
 timeout(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to 500ms."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, #{shutdown => 500},
 		echo_protocol, []),
@@ -117,7 +116,7 @@ timeout_trap_exit(_) ->
 	doc("Shutdown Ranch listener with shutdown option set to 500ms "
 		"and protocol process trapping exits. The listener will only stop "
 		"after the 500ms timeout."),
-	Name = name(),
+	Name = ?FUNCTION_NAME,
 	{ok, ListenerSup} = ranch:start_listener(Name,
 		ranch_tcp, #{shutdown => 500},
 		trap_exit_protocol, []),
