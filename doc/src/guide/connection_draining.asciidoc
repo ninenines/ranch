@@ -11,7 +11,8 @@ by themselves instead of being killed.
 
 For this purpose, you should first suspend the listener you wish to
 stop gracefully, and then wait for its connection count to drop to
-zero.
+zero by calling
+link:man:ranch:wait_for_connections(3)[ranch:wait_for_connections(3)].
 
 .Draining a single listener
 

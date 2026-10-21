@@ -173,7 +173,9 @@ will be used. With one exception though. The `setopts/2` function *must*
 implement the `{active, once}` and the `{active, true}` options.
 
 If the transport handler doesn't have a native implementation of `sendfile/5` a
-fallback is available, `ranch_transport:sendfile/6`. The extra first argument
+fallback is available,
+link:man:ranch_transport:sendfile(3)[ranch_transport:sendfile(3)].
+The extra first argument
 is the transport's module. See `ranch_ssl` for an example.
 
 It is highly recommended for a custom transport handler to implement the

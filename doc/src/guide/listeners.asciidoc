@@ -22,8 +22,11 @@ When starting a listener, a number of different settings are required:
 * A transport handler and its associated options.
 * A protocol handler and its associated options.
 
+Transport options are documented in link:man:ranch(3)[ranch(3)].
+
 Ranch includes both TCP and SSL transport handlers, respectively
-`ranch_tcp` and `ranch_ssl`.
+link:man:ranch_tcp(3)[ranch_tcp(3)] and
+link:man:ranch_ssl(3)[ranch_ssl(3)].
 
 A listener can be started by calling the `ranch:start_listener/5`
 function. Before doing so however, you must ensure that the `ranch`
@@ -222,7 +225,8 @@ end,
 === Accepting connections on an existing socket
 
 If you want to accept connections on an existing socket, you can write
-a custom `ranch_transport` implementation that fetches or otherwise
+a custom link:man:ranch_transport(3)[ranch_transport(3)]
+implementation that fetches or otherwise
 acquires a listening socket in the `listen/1` callback and returns it
 in the form of `{ok, ListenSocket}`.
 
@@ -462,9 +466,10 @@ Opts = ranch:get_protocol_options(tcp_echo).
 === Changing transport options
 
 Ranch allows you to change the transport options of a listener with
-the `ranch:set_transport_options/2` function, for example to change the
+the link:man:ranch:set_transport_options(3)[ranch:set_transport_options(3)]
+function, for example to change the
 number of acceptors or to make it listen on a different port.
-See `ranch:set_transport_options(3)` for when each option takes effect.
+See that manual for when each option takes effect.
 
 .Changing the transport options
 

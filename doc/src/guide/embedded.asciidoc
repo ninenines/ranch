@@ -24,7 +24,8 @@ to your supervision tree. This can all be done in the `init/1` function
 of one of your application supervisors.
 
 Ranch has a convenience function for getting the listeners child specs
-called `ranch:child_spec/5`, that works like `ranch:start_listener/5`,
+called link:man:ranch:child_spec(3)[ranch:child_spec(3)],
+that works like `ranch:start_listener/5`,
 except that it doesn't start anything, it only returns child specs.
 
 The following example adds one listener to another application's

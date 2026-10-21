@@ -22,7 +22,7 @@ socket. The argument is the listener name.
 
 When a PROXY protocol header is expected, call
 link:man:ranch:recv_proxy_header(3)[ranch:recv_proxy_header(3)]
-before link:man:ranch:handshake(3)[ranch:handshake(3)].
+before `ranch:handshake/1,2`.
 
 .Perform the socket handshake
 
