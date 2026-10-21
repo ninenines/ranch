@@ -218,8 +218,9 @@ Immediate peers allowed to send a PROXY protocol header.
 Each entry is an address and a prefix length,
 `{inet:ip4_address(), 0..32}` or `{inet:ip6_address(), 0..128}`.
 An exact host is a prefix of 32 or 128. A bare address, a
-string or an IPv4-mapped IPv6 address is rejected when the
-listener starts.
+string or an IPv4-mapped IPv6 address is rejected by
+`ranch:start_listener/5`, `ranch:child_spec/5` and
+`ranch:set_transport_options/2`.
 +
 `ranch:recv_proxy_header/2` compares the list to the socket
 peer, not to the source address in the header. An IPv4 peer

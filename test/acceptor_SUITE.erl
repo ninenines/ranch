@@ -100,6 +100,7 @@ groups() ->
 	]}, {misc, [
 		misc_bad_transport,
 		misc_bad_transport_options,
+		misc_bad_child_spec,
 		misc_repeated_remove,
 		misc_info,
 		misc_info_embedded,
@@ -182,6 +183,37 @@ misc_bad_transport_options(_) ->
 	{ok, _} = ranch:start_listener(misc_bad_transport_options,
 		ranch_tcp, [binary, {packet, 4}, <<"garbage">>, raw, backlog],
 		echo_protocol, []),
+	ok.
+
+misc_bad_child_spec(_) ->
+	doc("Reject invalid transport options when building a child spec."),
+	Name = ?FUNCTION_NAME,
+	try
+		ranch:child_spec(Name, ranch_tcp,
+			#{trusted_proxies => [{{10, 0, 0, 1}, 33}]},
+			echo_protocol, [])
+	of
+		_ ->
+			error(expected_badarg)
+	catch
+		error:{badarg, {bad_option, trusted_proxies}} ->
+			ok
+	end,
+	try
+		ranch:child_spec(Name, ranch_tcp, #{num_acceptors => 0},
+			echo_protocol, [])
+	of
+		_ ->
+			error(expected_badarg)
+	catch
+		error:{badarg, {bad_option, num_acceptors}} ->
+			ok
+	end,
+	#{start := {ranch_embedded_sup, start_link, [Name, ranch_tcp, #{},
+		echo_protocol, []]}} = ranch:child_spec(Name, ranch_tcp, #{},
+		echo_protocol, []),
+	#{start := {ranch_embedded_sup, start_link, _}} = ranch:child_spec(Name,
+		ranch_tcp, [{port, 0}], echo_protocol, []),
 	ok.
 
 misc_info(_) ->

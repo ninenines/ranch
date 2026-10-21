@@ -71,8 +71,13 @@ module you are using for more details.
 
 Child specifications are returned.
 
+Invalid transport options raise
+`{badarg, {bad_option, Key}}`, where `Key` is the
+rejected option.
+
 == Changelog
 
+* *2.4*: Invalid transport options raise `{badarg, {bad_option, Key}}`.
 * *2.0*: The actual listener is placed under a supervisor in order to
          restart the listener if `ranch_server` crashes.
 * *2.0*: The `TransOpts` argument must no longer contain

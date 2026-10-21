@@ -347,9 +347,14 @@ do_acceptor(AcceptorsSup, AcceptorId, restart_child) ->
 	-> supervisor:child_spec().
 child_spec(Ref, Transport, TransOpts0, Protocol, ProtoOpts) ->
 	TransOpts = normalize_opts(TransOpts0),
-	#{id => {ranch_embedded_sup, Ref}, start => {ranch_embedded_sup, start_link, [
-		Ref, Transport, TransOpts, Protocol, ProtoOpts
-	]}, type => supervisor}.
+	case validate_transport_opts(TransOpts) of
+		ok ->
+			#{id => {ranch_embedded_sup, Ref}, start => {ranch_embedded_sup, start_link, [
+				Ref, Transport, TransOpts, Protocol, ProtoOpts
+			]}, type => supervisor};
+		{error, Reason} ->
+			error({badarg, Reason})
+	end.
 
 -spec handshake(ref()) -> {ok, ranch_transport:socket()} | {continue, any()}.
 handshake(Ref) ->
