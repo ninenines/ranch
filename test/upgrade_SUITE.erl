@@ -129,6 +129,9 @@ do_use_ranch_commit(Example, Commit) ->
 do_build_relup(Example, CommitOrTag) ->
 	Make = do_find_make_cmd(),
 	{Dir, _, _} = do_get_paths(Example),
+	PrevVersion = do_exec_log("grep \"PROJECT_VERSION = \" "
+		++ Dir ++ "/deps/ranch/Makefile"),
+	["PROJECT_VERSION = " ++ PrevVsn|_] = string:lexemes(PrevVersion, "\n"),
 	_ = do_exec_log("rm -rf " ++ Dir ++ "/deps/ranch/*"),
 	_ = do_exec_log("sed -i.bak s/\"1\"/\"2\"/ " ++ Dir ++ "/relx.config"),
 	%% We need Ranch to be fetched first in order to copy the current appup
@@ -154,12 +157,14 @@ do_build_relup(Example, CommitOrTag) ->
 				"sed -i.bak s/\"PROJECT_VERSION = .*\"/\"PROJECT_VERSION = " ++ Vsn ++ "\"/ "
 					++ Dir ++ "/deps/ranch/Makefile"
 			),
-			%% The version in the appup must be the same as PROJECT_VERSION.
-			_ = do_exec_log(
-				"sed -i.bak s/\"" ++ Vsn0 ++ "\"/\"" ++ Vsn ++ "\"/ "
-					++ Dir ++ "/deps/ranch/src/ranch.appup"
-			)
+			%% The committed instructions name the previous release
+			%% line, not the tag this test started from.
+			do_retarget_appup(Dir ++ "/deps/ranch/src/ranch.appup",
+				PrevVsn, Vsn)
 	end,
+	%% `make relup` skips Ranch when .erlang.mk/dep_built still
+	%% has its marker, including after the sources were replaced.
+	_ = do_exec_log(Make ++ " -C " ++ Dir ++ "/deps/ranch IS_DEP=1"),
 	_ = do_exec_log(Make ++ " -C " ++ Dir ++ " relup"),
 	ok.
 
@@ -172,15 +177,32 @@ do_upgrade(Example) ->
 			++ "_example/" ++ ExampleStr ++ "_example-2.tar.gz "
 		++ Dir ++ "/_rel/" ++ ExampleStr
 			++ "_example/releases/2/" ++ ExampleStr ++ "_example.tar.gz"),
-	_ = do_exec_log(Rel ++ " upgrade \"2\""),
+	do_require_permanent(do_exec_log(Rel ++ " upgrade \"2\"")),
 	_ = do_exec_log(Rel ++ " eval 'application:info()'"),
 	ok.
 
 do_downgrade(Example) ->
 	{_, Rel, _} = do_get_paths(Example),
-	_ = do_exec_log(Rel ++ " downgrade \"1\""),
+	do_require_permanent(do_exec_log(Rel ++ " downgrade \"1\"")),
 	_ = do_exec_log(Rel ++ " eval 'application:info()'"),
 	ok.
+
+%% The release script prints this only after make_permanent succeeds.
+%% Without the check, a failed relup still leaves the test ok.
+do_require_permanent(Out) ->
+	case string:find(Out, "Made release permanent") of
+		nomatch ->
+			error(release_not_made_permanent);
+		_ ->
+			ok
+	end.
+
+do_retarget_appup(Appup, FromVsn, ToVsn) ->
+	{ok, [{_, Up, Down}|_]} = file:consult(Appup),
+	Term = {ToVsn,
+		[{FromVsn, Instructions} || {_, Instructions} <- Up],
+		[{FromVsn, Instructions} || {_, Instructions} <- Down]},
+	ok = file:write_file(Appup, io_lib:format("~p.~n", [Term])).
 
 %% Tests.
 
