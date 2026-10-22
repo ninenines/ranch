@@ -157,8 +157,8 @@ do_build_relup(Example, CommitOrTag) ->
 				"sed -i.bak s/\"PROJECT_VERSION = .*\"/\"PROJECT_VERSION = " ++ Vsn ++ "\"/ "
 					++ Dir ++ "/deps/ranch/Makefile"
 			),
-			%% The committed instructions name the previous release
-			%% line, not the tag this test started from.
+			%% The appup version is the next release. An untagged
+			%% build still has the previous PROJECT_VERSION.
 			do_retarget_appup(Dir ++ "/deps/ranch/src/ranch.appup",
 				PrevVsn, Vsn)
 	end,
