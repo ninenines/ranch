@@ -1781,7 +1781,9 @@ tcp_remove_connections_acceptor_wakeup(Config) ->
 	{ok, Socket2} = gen_tcp:connect(Localhost, Port, ConnectOptions),
 	{ok, Socket3} = gen_tcp:connect(Localhost, Port, ConnectOptions),
 	ok = gen_tcp:send(Socket3, <<"bye">>),
-	true = maps:get(all_connections, ranch:info(Name)) >= 2,
+	%% The acceptor accepts the queued connections asynchronously,
+	%% so we wait until it has gone past max_connections.
+	ok = ranch:wait_for_connections(Name, '>=', 2, 100),
 	ok = gen_tcp:send(Socket1, <<"bye">>),
 	ok = gen_tcp:send(Socket2, <<"bye">>),
 	ok = ranch:stop_listener(Name).
