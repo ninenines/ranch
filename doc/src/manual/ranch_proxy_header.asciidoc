@@ -82,7 +82,11 @@ The transport protocol of the original connection.
 src_address::
 
 The source address of the original connection. This is the
-original address of the client.
+original address of the client. The address may be a
+loopback address, for example `{127, 0, 0, 1}` or
+`{0, 0, 0, 0, 0, 0, 0, 1}`. A loopback source is the
+client's address on the original connection. It does not
+mean the client is local to this server.
 
 src_port::
 
@@ -92,7 +96,10 @@ is not defined for UNIX domain sockets.
 
 dest_address::
 
-The destination address of the original connection.
+The destination address of the original connection. The
+address may be a loopback address. A loopback destination
+is the destination of the original connection. It does not
+mean this server was reached over loopback.
 
 dest_port::
 
