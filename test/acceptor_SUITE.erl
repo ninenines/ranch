@@ -1797,6 +1797,9 @@ tcp_set_max_connections(Config) ->
 		notify_and_wait_protocol, #{pid => self()}),
 	Port = ranch:get_port(Name),
 	ok = connect_loop(Port, 20, 0),
+	%% The acceptor accepts the connections asynchronously,
+	%% so we wait until it has reached max_connections.
+	ok = ranch:wait_for_connections(Name, '==', 10, 100),
 	10 = ranch_server:count_connections(Name),
 	{10, Pids1} = receive_loop(connected, 1000),
 	10 = ranch:get_max_connections(Name),
