@@ -49,7 +49,7 @@ Ranch 2.4 is tested with Erlang/OTP 27.0 onward.
   whose addresses would otherwise parse.
 
 * PROXY protocol version 2 reading and parsing
-  was strenghtened.
+  was strengthened.
 
 * `ranch:set_transport_options/2` left the stored
   `max_connections` limit unchanged.
