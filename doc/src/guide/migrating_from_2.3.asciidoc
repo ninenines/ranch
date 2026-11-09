@@ -1,0 +1,61 @@
+[appendix]
+== Migrating from Ranch 2.3 to 2.4
+
+Ranch 2.4 adds PROXY protocol controls and acceptor
+diagnostics, and fixes connection accounting, local
+socket cleanup, and PROXY header parsing.
+
+Ranch 2.4 is tested with Erlang/OTP 27.0 onward.
+
+=== Features added
+
+* The `trusted_proxies` transport option limits which
+  immediate peers may send a PROXY protocol header.
+  Each entry is `{inet:ip4_address(), 0..32}` or
+  `{inet:ip6_address(), 0..128}`. When the option is
+  absent, any immediate peer may send a header. An
+  empty list rejects every peer.
+
+* `ranch:remove_connection/2` drops the given pid
+  when the process is under a `supervisor`.
+
+* Optional transport callbacks `peercert/1` and
+  `negotiated_protocol/1` were added. `ranch_ssl`
+  implements them.
+
+* PROXY protocol version 2 parses and builds the SSL
+  TLV subtypes `group`, `sig_scheme`, and
+  `client_cert`. `client_cert` carries the client
+  certificate in ASN.1 DER form.
+
+* `ranch:trace_acceptors/1,2` samples the
+  `{error, Reason}` values from `Transport:accept/2`.
+
+=== Bugs fixed
+
+* Potential incompatibility: Before listening, and
+  again from `ranch:stop_listener/1`, Ranch deletes
+  a `{local, Path}` file only when it is a socket or
+  FIFO. A regular file, directory, symlink, or device
+  is left in place and must not already exist.
+
+* Potential incompatibility: `ranch:child_spec/5`
+  raises `{badarg, {bad_option, Key}}` when a
+  transport option is invalid.
+
+* Potential incompatibility: A PROXY protocol
+  version 1 line longer than 107 bytes is rejected
+  before it is decoded. This includes a TCP6 line
+  whose addresses would otherwise parse.
+
+* PROXY protocol version 2 reading and parsing
+  was strenghtened.
+
+* `ranch:set_transport_options/2` left the stored
+  `max_connections` limit unchanged.
+  `ranch:get_max_connections/1` and a restarted
+  connection supervisor now see the new value.
+
+* A release upgrade now fails when an acceptor
+  does not stop or restart using the Ranch-provided
+  appup files.
