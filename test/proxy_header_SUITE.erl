@@ -318,6 +318,38 @@ trusted_proxy_empty(_) ->
 	{error, protocol_error, _} = Result,
 	ok.
 
+trusted_proxy_set_transport_options(_) ->
+	doc("A new trusted_proxies list applies to the next connection."),
+	Name = ?FUNCTION_NAME,
+	Header = ranch_proxy_header:header(claimed_proxy_info()),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{trusted_proxies => [{{127, 0, 0, 0}, 8}]},
+		proxy_header_result, #{pid => self()}),
+	try
+		Port = ranch:get_port(Name),
+		{ok, Socket1} = do_connect_ipv4(Port),
+		ok = gen_tcp:send(Socket1, Header),
+		receive
+			{result, _, {ok, _}} ->
+				ok
+		after 2000 ->
+			error(timeout)
+		end,
+		ok = ranch:set_transport_options(Name, #{
+			socket_opts => [{port, Port}],
+			trusted_proxies => [{{10, 0, 0, 0}, 8}]}),
+		{ok, Socket2} = do_connect_ipv4(Port),
+		ok = gen_tcp:send(Socket2, Header),
+		receive
+			{result, _, {error, protocol_error, _}} ->
+				ok
+		after 2000 ->
+			error(timeout)
+		end
+	after
+		ranch:stop_listener(Name)
+	end.
+
 trusted_proxy_unknown(_) ->
 	doc("The allowlist is checked when the header family is unknown."),
 	Name = ?FUNCTION_NAME,

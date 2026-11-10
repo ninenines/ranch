@@ -9,6 +9,58 @@
 %% module then call system_code_change; and when downgrading,
 %% call system_code_change and then load the module.
 
+{"2.4.1",
+	[{<<"2\\.4\\.[0-9]+.*">>, [
+		{apply, {ranch, stop_all_acceptors, []}},
+		{load_module, ranch_acceptor},
+		{update, ranch_acceptors_sup, supervisor},
+		{load_module, ranch_app},
+		%% 2.4.0 is still current, so nothing calls get_proxy_opts/1.
+		{apply, {ets, match_delete, [ranch_server, {{proxy_opts, '_'}, '_'}]}},
+		%% ranch calls get_proxy_opts/1.
+		{update, ranch_server, {advanced, []}},
+		{load_module, ranch},
+		{update, ranch_conns_sup_sup, supervisor},
+		%% See comments at the top of the file about ranch_conns_sup.
+		{update, ranch_conns_sup, {advanced, []}},
+		{load_module, ranch_crc32c},
+		{update, ranch_embedded_sup, supervisor},
+		{update, ranch_listener_sup, supervisor},
+		{load_module, ranch_protocol},
+		{load_module, ranch_proxy_header},
+		{update, ranch_server_proxy, {advanced, []}},
+		{load_module, ranch_ssl},
+		{update, ranch_sup, supervisor},
+		{load_module, ranch_tcp},
+		{load_module, ranch_transport},
+		{apply, {ranch, restart_all_acceptors, []}}
+	]}],
+	[{<<"2\\.4\\.[0-9]+.*">>, [
+		{apply, {ranch, stop_all_acceptors, []}},
+		{load_module, ranch},
+		{load_module, ranch_acceptor},
+		{update, ranch_acceptors_sup, supervisor},
+		{load_module, ranch_app},
+		%% See comments at the top of the file about ranch_conns_sup.
+		{update, ranch_conns_sup, {advanced, []}},
+		{update, ranch_conns_sup_sup, supervisor},
+		{load_module, ranch_crc32c},
+		{update, ranch_embedded_sup, supervisor},
+		{update, ranch_listener_sup, supervisor},
+		{load_module, ranch_protocol},
+		{load_module, ranch_proxy_header},
+		{update, ranch_server, {advanced, []}},
+		%% get_proxy_opts/1 is gone. Drop a row inserted during code_change.
+		{apply, {ets, match_delete, [ranch_server, {{proxy_opts, '_'}, '_'}]}},
+		{update, ranch_server_proxy, {advanced, []}},
+		{load_module, ranch_ssl},
+		{update, ranch_sup, supervisor},
+		{load_module, ranch_tcp},
+		{load_module, ranch_transport},
+		{apply, {ranch, restart_all_acceptors, []}}
+	]}]
+}.
+
 {"2.4.0",
 	[{<<"2\\.3\\.[0-9]+.*">>, [
 		{apply, {ranch, stop_all_acceptors, []}},
