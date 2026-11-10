@@ -611,7 +611,8 @@ parse_tlv(<<16#20, TLVLen:16, Client0, Verify:32, Rest0/bits>>, Len, Info, Heade
 			},
 			case parse_ssl_tlv(Subs, SubsLen, SSL0) of
 				{ok, SSL, <<>>} ->
-					parse_tlv(Rest, Len - TLVLen - 3, Info#{ssl => SSL}, Header);
+					parse_tlv(Rest, Len - TLVLen - 3,
+						Info#{ssl => drop_unpresented_cn(SSL)}, Header);
 				Error={error, _} ->
 					Error
 			end;
@@ -648,6 +649,16 @@ parse_client(<<_:5, ClientCertSess:1, ClientCertConn:1, ClientSSL:1>>) ->
 %% client certificate was presented.
 cert_presented(Client) ->
 	lists:member(cert_conn, Client) orelse lists:member(cert_sess, Client).
+
+%% The CN names a client certificate. A sender can attach
+%% the TLV without cert_conn or cert_sess.
+drop_unpresented_cn(SSL=#{client := Client}) ->
+	case cert_presented(Client) of
+		true ->
+			SSL;
+		false ->
+			maps:remove(cn, SSL)
+	end.
 
 parse_ssl_tlv(Rest, 0, Info) ->
 	{ok, Info, Rest};
@@ -802,7 +813,7 @@ ssl_tlv(#{ssl := Info=#{client := Client0, verified := Verify0}}) ->
 	end,
 	TLVs = [
 		binary_tlv(Info, version, 16#21),
-		binary_tlv(Info, cn, 16#22),
+		cn_tlv(Info, Client0),
 		binary_tlv(Info, cipher, 16#23),
 		binary_tlv(Info, sig_alg, 16#24),
 		binary_tlv(Info, key_alg, 16#25),
@@ -814,6 +825,14 @@ ssl_tlv(#{ssl := Info=#{client := Client0, verified := Verify0}}) ->
 	[<<16#20, Len:16, Client, Verify:32>>, TLVs];
 ssl_tlv(_) ->
 	<<>>.
+
+cn_tlv(Info, Client) ->
+	case cert_presented(Client) of
+		true ->
+			binary_tlv(Info, cn, 16#22);
+		false ->
+			<<>>
+	end.
 
 client([], Client) -> Client;
 client([ssl|Tail], Client) -> client(Tail, Client bor 16#1);
@@ -946,6 +965,41 @@ ssl_header(Client, Verify) ->
 		127, 0, 0, 1, 10, 0, 0, 1,
 		1:16, 443:16,
 		16#20, 5:16, Client, Verify:32
+	>>.
+
+ssl_cn_requires_cert_flag_test() ->
+	{ok, #{ssl := NoCert}, <<>>} = parse(ssl_cn_header(16#01, 0)),
+	false = maps:is_key(cn, NoCert),
+	{ok, #{ssl := #{client := [ssl, cert_sess], cn := <<"alice">>}}, <<>>} =
+		parse(ssl_cn_header(16#05, 0)),
+	{ok, #{ssl := #{client := [ssl, cert_conn], cn := <<"alice">>}}, <<>>} =
+		parse(ssl_cn_header(16#03, 0)),
+	%% header/1 must not emit the CN without a cert flag.
+	<<"\r\n\r\n\0\r\nQUIT\n", 16#21, 16#11, 20:16,
+		127, 0, 0, 1, 10, 0, 0, 1,
+		1:16, 443:16,
+		16#20, 5:16, 16#01, 1:32>> =
+		iolist_to_binary(header(#{
+			version => 2,
+			command => proxy,
+			transport_family => ipv4,
+			transport_protocol => stream,
+			src_address => {127, 0, 0, 1},
+			src_port => 1,
+			dest_address => {10, 0, 0, 1},
+			dest_port => 443,
+			ssl => #{client => [ssl], verified => true, cn => <<"alice">>}
+		})),
+	ok.
+
+ssl_cn_header(Client, Verify) ->
+	<<
+		"\r\n\r\n\0\r\nQUIT\n",
+		16#21, 16#11, 28:16,
+		127, 0, 0, 1, 10, 0, 0, 1,
+		1:16, 443:16,
+		16#20, 13:16, Client, Verify:32,
+		16#22, 5:16, "alice"
 	>>.
 
 v2_tlvs_test() ->

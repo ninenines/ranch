@@ -182,7 +182,9 @@ in the version 2 header.
 cn:::
 
 The UTF-8 string representation of the Common Name field
-of the client certificate's Distinguished Name.
+of the client certificate's Distinguished Name. Ranch
+forces it to be absent when neither `cert_conn` nor
+`cert_sess` is set.
 
 raw_tlvs::
 
