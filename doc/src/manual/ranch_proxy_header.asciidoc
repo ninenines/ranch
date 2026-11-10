@@ -156,12 +156,14 @@ The US-ASCII string name of the cipher used.
 sig_alg:::
 
 The US-ASCII string name of the algorithm used to sign
-the certificate provided by the client.
+the certificate the frontend presented on the original
+connection.
 
 key_alg:::
 
 The US-ASCII string name of the algorithm used to generate
-the key of the certificate provided by the client.
+the key of the certificate the frontend presented on the
+original connection.
 
 group:::
 
