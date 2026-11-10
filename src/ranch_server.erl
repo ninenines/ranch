@@ -36,6 +36,7 @@
 -export([get_stats_counters/1]).
 -export([set_transport_options/2]).
 -export([get_transport_options/1]).
+-export([get_proxy_opts/1]).
 -export([set_protocol_options/2]).
 -export([get_protocol_options/1]).
 -export([get_listener_start_args/1]).
@@ -71,6 +72,7 @@ cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {addr, Ref}),
 	_ = ets:delete(?TAB, {max_conns, Ref}),
 	_ = ets:delete(?TAB, {trans_opts, Ref}),
+	_ = ets:delete(?TAB, {proxy_opts, Ref}),
 	_ = ets:delete(?TAB, {proto_opts, Ref}),
 	_ = ets:delete(?TAB, {listener_start_args, Ref}),
 	%% We also remove the pid of the connection supervisors.
@@ -159,6 +161,22 @@ set_transport_options(Ref, TransOpts) ->
 get_transport_options(Ref) ->
 	ets:lookup_element(?TAB, {trans_opts, Ref}, 2).
 
+-spec get_proxy_opts(ranch:ref()) -> map().
+get_proxy_opts(Ref) ->
+	case ets:lookup(?TAB, {proxy_opts, Ref}) of
+		[{_, Opts}] ->
+			Opts;
+		[] ->
+			Opts = proxy_opts(get_transport_options(Ref)),
+			case ets:insert_new(?TAB, {{proxy_opts, Ref}, Opts}) of
+				true ->
+					Opts;
+				false ->
+					%% The row appeared after the miss. Use that one.
+					ets:lookup_element(?TAB, {proxy_opts, Ref}, 2)
+			end
+	end.
+
 -spec set_protocol_options(ranch:ref(), any()) -> ok.
 set_protocol_options(Ref, ProtoOpts) ->
 	gen_server:call(?MODULE, {set_proto_opts, Ref, ProtoOpts}).
@@ -194,6 +212,7 @@ init([]) ->
 handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}, _, State) ->
 	ets:insert_new(?TAB, {{max_conns, Ref}, MaxConns}),
 	ets:insert_new(?TAB, {{trans_opts, Ref}, TransOpts}),
+	ets:insert_new(?TAB, {{proxy_opts, Ref}, proxy_opts(TransOpts)}),
 	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
 	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
 	{reply, ok, State};
@@ -214,7 +233,10 @@ handle_call({set_stats_counters, Ref, Counters}, _, State) ->
 	ets:insert(?TAB, {{stats_counters, Ref}, Counters}),
 	{reply, ok, State};
 handle_call({set_trans_opts, Ref, Opts}, _, State) ->
-	ets:insert(?TAB, {{trans_opts, Ref}, Opts}),
+	ets:insert(?TAB, [
+		{{trans_opts, Ref}, Opts},
+		{{proxy_opts, Ref}, proxy_opts(Opts)}
+	]),
 	{reply, ok, State};
 handle_call({set_proto_opts, Ref, Opts}, _, State) ->
 	ets:insert(?TAB, {{proto_opts, Ref}, Opts}),
@@ -253,12 +275,17 @@ terminate(_Reason, _State) ->
 
 -spec code_change(term() | {down, term()}, #state{}, term()) -> {ok, term()}.
 code_change({down, _}, State, _Extra) ->
-	true = ets:match_delete(?TAB, {{stats_counters, '_'}, '_'}),
+	true = ets:match_delete(?TAB, {{proxy_opts, '_'}, '_'}),
 	{ok, State};
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 %% Internal.
+
+%% Fields read on every PROXY header. The rest of the transport
+%% options, including socket options, stay on {trans_opts, Ref}.
+proxy_opts(Opts) ->
+	maps:with([trusted_proxies, logger], Opts).
 
 set_monitored_process(Key, Pid, State=#state{monitors=Monitors0}) ->
 	%% First we cleanup the monitor if a residual one exists.

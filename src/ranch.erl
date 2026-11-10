@@ -436,10 +436,10 @@ recv_proxy_header(Ref, Timeout) ->
 	end.
 
 check_proxy_peer(Ref, Transport, Socket) ->
-	case ranch_server:get_transport_options(Ref) of
-		#{trusted_proxies := Trusted} = TransOpts ->
+	case ranch_server:get_proxy_opts(Ref) of
+		#{trusted_proxies := Trusted} = Opts ->
 			check_proxy_peer(Transport, Socket, Trusted,
-				maps:get(logger, TransOpts, logger));
+				maps:get(logger, Opts, logger));
 		_ ->
 			ok
 	end.
