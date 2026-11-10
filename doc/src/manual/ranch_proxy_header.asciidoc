@@ -141,7 +141,8 @@ the TLS session this connection belongs to.
 verified:::
 
 Whether the client presented a certificate and it was
-successfully verified.
+successfully verified. Ranch forces the value to false
+when neither `cert_conn` nor `cert_sess` is set.
 
 version:::
 

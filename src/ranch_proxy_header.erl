@@ -600,13 +600,14 @@ parse_tlv(<<16#5, TLVLen:16, UniqueID:TLVLen/binary, Rest/bits>>, Len, Info, Hea
 parse_tlv(<<16#5, _/bits>>, _, _, _) ->
 	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2, PP 2.2.5)'};
 %% PP2_TYPE_SSL.
-parse_tlv(<<16#20, TLVLen:16, Client, Verify:32, Rest0/bits>>, Len, Info, Header) ->
+parse_tlv(<<16#20, TLVLen:16, Client0, Verify:32, Rest0/bits>>, Len, Info, Header) ->
 	SubsLen = TLVLen - 5,
 	case Rest0 of
 		<<Subs:SubsLen/binary, Rest/bits>> ->
+			Client = parse_client(<<Client0>>),
 			SSL0 = #{
-				client => parse_client(<<Client>>),
-				verified => Verify =:= 0
+				client => Client,
+				verified => Verify =:= 0 andalso cert_presented(Client)
 			},
 			case parse_ssl_tlv(Subs, SubsLen, SSL0) of
 				{ok, SSL, <<>>} ->
@@ -641,6 +642,12 @@ parse_client(<<_:5, ClientCertSess:1, ClientCertConn:1, ClientSSL:1>>) ->
 		0 -> Client1;
 		1 -> [ssl|Client1]
 	end.
+
+%% PP2_CLIENT_CERT_CONN or PP2_CLIENT_CERT_SESS. The verify
+%% field alone is not enough: senders leave it at 0 when no
+%% client certificate was presented.
+cert_presented(Client) ->
+	lists:member(cert_conn, Client) orelse lists:member(cert_sess, Client).
 
 parse_ssl_tlv(Rest, 0, Info) ->
 	{ok, Info, Rest};
@@ -789,9 +796,9 @@ noop_tlv(_) ->
 
 ssl_tlv(#{ssl := Info=#{client := Client0, verified := Verify0}}) ->
 	Client = client(Client0, 0),
-	Verify = if
-		Verify0 -> 0;
-		not Verify0 -> 1
+	Verify = case Verify0 andalso cert_presented(Client0) of
+		true -> 0;
+		false -> 1
 	end,
 	TLVs = [
 		binary_tlv(Info, version, 16#21),
@@ -897,6 +904,49 @@ v2_test() ->
 	},
 	{ok, Test4, <<>>} = parse(iolist_to_binary(header(Test4))),
 	ok.
+
+ssl_verified_requires_cert_flag_test() ->
+	%% PP2_CLIENT_SSL only. The verify field is 0.
+	{ok, #{ssl := #{client := [ssl], verified := false}}, <<>>} =
+		parse(ssl_header(16#01, 0)),
+	%% A certificate on the session, DER omitted.
+	{ok, #{ssl := #{client := [ssl, cert_sess], verified := true}}, <<>>} =
+		parse(ssl_header(16#05, 0)),
+	%% A certificate on this connection.
+	{ok, #{ssl := #{client := [ssl, cert_conn], verified := true}}, <<>>} =
+		parse(ssl_header(16#03, 0)),
+	%% Both flags and a successful verify field.
+	{ok, #{ssl := #{client := [ssl, cert_conn, cert_sess], verified := true}}, <<>>} =
+		parse(ssl_header(16#07, 0)),
+	%% Presented, and the proxy rejected it.
+	{ok, #{ssl := #{client := [ssl, cert_conn, cert_sess], verified := false}}, <<>>} =
+		parse(ssl_header(16#07, 1)),
+	%% header/1 must not emit verify 0 without a cert flag.
+	<<"\r\n\r\n\0\r\nQUIT\n", 16#21, 16#11, 20:16,
+		127, 0, 0, 1, 10, 0, 0, 1,
+		1:16, 443:16,
+		16#20, 5:16, 16#01, 1:32>> =
+		iolist_to_binary(header(#{
+			version => 2,
+			command => proxy,
+			transport_family => ipv4,
+			transport_protocol => stream,
+			src_address => {127, 0, 0, 1},
+			src_port => 1,
+			dest_address => {10, 0, 0, 1},
+			dest_port => 443,
+			ssl => #{client => [ssl], verified => true}
+		})),
+	ok.
+
+ssl_header(Client, Verify) ->
+	<<
+		"\r\n\r\n\0\r\nQUIT\n",
+		16#21, 16#11, 20:16,
+		127, 0, 0, 1, 10, 0, 0, 1,
+		1:16, 443:16,
+		16#20, 5:16, Client, Verify:32
+	>>.
 
 v2_tlvs_test() ->
 	Common = #{
