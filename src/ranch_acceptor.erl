@@ -61,15 +61,18 @@ loop(LSocket, Transport, Logger, ConnsSup, MonitorRef) ->
 		{error, _} ->
 			ok
 	end,
-	flush(Logger),
+	flush(Logger, ConnsSup, MonitorRef),
 	?MODULE:loop(LSocket, Transport, Logger, ConnsSup, MonitorRef).
 
-flush(Logger) ->
-	receive Msg ->
-		ranch:log(warning,
-			"Ranch acceptor received unexpected message: ~p~n",
-			[Msg], Logger),
-		flush(Logger)
+flush(Logger, ConnsSup, MonitorRef) ->
+	receive
+		{'DOWN', MonitorRef, process, ConnsSup, Reason} ->
+			exit(Reason);
+		Msg ->
+			ranch:log(warning,
+				"Ranch acceptor received unexpected message: ~p~n",
+				[Msg], Logger),
+			flush(Logger, ConnsSup, MonitorRef)
 	after 0 ->
 		ok
 	end.
