@@ -185,8 +185,8 @@ parse_port(Port) when byte_size(Port) >= 1, byte_size(Port) =< 5 ->
 parse_port(_) ->
 	throw(parse_port_error).
 
-%% PP 2.1 forbids a sign and heading zeroes. A single 0 is rejected.
-parse_port1(<<A>>, Rest) when A >= $1, A =< $9 ->
+%% PP 2.1 forbids heading zeroes. A single 0 is in range.
+parse_port1(<<A>>, Rest) when A >= $0, A =< $9 ->
 	{ok, A - $0, Rest};
 parse_port1(<<A, B>>, Rest)
 		when A >= $1, A =< $9, B >= $0, B =< $9 ->
@@ -312,14 +312,38 @@ parse_v1_test() ->
 	}, <<"GET / HTTP/1.1\r">>} = parse(<<"PROXY UNKNOWN\r\nGET / HTTP/1.1\r">>),
 	ok.
 
-%% PP 2.1: no sign and no heading zero. A single 0 is not a port.
+%% PP 2.1: no heading zero. A single 0 is port 0.
 parse_v1_port_test() ->
 	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 +80 443\r\n">>),
 	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 0080 443\r\n">>),
-	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 0 443\r\n">>),
+	{ok, #{src_port := 0, dest_port := 443}, <<>>}
+		= parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 0 443\r\n">>),
 	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 443 +80\r\n">>),
+	{ok, #{src_port := 80, dest_port := 0}, <<>>}
+		= parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 80 0\r\n">>),
+	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 08 443\r\n">>),
+	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 65536 443\r\n">>),
 	{ok, #{src_port := 80, dest_port := 443}, <<>>}
 		= parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 80 443\r\n">>),
+	Zero = #{
+		version => 1,
+		command => proxy,
+		transport_family => ipv4,
+		transport_protocol => stream,
+		src_address => {192, 168, 0, 1},
+		src_port => 0,
+		dest_address => {192, 168, 0, 11},
+		dest_port => 0
+	},
+	{ok, Zero, <<>>} = parse(iolist_to_binary(header(Zero))),
+	V4 = Zero#{version => 2},
+	{ok, V4, <<>>} = parse(iolist_to_binary(header(V4))),
+	V6 = V4#{
+		transport_family => ipv6,
+		src_address => {0, 0, 0, 0, 0, 0, 0, 1},
+		dest_address => {0, 0, 0, 0, 0, 16#ffff, 0, 1}
+	},
+	{ok, V6, <<>>} = parse(iolist_to_binary(header(V6))),
 	ok.
 
 %% No zone. A dotted tail is accepted.
@@ -813,7 +837,7 @@ header(#{version := 1, command := proxy,
 		transport_protocol := stream,
 		src_address := SrcAddress, src_port := SrcPort,
 		dest_address := DestAddress, dest_port := DestPort}, _)
-		when SrcPort > 0, SrcPort =< 65535, DestPort > 0, DestPort =< 65535 ->
+		when SrcPort >= 0, SrcPort =< 65535, DestPort >= 0, DestPort =< 65535 ->
 	[
 		<<"PROXY ">>,
 		case Family0 of
@@ -853,12 +877,12 @@ protocol(dgram) -> 2.
 addresses(#{transport_family := ipv4,
 		src_address := {S1, S2, S3, S4}, src_port := SrcPort,
 		dest_address := {D1, D2, D3, D4}, dest_port := DestPort})
-		when SrcPort > 0, SrcPort =< 65535, DestPort > 0, DestPort =< 65535 ->
+		when SrcPort >= 0, SrcPort =< 65535, DestPort >= 0, DestPort =< 65535 ->
 	<<S1, S2, S3, S4, D1, D2, D3, D4, SrcPort:16, DestPort:16>>;
 addresses(#{transport_family := ipv6,
 		src_address := {S1, S2, S3, S4, S5, S6, S7, S8}, src_port := SrcPort,
 		dest_address := {D1, D2, D3, D4, D5, D6, D7, D8}, dest_port := DestPort})
-		when SrcPort > 0, SrcPort =< 65535, DestPort > 0, DestPort =< 65535 ->
+		when SrcPort >= 0, SrcPort =< 65535, DestPort >= 0, DestPort =< 65535 ->
 	<<
 		S1:16, S2:16, S3:16, S4:16, S5:16, S6:16, S7:16, S8:16,
 		D1:16, D2:16, D3:16, D4:16, D5:16, D6:16, D7:16, D8:16,
