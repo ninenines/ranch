@@ -158,10 +158,19 @@ parse_ipv4(Addr0, Rest) ->
 		{error, einval} -> throw(parse_ipv4_error)
 	end.
 
+%% PP 2.1 is hex groups and one ::. A dotted tail is accepted
+%% for now. HAProxy issue 2963 is the ::ffff:d.d.d.d case:
+%% https://github.com/haproxy/haproxy/issues/2963
+%% inet_ntop does not write a zone, so % stays rejected.
 parse_ipv6(Addr0, Rest) ->
-	case inet:parse_ipv6strict_address(binary_to_list(Addr0)) of
-		{ok, Addr} -> {ok, Addr, Rest};
-		{error, einval} -> throw(parse_ipv6_error)
+	case binary:match(Addr0, <<"%">>) of
+		nomatch ->
+			case inet:parse_ipv6strict_address(binary_to_list(Addr0)) of
+				{ok, Addr} -> {ok, Addr, Rest};
+				{error, einval} -> throw(parse_ipv6_error)
+			end;
+		_ ->
+			throw(parse_ipv6_error)
 	end.
 
 parse_port(<<Port:1/binary, C, Rest/bits>>, C) -> parse_port1(Port, Rest);
@@ -311,6 +320,50 @@ parse_v1_port_test() ->
 	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 443 +80\r\n">>),
 	{ok, #{src_port := 80, dest_port := 443}, <<>>}
 		= parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 80 443\r\n">>),
+	ok.
+
+%% No zone. A dotted tail is accepted.
+parse_v1_ipv6_test() ->
+	{error, _} = parse(<<"PROXY TCP6 fe80::1%lo ::1 1 2\r\n">>),
+	{error, _} = parse(<<"PROXY TCP6 ::1 fe80::1%1 1 2\r\n">>),
+	{ok, #{src_address := {0, 0, 0, 0, 0, 16#ffff, 16#c000, 16#201}}, <<>>}
+		= parse(<<"PROXY TCP6 ::ffff:192.0.2.1 ::1 1 2\r\n">>),
+	{ok, #{src_address := {0, 0, 0, 0, 0, 0, 16#c000, 16#201}}, <<>>}
+		= parse(<<"PROXY TCP6 ::192.0.2.1 ::1 1 2\r\n">>),
+	{ok, #{src_address := {8193, 3512, 0, 0, 0, 0, 16#c000, 16#201}}, <<>>}
+		= parse(<<"PROXY TCP6 2001:db8::192.0.2.1 ::1 1 2\r\n">>),
+	{ok, #{src_address := {1, 2, 3, 4, 5, 6, 16#c000, 16#201}}, <<>>}
+		= parse(<<"PROXY TCP6 1:2:3:4:5:6:192.0.2.1 ::1 1 2\r\n">>),
+	{ok, #{src_address := {0, 0, 0, 0, 16#ffff, 1, 16#c000, 16#201}}, <<>>}
+		= parse(<<"PROXY TCP6 ::ffff:1:192.0.2.1 ::1 1 2\r\n">>),
+	{ok, #{src_address := {0, 0, 0, 0, 0, 1, 16#c000, 16#201}}, <<>>}
+		= parse(<<"PROXY TCP6 ::1:192.0.2.1 ::1 1 2\r\n">>),
+	{ok, #{
+		transport_family := ipv6,
+		src_address := {65152, 0, 0, 0, 0, 0, 0, 1},
+		dest_address := {0, 0, 0, 0, 0, 0, 0, 1}
+	}, <<>>} = parse(<<"PROXY TCP6 fe80::1 ::1 1 2\r\n">>),
+	%% inet:ntoa prints fe80::1%01 for Scoped and a dotted tail for
+	%% Mapped. Scoped is written as eight hex groups. The dotted
+	%% tail is kept.
+	Scoped = {16#fe80, 1, 0, 0, 0, 0, 0, 1},
+	Mapped = {0, 0, 0, 0, 0, 16#ffff, 16#c000, 16#201},
+	Info = #{
+		version => 1,
+		command => proxy,
+		transport_family => ipv6,
+		transport_protocol => stream,
+		src_address => Scoped,
+		src_port => 1,
+		dest_address => Mapped,
+		dest_port => 2
+	},
+	Header = iolist_to_binary(header(Info)),
+	{ok, #{src_address := Scoped, dest_address := Mapped}, <<>>}
+		= parse(Header),
+	{_, _} = binary:match(Header, <<"fe80:1:0:0:0:0:0:1">>),
+	{_, _} = binary:match(Header, <<"::ffff:192.0.2.1">>),
+	nomatch = binary:match(Header, <<"%">>),
 	ok.
 
 %% PP 2.1: the CRLF must occur in the first 107 bytes. The worst case
@@ -767,7 +820,7 @@ header(#{version := 1, command := proxy,
 			ipv4 when tuple_size(SrcAddress) =:= 4, tuple_size(DestAddress) =:= 4 ->
 				[<<"TCP4 ">>, inet:ntoa(SrcAddress), $\s, inet:ntoa(DestAddress)];
 			ipv6 when tuple_size(SrcAddress) =:= 8, tuple_size(DestAddress) =:= 8 ->
-				[<<"TCP6 ">>, inet:ntoa(SrcAddress), $\s, inet:ntoa(DestAddress)]
+				[<<"TCP6 ">>, ipv6_text(SrcAddress), $\s, ipv6_text(DestAddress)]
 		end,
 		$\s,
 		integer_to_binary(SrcPort),
@@ -775,6 +828,20 @@ header(#{version := 1, command := proxy,
 		integer_to_binary(DestPort),
 		$\r, $\n
 	].
+
+%% inet:ntoa appends % and a zone for some link-local tuples.
+%% Write eight hex groups then, so the second word is kept.
+%% A dotted tail is left as inet:ntoa prints it.
+ipv6_text(Addr) ->
+	Text = list_to_binary(inet:ntoa(Addr)),
+	case binary:match(Text, <<"%">>) of
+		nomatch ->
+			Text;
+		_ ->
+			Groups = [string:lowercase(integer_to_binary(W, 16))
+				|| W <- tuple_to_list(Addr)],
+			iolist_to_binary(lists:join($:, Groups))
+	end.
 
 family(ipv4) -> 1;
 family(ipv6) -> 2;
