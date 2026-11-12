@@ -176,15 +176,33 @@ parse_port(Port) when byte_size(Port) >= 1, byte_size(Port) =< 5 ->
 parse_port(_) ->
 	throw(parse_port_error).
 
-parse_port1(Port0, Rest) ->
-	try binary_to_integer(Port0) of
-		Port when Port > 0, Port =< 65535 ->
+%% PP 2.1 forbids a sign and heading zeroes. A single 0 is rejected.
+parse_port1(<<A>>, Rest) when A >= $1, A =< $9 ->
+	{ok, A - $0, Rest};
+parse_port1(<<A, B>>, Rest)
+		when A >= $1, A =< $9, B >= $0, B =< $9 ->
+	{ok, (A - $0) * 10 + (B - $0), Rest};
+parse_port1(<<A, B, C>>, Rest)
+		when A >= $1, A =< $9, B >= $0, B =< $9, C >= $0, C =< $9 ->
+	{ok, (A - $0) * 100 + (B - $0) * 10 + (C - $0), Rest};
+parse_port1(<<A, B, C, D>>, Rest)
+		when A >= $1, A =< $9, B >= $0, B =< $9,
+			C >= $0, C =< $9, D >= $0, D =< $9 ->
+	{ok, (A - $0) * 1000 + (B - $0) * 100
+		+ (C - $0) * 10 + (D - $0), Rest};
+parse_port1(<<A, B, C, D, E>>, Rest)
+		when A >= $1, A =< $9, B >= $0, B =< $9,
+			C >= $0, C =< $9, D >= $0, D =< $9, E >= $0, E =< $9 ->
+	Port = (A - $0) * 10000 + (B - $0) * 1000
+		+ (C - $0) * 100 + (D - $0) * 10 + (E - $0),
+	case Port =< 65535 of
+		true ->
 			{ok, Port, Rest};
-		_ ->
+		false ->
 			throw(parse_port_error)
-	catch _:_ ->
-		throw(parse_port_error)
-	end.
+	end;
+parse_port1(_, _) ->
+	throw(parse_port_error).
 
 -ifdef(TEST).
 parse_v1_test() ->
@@ -283,6 +301,16 @@ parse_v1_test() ->
 		transport_family := undefined,
 		transport_protocol := undefined
 	}, <<"GET / HTTP/1.1\r">>} = parse(<<"PROXY UNKNOWN\r\nGET / HTTP/1.1\r">>),
+	ok.
+
+%% PP 2.1: no sign and no heading zero. A single 0 is not a port.
+parse_v1_port_test() ->
+	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 +80 443\r\n">>),
+	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 0080 443\r\n">>),
+	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 0 443\r\n">>),
+	{error, _} = parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 443 +80\r\n">>),
+	{ok, #{src_port := 80, dest_port := 443}, <<>>}
+		= parse(<<"PROXY TCP4 192.168.0.1 192.168.0.11 80 443\r\n">>),
 	ok.
 
 %% PP 2.1: the CRLF must occur in the first 107 bytes. The worst case
