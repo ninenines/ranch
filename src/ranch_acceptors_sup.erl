@@ -115,8 +115,22 @@ hide_socket_opts([{password, _}|SocketOpts]) ->
 	[{password, '...'}|hide_socket_opts(SocketOpts)];
 hide_socket_opts([{certs_keys, _}|SocketOpts]) ->
 	[{certs_keys, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{sni_hosts, Hosts}|SocketOpts]) when is_list(Hosts) ->
+	[{sni_hosts, hide_sni_hosts(Hosts)}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{stateless_tickets_seed, _}|SocketOpts]) ->
+	[{stateless_tickets_seed, '...'}|hide_socket_opts(SocketOpts)];
 hide_socket_opts([SocketOpt|SocketOpts]) ->
-	[SocketOpt|hide_socket_opts(SocketOpts)].
+	[SocketOpt|hide_socket_opts(SocketOpts)];
+%% Not a list. An improper tail ends up here as well.
+hide_socket_opts(SocketOpt) ->
+	SocketOpt.
+
+hide_sni_hosts([{Host, Opts}|Hosts]) when is_list(Opts) ->
+	[{Host, hide_socket_opts(Opts)}|hide_sni_hosts(Hosts)];
+hide_sni_hosts([Host|Hosts]) ->
+	[Host|hide_sni_hosts(Hosts)];
+hide_sni_hosts(Hosts) ->
+	Hosts.
 
 %% Handling of no_cert really should be done in ranch_ssl. We leave it here for
 %% backwards compatibility with possibly existing custom transports without a
