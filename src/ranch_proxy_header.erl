@@ -724,6 +724,8 @@ parse_tlv(<<16#20, TLVLen:16, Client0, Verify:32, Rest0/bits>>, Len, Info, Heade
 		_ ->
 			{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2)'}
 	end;
+parse_tlv(<<16#20, _/bits>>, _, _, _) ->
+	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2)'};
 %% PP2_TYPE_NETNS.
 parse_tlv(<<16#30, TLVLen:16, NetNS:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	parse_tlv(Rest, Len - TLVLen - 3, Info#{netns => NetNS}, Header);
@@ -1075,6 +1077,18 @@ ssl_verified_requires_cert_flag_test() ->
 			dest_port => 443,
 			ssl => #{client => [ssl], verified => true}
 		})),
+	ok.
+
+ssl_short_tlv_test() ->
+	%% PP2_TYPE_SSL shorter than the client byte and verify field,
+	%% and last in the header.
+	{error, _} = parse(<<
+		"\r\n\r\n\0\r\nQUIT\n",
+		16#21, 16#11, 19:16,
+		127, 0, 0, 1, 10, 0, 0, 1,
+		1:16, 443:16,
+		16#20, 4:16, 0, 0, 0, 0
+	>>),
 	ok.
 
 ssl_header(Client, Verify) ->
