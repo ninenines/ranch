@@ -106,6 +106,7 @@ groups() ->
 		misc_info_embedded,
 		misc_process_labels,
 		misc_metrics,
+		misc_stats_counters_upgrade,
 		misc_opts_logger,
 		misc_post_listen_callback,
 		misc_post_listen_callback_error,
@@ -439,6 +440,23 @@ misc_metrics(_) ->
 	{20, 20} = do_accumulate_metrics(Metrics4),
 	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
+misc_stats_counters_upgrade(_) ->
+	doc("A supervisor upgrade does not reset connection counters."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, #{}, echo_protocol, []),
+	Counters = ranch_server:get_stats_counters(Name),
+	ok = counters:add(Counters, 1, 1),
+	Opts = ranch:get_transport_options(Name),
+	ok = ranch:set_transport_options(Name, Opts#{num_acceptors => 20}),
+	try
+		{ok, _} = ranch_conns_sup_sup:init({Name, ranch_tcp, echo_protocol, logger}),
+		Counters = ranch_server:get_stats_counters(Name),
+		1 = counters:get(Counters, 1)
+	after
+		ok = ranch:stop_listener(Name)
+	end,
 	ok.
 
 do_accumulate_metrics(Metrics) ->
