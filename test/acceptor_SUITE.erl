@@ -121,6 +121,7 @@ groups() ->
 		misc_stop_unknown_listener,
 		misc_repeated_start_stop,
 		misc_listen_error,
+		misc_listen_error_secrets,
 		misc_trace_acceptors,
 		misc_trace_acceptors_timeout,
 		misc_trace_acceptors_mailbox,
@@ -898,6 +899,47 @@ misc_listen_error(_) ->
 		error(timeout)
 	end,
 	logger:remove_primary_filter(Name),
+	ok.
+
+misc_listen_error_secrets(_) ->
+	doc("Listen failures do not log SNI keys or the ticket seed."),
+	Name = ?FUNCTION_NAME,
+	Self = self(),
+	Key = <<"sni-host-key">>,
+	Password = <<"sni-host-password">>,
+	Seed = <<"ticket-seed">>,
+	logger:add_primary_filter(Name, {fun(Event, _Args) -> Self ! {Name, Event}, ignore end, undefined}),
+	SocketOpts = [
+		[
+			{sni_hosts, [{"localhost", [
+				{key, Key},
+				{password, Password}
+			]}]},
+			{stateless_tickets_seed, Seed}
+		],
+		[{sni_hosts, [[{key, Key}, {password, Password}]]}],
+		[{sni_hosts, [{"localhost", #{key => Key, password => Password}}]}],
+		[{sni_hosts, [{password, binary_to_list(Password)}, {key, Key}]}],
+		[{sni_hosts, Key}]
+	],
+	try
+		lists:foreach(fun(Opts) ->
+			{error, _} = ranch:start_listener(Name,
+				ranch_listen_error_transport, #{socket_opts => Opts},
+				echo_protocol, []),
+			receive
+				{Name, #{msg := {Format, Args}}} when is_list(Format) ->
+					Msg = iolist_to_binary(io_lib:format(Format, Args)),
+					nomatch = binary:match(Msg, Key),
+					nomatch = binary:match(Msg, Password),
+					nomatch = binary:match(Msg, Seed)
+			after 1000 ->
+				error(timeout)
+			end
+		end, SocketOpts)
+	after
+		logger:remove_primary_filter(Name)
+	end,
 	ok.
 
 misc_trace_acceptors(_) ->
