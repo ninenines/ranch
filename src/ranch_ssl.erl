@@ -141,15 +141,35 @@ listen(TransOpts) ->
 			{error, no_cert}
 	end.
 
-do_listen(SocketOpts0, Logger) ->
-	SocketOpts = set_default_options(SocketOpts0),
-	DisallowedOpts0 = disallowed_listen_options(),
-	DisallowedOpts = unsupported_tls_options(SocketOpts) ++ DisallowedOpts0,
+do_listen(SocketOpts, Logger) ->
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(SocketOpts, DisallowedOpts,
-		[binary, {active, false}, {reuseaddr, true}], Logger)).
+	ssl:listen(0, prepare_socket_opts(SocketOpts, Logger)).
+
+prepare_socket_opts([Backend = {inet_backend, _}|SocketOpts], Logger) ->
+	%% ssl conses non-emulated socket options. Before ssl 11.6
+	%% that list is not reversed, so gen_tcp sees the last option
+	%% first. ssl 11.6+ reverses it. gen_tcp exits badarg unless
+	%% the tuple is first.
+	Opts = prepare_socket_opts(SocketOpts, Logger),
+	case ssl_preserves_socket_opt_order() of
+		true ->
+			[Backend|Opts];
+		false ->
+			Opts ++ [Backend]
+	end;
+prepare_socket_opts(SocketOpts0, Logger) ->
+	SocketOpts = set_default_options(SocketOpts0),
+	DisallowedOpts0 = disallowed_listen_options(),
+	DisallowedOpts = unsupported_tls_options(SocketOpts) ++ DisallowedOpts0,
+	ranch:filter_options(SocketOpts, DisallowedOpts,
+		[binary, {active, false}, {reuseaddr, true}], Logger).
+
+ssl_preserves_socket_opt_order() ->
+	{ok, Vsn} = application:get_key(ssl, vsn),
+	Ns = [list_to_integer(N) || N <- string:split(Vsn, ".", all)],
+	Ns >= [11, 6].
 
 set_default_options(SocketOpts0) ->
 	case proplists:get_value(protocol, SocketOpts0, tls) of

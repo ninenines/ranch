@@ -78,6 +78,7 @@ groups() ->
 		ssl_active_echo,
 		ssl_active_n_echo,
 		ssl_echo,
+		ssl_inet_backend_socket,
 		ssl_local_echo,
 		ssl_dtls_echo,
 		ssl_graceful,
@@ -1202,6 +1203,32 @@ ssl_echo(_) ->
 	%% Make sure the listener stopped.
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
+
+ssl_inet_backend_socket(_) ->
+	doc("TLS listen keeps a leading socket inet_backend."),
+	case os:type() of
+		{win32, nt} ->
+			{skip, "No socket backend support"};
+		_ ->
+			Name = ?FUNCTION_NAME,
+			Opts = ct_helper:get_certs_from_ets(),
+			{ok, ListenerSup} = ranch:start_listener(Name,
+				ranch_ssl, #{socket_opts => [{inet_backend, socket}|Opts]},
+				echo_protocol, []),
+			{_, AcceptorsSup, _, _} = lists:keyfind(ranch_acceptors_sup, 1,
+				supervisor:which_children(ListenerSup)),
+			{dictionary, Dict} = process_info(AcceptorsSup, dictionary),
+			{lsockets, [{1, LSock}]} = lists:keyfind(lsockets, 1, Dict),
+			Sock = case LSock of
+				{sslsocket, nil, {S, _}} ->
+					S;
+				_ ->
+					element(2, LSock)
+			end,
+			{'$inet', gen_tcp_socket, _} = Sock,
+			true = is_integer(ranch:get_port(Name)),
+			ok = ranch:stop_listener(Name)
+	end.
 
 ssl_dtls_echo(_) ->
 	doc("Ensure that passive mode works with SSL transport."),
