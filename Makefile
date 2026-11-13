@@ -18,7 +18,7 @@ DOC_DEPS = asciideck
 
 TEST_DEPS = $(if $(CI_ERLANG_MK),ci.erlang.mk) ct_helper stampede
 dep_ct_helper = git https://github.com/ninenines/ct_helper master
-dep_stampede = git https://github.com/juhlig/stampede 0.6.0
+dep_stampede = git https://github.com/juhlig/stampede 1945414856a35f55ec030fd2265c834219dbfff2 # 0.6.0
 
 # CI configuration.
 

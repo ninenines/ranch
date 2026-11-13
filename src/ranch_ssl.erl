@@ -141,15 +141,23 @@ listen(TransOpts) ->
 			{error, no_cert}
 	end.
 
-do_listen(SocketOpts0, Logger) ->
-	SocketOpts = set_default_options(SocketOpts0),
-	DisallowedOpts0 = disallowed_listen_options(),
-	DisallowedOpts = unsupported_tls_options(SocketOpts) ++ DisallowedOpts0,
+do_listen(SocketOpts, Logger) ->
 	%% We set the port to 0 because it is given in the Opts directly.
 	%% The port in the options takes precedence over the one in the
 	%% first argument.
-	ssl:listen(0, ranch:filter_options(SocketOpts, DisallowedOpts,
-		[binary, {active, false}, {reuseaddr, true}], Logger)).
+	ssl:listen(0, prepare_socket_opts(SocketOpts, Logger)).
+
+prepare_socket_opts([Backend = {inet_backend, _}|SocketOpts], Logger) ->
+	%% On OTP 29, ssl reverses non-emulated socket options, so
+	%% gen_tcp sees this tuple first only when it is prepended.
+	%% It exits badarg if the tuple remains later in the list.
+	[Backend|prepare_socket_opts(SocketOpts, Logger)];
+prepare_socket_opts(SocketOpts0, Logger) ->
+	SocketOpts = set_default_options(SocketOpts0),
+	DisallowedOpts0 = disallowed_listen_options(),
+	DisallowedOpts = unsupported_tls_options(SocketOpts) ++ DisallowedOpts0,
+	ranch:filter_options(SocketOpts, DisallowedOpts,
+		[binary, {active, false}, {reuseaddr, true}], Logger).
 
 set_default_options(SocketOpts0) ->
 	case proplists:get_value(protocol, SocketOpts0, tls) of
