@@ -115,8 +115,36 @@ hide_socket_opts([{password, _}|SocketOpts]) ->
 	[{password, '...'}|hide_socket_opts(SocketOpts)];
 hide_socket_opts([{certs_keys, _}|SocketOpts]) ->
 	[{certs_keys, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{sni_hosts, Hosts}|SocketOpts]) when is_list(Hosts) ->
+	[{sni_hosts, hide_sni_hosts(Hosts)}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{sni_hosts, _}|SocketOpts]) ->
+	[{sni_hosts, '...'}|hide_socket_opts(SocketOpts)];
+hide_socket_opts([{stateless_tickets_seed, _}|SocketOpts]) ->
+	[{stateless_tickets_seed, '...'}|hide_socket_opts(SocketOpts)];
 hide_socket_opts([SocketOpt|SocketOpts]) ->
 	[SocketOpt|hide_socket_opts(SocketOpts)].
+
+hide_sni_hosts([]) ->
+	[];
+hide_sni_hosts([{Host, Opts}|Hosts]) ->
+	case option_list(Opts) of
+		true ->
+			[{Host, hide_socket_opts(Opts)}|hide_sni_hosts(Hosts)];
+		false ->
+			['...'|hide_sni_hosts(Hosts)]
+	end;
+hide_sni_hosts([_|Hosts]) ->
+	['...'|hide_sni_hosts(Hosts)];
+hide_sni_hosts(_) ->
+	'...'.
+
+%% A password string is a list. Only a list of pairs is host options.
+option_list([]) ->
+	true;
+option_list([{_, _}|Opts]) ->
+	option_list(Opts);
+option_list(_) ->
+	false.
 
 %% Handling of no_cert really should be done in ranch_ssl. We leave it here for
 %% backwards compatibility with possibly existing custom transports without a
