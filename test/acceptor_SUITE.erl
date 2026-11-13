@@ -138,6 +138,7 @@ groups() ->
 		supervisor_restart_acceptors,
 		supervisor_suspended_acceptors,
 		supervisor_conns_alive,
+		supervisor_conns_sup_crash,
 		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
@@ -2230,6 +2231,44 @@ supervisor_conns_alive(_) ->
 	_ = erlang:trace(all, false, [all]),
 	ok = clean_traces(),
 	ok = ranch:stop_listener(Name).
+
+supervisor_conns_sup_crash(_) ->
+	doc("Ensure that an acceptor recovers after its connections "
+		"supervisor crashed while it was waiting in accept."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1, num_conns_sups => 1},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	ok = do_echo(Port),
+	[{1, ConnsSup0}] = ranch_server:get_connections_sups(Name),
+	exit(ConnsSup0, kill),
+	ok = do_wait_new_conns_sup(Name, ConnsSup0, 50),
+	%% The acceptor notices the crash on the next connection,
+	%% which is lost. All later connections work.
+	_ = do_echo(Port),
+	ok = do_echo(Port),
+	ok = do_echo(Port),
+	ok = ranch:stop_listener(Name).
+
+do_wait_new_conns_sup(Name, ConnsSup0, N) when N > 0 ->
+	case ranch_server:get_connections_sups(Name) of
+		[{1, ConnsSup}] when ConnsSup =/= ConnsSup0 ->
+			ok;
+		_ ->
+			receive after 100 -> ok end,
+			do_wait_new_conns_sup(Name, ConnsSup0, N - 1)
+	end.
+
+do_echo(Port) ->
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	Res = case gen_tcp:recv(Socket, 21, 1000) of
+		{ok, <<"TCP Ranch is working!">>} -> ok;
+		Error -> Error
+	end,
+	ok = gen_tcp:close(Socket),
+	Res.
 
 supervisor_embedded_ranch_server_crash(_) ->
 	doc("Ensure that restarting ranch_server also restarts embedded listeners."),
