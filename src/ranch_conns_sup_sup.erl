@@ -33,7 +33,7 @@ init({Ref, Transport, Protocol, Logger}) ->
 	TransOpts = ranch_server:get_transport_options(Ref),
 	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 	NumConnsSups = maps:get(num_conns_sups, TransOpts, NumAcceptors),
-	StatsCounters = counters:new(2*NumConnsSups, []),
+	StatsCounters = stats_counters(Ref, 2*NumConnsSups),
 	ok = ranch_server:set_stats_counters(Ref, StatsCounters),
 	%% The supervisor logs this MFA. connection_type is fixed until the
 	%% listener restarts. Other options are read from ranch_server.
@@ -45,3 +45,14 @@ init({Ref, Transport, Protocol, Logger}) ->
 		type => supervisor
 	} || N <- lists:seq(1, NumConnsSups)],
 	{ok, {#{intensity => 1 + ceil(math:log2(NumConnsSups))}, ChildSpecs}}.
+
+%% A supervisor upgrade calls init/1 again and does not restart
+%% connection supervisors. They already hold this ref. start_link/4
+%% deletes it before the first init, which is when the count is fixed.
+stats_counters(Ref, NumCounters) ->
+	try
+		ranch_server:get_stats_counters(Ref)
+	catch
+		error:badarg ->
+			counters:new(NumCounters, [])
+	end.
