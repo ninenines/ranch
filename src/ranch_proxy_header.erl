@@ -893,8 +893,9 @@ addresses(#{transport_family := ipv6,
 addresses(#{transport_family := unix,
 		src_address := SrcAddress, dest_address := DestAddress})
 		when byte_size(SrcAddress) =< 108, byte_size(DestAddress) =< 108 ->
-	case binary:match(SrcAddress, <<0>>) =:= nomatch andalso
-			binary:match(DestAddress, <<0>>) =:= nomatch of
+	case byte_size(SrcAddress) < 108 andalso byte_size(DestAddress) < 108
+			andalso binary:match(SrcAddress, <<0>>) =:= nomatch
+			andalso binary:match(DestAddress, <<0>>) =:= nomatch of
 		true ->
 			SrcPadding = 8 * (108 - byte_size(SrcAddress)),
 			DestPadding = 8 * (108 - byte_size(DestAddress)),
@@ -1062,6 +1063,10 @@ unix_nul_address_test() ->
 	},
 	?assertError(badarg, header(Base#{src_address => <<"/tmp/a\0/evil">>})),
 	?assertError(badarg, header(Base#{dest_address => <<"/tmp/b\0/evil">>})),
+	?assertError(badarg, header(Base#{src_address => binary:copy(<<$a>>, 108)})),
+	Path = binary:copy(<<$a>>, 107),
+	Round = Base#{src_address => Path},
+	{ok, Round, <<>>} = parse(iolist_to_binary(header(Round))),
 	ok.
 
 ssl_verified_requires_cert_flag_test() ->
