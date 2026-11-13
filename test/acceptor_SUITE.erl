@@ -106,6 +106,7 @@ groups() ->
 		misc_info_embedded,
 		misc_process_labels,
 		misc_metrics,
+		misc_stats_counters_upgrade,
 		misc_opts_logger,
 		misc_post_listen_callback,
 		misc_post_listen_callback_error,
@@ -440,6 +441,38 @@ misc_metrics(_) ->
 	{20, 20} = do_accumulate_metrics(Metrics4),
 	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
+	ok.
+
+misc_stats_counters_upgrade(_) ->
+	doc("A supervisor upgrade does not reset connection counters."),
+	Name = ?FUNCTION_NAME,
+	{ok, ListenerSup} = ranch:start_listener(Name, ranch_tcp,
+		#{num_conns_sups => 1}, echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket1} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	ok = gen_tcp:send(Socket1, <<"a">>),
+	{ok, <<"a">>} = gen_tcp:recv(Socket1, 1, 1000),
+	#{metrics := Metrics1} = ranch:info(Name),
+	{1, 0} = do_accumulate_metrics(Metrics1),
+	Counters = ranch_server:get_stats_counters(Name),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
+		supervisor:which_children(ListenerSup)),
+	try
+		ok = sys:suspend(ConnsSupSup),
+		ok = sys:change_code(ConnsSupSup, ranch_conns_sup_sup, undefined, []),
+		ok = sys:resume(ConnsSupSup),
+		Counters = ranch_server:get_stats_counters(Name),
+		{ok, Socket2} = gen_tcp:connect("localhost", Port,
+			[binary, {active, false}]),
+		ok = gen_tcp:send(Socket2, <<"b">>),
+		{ok, <<"b">>} = gen_tcp:recv(Socket2, 1, 1000),
+		#{metrics := Metrics2} = ranch:info(Name),
+		{2, 0} = do_accumulate_metrics(Metrics2),
+		ok = gen_tcp:close(Socket2)
+	after
+		ok = gen_tcp:close(Socket1),
+		ok = ranch:stop_listener(Name)
+	end,
 	ok.
 
 do_accumulate_metrics(Metrics) ->
