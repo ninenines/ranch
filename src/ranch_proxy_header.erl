@@ -515,24 +515,36 @@ parse_v2(<<
 parse_v2(<<SrcAddr0:108/binary, DestAddr0:108/binary, Rest/bits>>,
 		Len, Family=unix, Protocol, Header)
 		when Len >= 216 ->
-	try
-		[SrcAddr, _] = binary:split(SrcAddr0, <<0>>),
-		true = byte_size(SrcAddr) > 0,
-		[DestAddr, _] = binary:split(DestAddr0, <<0>>),
-		true = byte_size(DestAddr) > 0,
-		parse_tlv(Rest, Len - 216, #{
-			version => 2,
-			command => proxy,
-			transport_family => Family,
-			transport_protocol => Protocol,
-			src_address => SrcAddr,
-			dest_address => DestAddr
-		}, Header)
-	catch _:_ ->
-		{error, 'Invalid UNIX address in PROXY protocol binary header. (PP 2.2)'}
-	end;
+	SrcAddr = parse_unix_address(SrcAddr0),
+	DestAddr = parse_unix_address(DestAddr0),
+	parse_tlv(Rest, Len - 216, #{
+		version => 2,
+		command => proxy,
+		transport_family => Family,
+		transport_protocol => Protocol,
+		src_address => SrcAddr,
+		dest_address => DestAddr
+	}, Header);
 parse_v2(_, _, _, _, _) ->
 	{error, 'Invalid length in the PROXY protocol binary header. (PP 2.2)'}.
+
+%% A 108-byte address has no room for a terminator. A shorter
+%% address is the bytes before the first NUL. A leading NUL is
+%% the empty address. A match of 64 bytes or less does not keep
+%% the rest of the header.
+parse_unix_address(Addr) ->
+	case first_nul(Addr) of
+		undefined ->
+			binary:copy(Addr);
+		0 ->
+			<<>>;
+		Pos when Pos =< 64 ->
+			<<UnixAddr:Pos/binary, _/bits>> = Addr,
+			UnixAddr;
+		Pos ->
+			<<UnixAddr:Pos/binary, _/bits>> = Addr,
+			binary:copy(UnixAddr)
+	end.
 
 -ifdef(TEST).
 parse_v2_test() ->
@@ -893,12 +905,60 @@ addresses(#{transport_family := ipv6,
 addresses(#{transport_family := unix,
 		src_address := SrcAddress, dest_address := DestAddress})
 		when byte_size(SrcAddress) =< 108, byte_size(DestAddress) =< 108 ->
-	SrcPadding = 8 * (108 - byte_size(SrcAddress)),
-	DestPadding = 8 * (108 - byte_size(DestAddress)),
-	<<
-		SrcAddress/binary, 0:SrcPadding,
-		DestAddress/binary, 0:DestPadding
-	>>.
+	case {first_nul(SrcAddress), first_nul(DestAddress)} of
+		{undefined, undefined} ->
+			SrcPadding = 8 * (108 - byte_size(SrcAddress)),
+			DestPadding = 8 * (108 - byte_size(DestAddress)),
+			<<
+				SrcAddress/binary, 0:SrcPadding,
+				DestAddress/binary, 0:DestPadding
+			>>;
+		{_, _} ->
+			error(badarg)
+	end.
+
+first_nul(Bin) ->
+	first_nul(Bin, 0).
+
+%% Seven bytes fit in a small integer. Subtracting 0x01
+%% from a byte sets that byte's high bit when it was 0.
+%% A 16#01 before that NUL sets the same bit, so the word
+%% is scanned to find the real byte.
+first_nul(<<Int:56, Rest/binary>> = Bin, Off) ->
+	Mask = (Int - 16#01010101010101) band bnot Int
+		band 16#80808080808080,
+	case Mask of
+		0 ->
+			first_nul(Rest, Off + 7);
+		_ ->
+			Off + nul_at(Bin)
+	end;
+%% At most six bytes remain. This clause must stay
+%% below the seven-byte clause.
+first_nul(Bin, Off) ->
+	case nul_at(Bin) of
+		undefined ->
+			undefined;
+		At ->
+			Off + At
+	end.
+
+nul_at(<<0, _/bits>>) ->
+	0;
+nul_at(<<_, 0, _/bits>>) ->
+	1;
+nul_at(<<_, _, 0, _/bits>>) ->
+	2;
+nul_at(<<_, _, _, 0, _/bits>>) ->
+	3;
+nul_at(<<_, _, _, _, 0, _/bits>>) ->
+	4;
+nul_at(<<_, _, _, _, _, 0, _/bits>>) ->
+	5;
+nul_at(<<_, _, _, _, _, _, 0, _/bits>>) ->
+	6;
+nul_at(<<_/bits>>) ->
+	undefined.
 
 tlvs(ProxyInfo, Opts) ->
 	[
@@ -1043,6 +1103,53 @@ v2_test() ->
 		dest_address => <<"/run/destination.sock">>
 	},
 	{ok, Test4, <<>>} = parse(iolist_to_binary(header(Test4))),
+	ok.
+
+unix_nul_address_test() ->
+	Base = #{
+		version => 2,
+		command => proxy,
+		transport_family => unix,
+		transport_protocol => stream,
+		src_address => <<"/tmp/a">>,
+		dest_address => <<"/tmp/b">>
+	},
+	?assertError(badarg, header(Base#{src_address => <<"/tmp/a\0/evil">>})),
+	?assertError(badarg, header(Base#{dest_address => <<"/tmp/b\0/evil">>})),
+	?assertError(badarg, header(Base#{src_address => <<"/tmp/ab", 0>>})),
+	?assertError(badarg, header(Base#{src_address => <<"/tmp/abc", 0>>})),
+	?assertError(badarg, header(Base#{src_address => <<"/tmp/abcd", 0>>})),
+	?assertError(badarg, header(Base#{src_address => <<"/tmp/abcde", 0>>})),
+	?assertError(badarg, header(Base#{src_address => <<"/tmp/abcdef", 0>>})),
+	?assertError(badarg, header(Base#{src_address => <<"/tmp/abcdefg", 0>>})),
+	Path = binary:copy(<<$a>>, 107),
+	Round = Base#{src_address => Path},
+	{ok, Round, <<>>} = parse(iolist_to_binary(header(Round))),
+	Full = binary:copy(<<$b>>, 108),
+	RoundFull = Base#{src_address => Full, dest_address => Full},
+	{ok, RoundFull, <<>>} = parse(iolist_to_binary(header(RoundFull))),
+	Empty = Base#{src_address => <<>>, dest_address => <<>>},
+	{ok, Empty, <<>>} = parse(iolist_to_binary(header(Empty))),
+	%% A 16#01 before the NUL stays in the address.
+	One = <<1, 1, 0, 0:(8 * 105)>>,
+	{ok, #{src_address := GotOne, dest_address := <<>>}, <<>>} = parse(<<
+		13, 10, 13, 10, 0, 13, 10, 81, 85, 73, 84, 10,
+		33, 49, 0, 216,
+		One/binary,
+		0:108/unit:8
+	>>),
+	<<1, 1>> = GotOne,
+	%% A leading NUL is an empty address.
+	Abstract = <<0, "name", 0:(8 * (108 - 5))>>,
+	{ok, #{src_address := <<>>, dest_address := <<>>}, <<>>} = parse(<<
+		13, 10, 13, 10, 0, 13, 10, 81, 85, 73, 84, 10,
+		33, 49, 0, 216,
+		Abstract/binary,
+		Abstract/binary
+	>>),
+	Name64 = binary:copy(<<$c>>, 64),
+	Round64 = Base#{src_address => Name64},
+	{ok, Round64, <<>>} = parse(iolist_to_binary(header(Round64))),
 	ok.
 
 ssl_verified_requires_cert_flag_test() ->
