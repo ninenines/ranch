@@ -555,9 +555,14 @@ get_connections(Ref, all) ->
 get_max_connections(Ref) ->
 	ranch_server:get_max_connections(Ref).
 
--spec set_max_connections(ref(), max_conns()) -> ok.
+-spec set_max_connections(ref(), max_conns()) -> ok | {error, not_found}.
 set_max_connections(Ref, MaxConnections) ->
-	ranch_server:set_max_connections(Ref, MaxConnections).
+	case ranch_server:listener_start_args_exists(Ref) of
+		true ->
+			ranch_server:set_max_connections(Ref, MaxConnections);
+		false ->
+			{error, not_found}
+	end.
 
 -spec get_transport_options(ref()) -> transport_opts(any()).
 get_transport_options(Ref) ->
@@ -565,13 +570,18 @@ get_transport_options(Ref) ->
 
 -spec set_transport_options(ref(), opts()) -> ok | {error, term()}.
 set_transport_options(Ref, TransOpts0) ->
-	TransOpts = normalize_opts(TransOpts0),
-	case validate_transport_opts(TransOpts) of
-		ok ->
-			ok = ranch_server:set_transport_options(Ref, TransOpts),
-			ok = apply_transport_options(Ref, TransOpts);
-		TransOptsError ->
-			TransOptsError
+	case ranch_server:listener_start_args_exists(Ref) of
+		true ->
+			TransOpts = normalize_opts(TransOpts0),
+			case validate_transport_opts(TransOpts) of
+				ok ->
+					ok = ranch_server:set_transport_options(Ref, TransOpts),
+					ok = apply_transport_options(Ref, TransOpts);
+				TransOptsError ->
+					TransOptsError
+			end;
+		false ->
+			{error, not_found}
 	end.
 
 apply_transport_options(Ref, TransOpts) ->
@@ -586,9 +596,14 @@ apply_transport_options(Ref, TransOpts) ->
 get_protocol_options(Ref) ->
 	ranch_server:get_protocol_options(Ref).
 
--spec set_protocol_options(ref(), any()) -> ok.
+-spec set_protocol_options(ref(), any()) -> ok | {error, not_found}.
 set_protocol_options(Ref, Opts) ->
-	ranch_server:set_protocol_options(Ref, Opts).
+	case ranch_server:listener_start_args_exists(Ref) of
+		true ->
+			ranch_server:set_protocol_options(Ref, Opts);
+		false ->
+			{error, not_found}
+	end.
 
 -spec info() -> #{ref() := #{atom() := term()}}.
 info() ->

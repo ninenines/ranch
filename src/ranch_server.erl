@@ -40,6 +40,7 @@
 -export([set_protocol_options/2]).
 -export([get_protocol_options/1]).
 -export([get_listener_start_args/1]).
+-export([listener_start_args_exists/1]).
 -export([count_connections/1]).
 
 %% gen_server.
@@ -188,6 +189,12 @@ get_protocol_options(Ref) ->
 -spec get_listener_start_args(ranch:ref()) -> [any()].
 get_listener_start_args(Ref) ->
 	ets:lookup_element(?TAB, {listener_start_args, Ref}, 2).
+
+%% Present until stop_listener/1 or a shutdown DOWN.
+%% A crashed listener keeps the row while it restarts.
+-spec listener_start_args_exists(ranch:ref()) -> boolean().
+listener_start_args_exists(Ref) ->
+	ets:member(?TAB, {listener_start_args, Ref}).
 
 -spec count_connections(ranch:ref()) -> non_neg_integer().
 count_connections(Ref) ->

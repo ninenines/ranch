@@ -111,6 +111,7 @@ groups() ->
 		misc_post_listen_callback_error,
 		misc_set_transport_options,
 		misc_set_transport_options_max_connections,
+		misc_stopped_listener_options,
 		misc_wait_for_connections,
 		misc_suspend_wait_stop,
 		misc_multiple_ip_local_socket_opts,
@@ -574,6 +575,27 @@ misc_set_transport_options_max_connections(_) ->
 	1024 = ranch:get_max_connections(Name),
 	{State1, _, _, _} = sys:get_state(ConnsSup),
 	1024 = element(11, State1),
+	ok = ranch:stop_listener(Name).
+
+misc_stopped_listener_options(_) ->
+	doc("Setters on a stopped listener must not leave rows for the next start."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
+		echo_protocol, []),
+	ok = ranch:stop_listener(Name),
+	{error, not_found} = ranch:set_max_connections(Name, 99),
+	{error, not_found} = ranch:set_protocol_options(Name, planted),
+	{error, not_found} = ranch:set_transport_options(Name, #{
+		max_connections => 98,
+		num_acceptors => 1
+	}),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 11, num_acceptors => 1},
+		echo_protocol, []),
+	11 = ranch:get_max_connections(Name),
+	[] = ranch:get_protocol_options(Name),
+	#{max_connections := 11} = ranch:get_transport_options(Name),
 	ok = ranch:stop_listener(Name).
 
 misc_wait_for_connections(_) ->
