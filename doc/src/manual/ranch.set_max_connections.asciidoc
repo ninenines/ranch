@@ -10,7 +10,7 @@ ranch:set_max_connections - Set the max number of connections per connection sup
 ----
 set_max_connections(Ref      :: ranch:ref(),
                     MaxConns :: ranch:max_conns())
-    -> ok
+    -> ok | {error, not_found}
 ----
 
 Set the max number of connections per connection supervisor.
@@ -32,10 +32,13 @@ The new maximum number of connections per connection supervisor.
 
 == Return value
 
-The atom `ok` is always returned. It can be safely ignored.
+The atom `ok` is returned on success.
+
+An error tuple is returned when the listener is not found.
 
 == Changelog
 
+* *2.5*: The function returns `{error, not_found}` when the listener does not exist.
 * *2.0*: The maximum number of connections is now per connection supervisor.
 
 == Examples

@@ -52,11 +52,12 @@ The new transport options.
 
 The atom `ok` is returned on success.
 
-An error tuple is returned on failure, for example if the given
-transport options contain invalid values.
+An error tuple is returned when the listener is not found,
+or when the given transport options contain invalid values.
 
 == Changelog
 
+* *2.5*: The function returns `{error, not_found}` when the listener does not exist.
 * *2.0*: The restriction that the listener must be suspended
          has been removed.
 * *2.0*: The `TransOpts` argument must no longer contain
