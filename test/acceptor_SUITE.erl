@@ -111,6 +111,7 @@ groups() ->
 		misc_post_listen_callback_error,
 		misc_set_transport_options,
 		misc_set_transport_options_max_connections,
+		misc_set_max_connections_badarg,
 		misc_stopped_listener_options,
 		misc_wait_for_connections,
 		misc_suspend_wait_stop,
@@ -575,6 +576,25 @@ misc_set_transport_options_max_connections(_) ->
 	1024 = ranch:get_max_connections(Name),
 	{State1, _, _, _} = sys:get_state(ConnsSup),
 	1024 = element(11, State1),
+	ok = ranch:stop_listener(Name).
+
+misc_set_max_connections_badarg(_) ->
+	doc("set_max_connections accepts only a non-negative integer or infinity."),
+	Name = ?FUNCTION_NAME,
+	%% A bad value is badarg even when the listener does not exist.
+	?assertError(badarg, ranch:set_max_connections(Name, -1)),
+	?assertError(badarg, ranch:set_max_connections(Name, foo)),
+	?assertError(badarg, ranch:set_max_connections(Name, "10")),
+	?assertError(badarg, ranch:set_max_connections(Name, <<"10">>)),
+	?assertError(badarg, ranch:set_max_connections(Name, 1.5)),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1},
+		echo_protocol, []),
+	?assertError(badarg, ranch:set_max_connections(Name, foo)),
+	ok = ranch:set_max_connections(Name, 0),
+	0 = ranch:get_max_connections(Name),
+	ok = ranch:set_max_connections(Name, infinity),
+	infinity = ranch:get_max_connections(Name),
 	ok = ranch:stop_listener(Name).
 
 misc_stopped_listener_options(_) ->

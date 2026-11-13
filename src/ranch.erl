@@ -556,13 +556,17 @@ get_max_connections(Ref) ->
 	ranch_server:get_max_connections(Ref).
 
 -spec set_max_connections(ref(), max_conns()) -> ok | {error, not_found}.
-set_max_connections(Ref, MaxConnections) ->
+set_max_connections(Ref, MaxConnections)
+		when is_integer(MaxConnections), MaxConnections >= 0;
+			MaxConnections =:= infinity ->
 	case ranch_server:listener_start_args_exists(Ref) of
 		true ->
 			ranch_server:set_max_connections(Ref, MaxConnections);
 		false ->
 			{error, not_found}
-	end.
+	end;
+set_max_connections(_, _) ->
+	error(badarg).
 
 -spec get_transport_options(ref()) -> transport_opts(any()).
 get_transport_options(Ref) ->
