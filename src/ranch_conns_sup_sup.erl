@@ -44,6 +44,7 @@ init({Ref, Transport, Protocol, Logger}) ->
 			ok = ranch_server:set_stats_counters(Ref,
 				counters:new(2*NumConnsSups, []))
 	end,
+	ok = ranch_server:set_num_connections_sups(Ref, NumConnsSups),
 	%% The supervisor logs this MFA. connection_type is fixed until the
 	%% listener restarts. Other options are read from ranch_server.
 	ConnType = maps:get(connection_type, TransOpts, worker),

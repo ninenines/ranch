@@ -15,64 +15,115 @@
 -module(ranch_acceptor).
 
 -export([start_link/5]).
--export([init/6]).
--export([loop/5]).
+-export([init/5]).
+-export([loop/1]).
+
+-record(state, {ref :: ranch:ref(),
+		id :: pos_integer(),
+		listen_socket :: inet:socket(),
+		transport :: module(),
+		conns_sup :: {pid(), reference()} | undefined,
+		logger :: module()}).
 
 -spec start_link(ranch:ref(), pos_integer(), pos_integer(), module(), module())
 	-> {ok, pid()}.
 start_link(Ref, AcceptorId, LSocketId, Transport, Logger) ->
 	LSocket = ranch_acceptors_sup:get_listen_socket(LSocketId),
-	ConnsSup = ranch_server:get_connections_sup(Ref, AcceptorId),
-	Pid = spawn_link(?MODULE, init, [Ref, AcceptorId, LSocket, Transport, Logger, ConnsSup]),
+	Pid = spawn_link(?MODULE, init, [Ref, AcceptorId, LSocket, Transport, Logger]),
 	{ok, Pid}.
 
--spec init(ranch:ref(), pos_integer(), inet:socket(), module(), module(), pid())
+-spec init(ranch:ref(), pos_integer(), inet:socket(), module(), module())
 	-> no_return().
-init(Ref, AcceptorId, LSocket, Transport, Logger, ConnsSup) ->
+init(Ref, AcceptorId, LSocket, Transport, Logger) ->
 	proc_lib:set_label({ranch_acceptor, Ref, AcceptorId}),
-	MonitorRef = monitor(process, ConnsSup),
-	loop(LSocket, Transport, Logger, ConnsSup, MonitorRef).
+	State0 = #state{ref = Ref,
+			id = AcceptorId,
+			listen_socket = LSocket,
+			transport = Transport,
+			logger = Logger},
+	State1 = update_conns_sup_or_fail(State0, no_conns_sup),
+	loop(State1).
 
--spec loop(inet:socket(), module(), module(), pid(), reference()) -> no_return().
-loop(LSocket, Transport, Logger, ConnsSup, MonitorRef) ->
-	_ = case Transport:accept(LSocket, infinity) of
-		{ok, CSocket} ->
-			case Transport:controlling_process(CSocket, ConnsSup) of
-				ok ->
-					%% This call will not return until process has been started
-					%% AND we are below the maximum number of connections.
-					ranch_conns_sup:start_protocol(ConnsSup, MonitorRef,
-						CSocket);
-				{error, _} ->
-					Transport:close(CSocket)
-			end;
-		%% Reduce the accept rate if we run out of file descriptors.
-		%% We can't accept anymore anyway, so we might as well wait
-		%% a little for the situation to resolve itself.
-		{error, Reason} when Reason =:= emfile; Reason =:= enfile ->
-			ranch:log(warning,
-				"Ranch acceptor reducing accept rate: out of file descriptors~n",
-				[], Logger),
-			receive after 100 -> ok end;
-		%% Exit if the listening socket got closed.
-		{error, closed} ->
-			exit(closed);
-		%% Continue otherwise.
+-spec loop(#state{}) -> no_return().
+loop(State0 = #state{transport = Transport, listen_socket = LSocket, logger = Logger}) ->
+	State1 = case Transport:accept(LSocket, infinity) of
+			 {ok, CSocket} ->
+				 socket_accepted(State0, CSocket);
+			 {error, Reason} ->
+				 handle_accept_error(Logger, Reason),
+				 State0
+		 end,
+	State2 = flush(State1),
+	?MODULE:loop(State2).
+
+socket_accepted(State = #state{transport = Transport, conns_sup = {ConnsSupPid, _}}, CSocket) ->
+	case Transport:controlling_process(CSocket, ConnsSupPid) of
+		ok ->
+			start_protocol(State, CSocket);
 		{error, _} ->
-			ok
-	end,
-	flush(Logger, ConnsSup, MonitorRef),
-	?MODULE:loop(LSocket, Transport, Logger, ConnsSup, MonitorRef).
+			Transport:close(CSocket),
+			State
+	end.
 
-flush(Logger, ConnsSup, MonitorRef) ->
+handle_accept_error(Logger, Reason) when Reason =:= emfile; Reason =:= enfile ->
+	ranch:log(warning,
+		  "Ranch acceptor reducing accept rate: out of file descriptors~n",
+		  [],
+		  Logger),
+	receive after 100 -> ok end;
+handle_accept_error(_, closed) ->
+	exit(closed);
+handle_accept_error(_, _) ->
+	ok.
+
+start_protocol(State = #state{conns_sup = {ConnsSupPid, ConnsSupMonitor}}, CSocket) ->
+	case ranch_conns_sup:start_protocol(ConnsSupPid, ConnsSupMonitor, CSocket) of
+		ok ->
+			State;
+		{error, Reason} ->
+			update_conns_sup_or_fail(State, Reason)
+	end.
+
+flush(State) ->
+	case do_flush(State, ok) of
+		ok ->
+			State;
+		{error, Reason} ->
+			update_conns_sup_or_fail(State, Reason)
+	end.
+
+do_flush(State = #state{logger = Logger, conns_sup = {ConnsSupPid, ConnsSupMonitor}}, Res) ->
 	receive
-		{'DOWN', MonitorRef, process, ConnsSup, Reason} ->
-			exit(Reason);
+		{'DOWN', ConnsSupMonitor, process, ConnsSupPid, Reason} ->
+			do_flush(State, {error, Reason});
 		Msg ->
 			ranch:log(warning,
 				"Ranch acceptor received unexpected message: ~p~n",
 				[Msg], Logger),
-			flush(Logger, ConnsSup, MonitorRef)
+			do_flush(State, Res)
 	after 0 ->
-		ok
+		Res
+	end.
+
+update_conns_sup_or_fail(State = #state{ref = Ref, id = Id}, Reason) ->
+	case get_conns_sup(Ref, Id) of
+		undefined ->
+			error(Reason);
+		ConnsSup ->
+			State#state{conns_sup = ConnsSup}
+	end.
+
+get_conns_sup(Ref, AcceptorId) ->
+	get_conns_sup(Ref, AcceptorId, 10).
+
+get_conns_sup(Ref, AcceptorId, N) ->
+	case ranch_server:get_connections_sup(Ref, AcceptorId) of
+		undefined when N =< 1 ->
+			undefined;
+		undefined ->
+			receive after 100 -> ok end,
+			get_conns_sup(Ref, AcceptorId, N - 1);
+		ConnsSup when is_pid(ConnsSup) ->
+			MonitorRef = monitor(process, ConnsSup),
+			{ConnsSup, MonitorRef}
 	end.
