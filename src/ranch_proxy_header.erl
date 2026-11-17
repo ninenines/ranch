@@ -685,26 +685,29 @@ parse_v2_truncated_test() ->
 -endif.
 
 parse_tlv(Rest, 0, Info, _) ->
-	{ok, Info, Rest};
+	{ok, maps:remove(checksum, Info), Rest};
 %% PP2_TYPE_ALPN.
 parse_tlv(<<16#1, TLVLen:16, ALPN:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	parse_tlv(Rest, Len - TLVLen - 3, Info#{alpn => ALPN}, Header);
 %% PP2_TYPE_AUTHORITY.
 parse_tlv(<<16#2, TLVLen:16, Authority:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	parse_tlv(Rest, Len - TLVLen - 3, Info#{authority => Authority}, Header);
-%% PP2_TYPE_CRC32C.
+%% PP2_TYPE_CRC32C. A second length-4 CRC is an error and is not checked.
 parse_tlv(<<16#3, TLVLen:16, CRC32C:32, Rest/bits>>, Len0, Info, Header)
-		when TLVLen =:= 4, Len0 >= 7 ->
+		when TLVLen =:= 4, Len0 >= 7, not is_map_key(checksum, Info) ->
 	Len = Len0 - TLVLen - 3,
 	BeforeLen = byte_size(Header) - Len - TLVLen,
 	<<Before:BeforeLen/binary, _:32, After:Len/binary>> = Header,
 	%% The initial CRC is ranch_crc32c:crc32c(<<"\r\n\r\n\0\r\nQUIT\n", 2:4, 1:4>>).
 	case ranch_crc32c:crc32c(2900412422, [Before, <<0:32>>, After]) of
 		CRC32C ->
-			parse_tlv(Rest, Len, Info, Header);
+			parse_tlv(Rest, Len, Info#{checksum => crc32c}, Header);
 		_ ->
 			{error, 'Failed CRC32C verification in PROXY protocol binary header. (PP 2.2)'}
 	end;
+parse_tlv(<<16#3, TLVLen:16, _:32, _/bits>>, Len0, #{checksum := crc32c}, _)
+		when TLVLen =:= 4, Len0 >= 7 ->
+	{error, 'Duplicate CRC32C TLV in PROXY protocol binary header. (PP 2.2)'};
 parse_tlv(<<16#3, _/bits>>, _, _, _) ->
 	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2)'};
 %% PP2_TYPE_NOOP.
@@ -1347,6 +1350,14 @@ v2_checksum_test() ->
 		dest_port => 23456
 	},
 	{ok, Test, <<>>} = parse(iolist_to_binary(header(Test, #{checksum => crc32c}))),
+	%% Both CRC32C values match this header. A second one is rejected.
+	{error, _} = parse(<<
+		13, 10, 13, 10, 0, 13, 10, 81, 85, 73, 84, 10,
+		33, 17, 0, 26,
+		127, 0, 0, 1, 10, 11, 12, 13, 4, 210, 91, 160,
+		3, 0, 4, 24, 150, 128, 115,
+		3, 0, 4, 146, 137, 26, 132
+	>>),
 	ok.
 
 v2_checksum_short_length_test() ->
