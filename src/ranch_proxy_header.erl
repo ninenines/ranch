@@ -538,12 +538,9 @@ parse_unix_address(Addr) ->
 			binary:copy(Addr);
 		0 ->
 			<<>>;
-		Pos when Pos =< 64 ->
-			<<UnixAddr:Pos/binary, _/bits>> = Addr,
-			UnixAddr;
 		Pos ->
 			<<UnixAddr:Pos/binary, _/bits>> = Addr,
-			binary:copy(UnixAddr)
+			maybe_copy_binary(UnixAddr)
 	end.
 
 -ifdef(TEST).
@@ -684,14 +681,20 @@ parse_v2_truncated_test() ->
 	ok.
 -endif.
 
+%% A match of 64 bytes or less does not keep the rest of the header.
+maybe_copy_binary(Bin) when byte_size(Bin) =< 64 ->
+	Bin;
+maybe_copy_binary(Bin) ->
+	binary:copy(Bin).
+
 parse_tlv(Rest, 0, Info, _) ->
 	{ok, maps:remove(checksum, Info), Rest};
 %% PP2_TYPE_ALPN.
 parse_tlv(<<16#1, TLVLen:16, ALPN:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
-	parse_tlv(Rest, Len - TLVLen - 3, Info#{alpn => ALPN}, Header);
+	parse_tlv(Rest, Len - TLVLen - 3, Info#{alpn => maybe_copy_binary(ALPN)}, Header);
 %% PP2_TYPE_AUTHORITY.
 parse_tlv(<<16#2, TLVLen:16, Authority:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
-	parse_tlv(Rest, Len - TLVLen - 3, Info#{authority => Authority}, Header);
+	parse_tlv(Rest, Len - TLVLen - 3, Info#{authority => maybe_copy_binary(Authority)}, Header);
 %% PP2_TYPE_CRC32C. A second length-4 CRC is an error and is not checked.
 parse_tlv(<<16#3, TLVLen:16, CRC32C:32, Rest/bits>>, Len0, Info, Header)
 		when TLVLen =:= 4, Len0 >= 7, not is_map_key(checksum, Info) ->
@@ -716,7 +719,7 @@ parse_tlv(<<16#4, TLVLen:16, _:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 %% PP2_TYPE_UNIQUE_ID.
 parse_tlv(<<16#5, TLVLen:16, UniqueID:TLVLen/binary, Rest/bits>>, Len, Info, Header)
 		when TLVLen =< 128 ->
-	parse_tlv(Rest, Len - TLVLen - 3, Info#{unique_id => UniqueID}, Header);
+	parse_tlv(Rest, Len - TLVLen - 3, Info#{unique_id => maybe_copy_binary(UniqueID)}, Header);
 parse_tlv(<<16#5, _/bits>>, _, _, _) ->
 	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2, PP 2.2.5)'};
 %% PP2_TYPE_SSL.
@@ -743,7 +746,7 @@ parse_tlv(<<16#20, _/bits>>, _, _, _) ->
 	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2)'};
 %% PP2_TYPE_NETNS.
 parse_tlv(<<16#30, TLVLen:16, NetNS:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
-	parse_tlv(Rest, Len - TLVLen - 3, Info#{netns => NetNS}, Header);
+	parse_tlv(Rest, Len - TLVLen - 3, Info#{netns => maybe_copy_binary(NetNS)}, Header);
 %% Unknown TLV. The total on-wire size, including each type
 %% and length, is at most 1024 bytes.
 parse_tlv(<<TLVType, TLVLen:16, TLVValue:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
@@ -753,7 +756,7 @@ parse_tlv(<<TLVType, TLVLen:16, TLVValue:TLVLen/binary, Rest/bits>>, Len, Info, 
 			{error, 'Unknown TLV exceeds 1024 bytes in PROXY protocol binary header. (PP 2.2)'};
 		false ->
 			parse_tlv(Rest, Len - TLVLen - 3,
-				Info#{raw_tlvs => [{TLVType, TLVValue}|RawTLVs]}, Header)
+				Info#{raw_tlvs => [{TLVType, maybe_copy_binary(TLVValue)}|RawTLVs]}, Header)
 	end;
 %% Invalid TLV length.
 parse_tlv(_, _, _, _) ->
@@ -797,7 +800,7 @@ parse_ssl_tlv(<<TLVType, TLVLen:16, TLVValue:TLVLen/binary, Rest/bits>>, Len, In
 		undefined ->
 			{error, 'Invalid TLV subtype for PP2_TYPE_SSL in PROXY protocol binary header. (PP 2.2)'};
 		Type ->
-			parse_ssl_tlv(Rest, Len - TLVLen - 3, Info#{Type => TLVValue})
+			parse_ssl_tlv(Rest, Len - TLVLen - 3, Info#{Type => maybe_copy_binary(TLVValue)})
 	end;
 %% Invalid TLV length.
 parse_ssl_tlv(_, _, _) ->
