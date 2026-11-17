@@ -115,6 +115,8 @@ groups() ->
 		misc_set_transport_options,
 		misc_set_transport_options_max_connections,
 		misc_set_max_connections_badarg,
+		misc_set_max_connections,
+		misc_set_max_connections_upgrade,
 		misc_stopped_listener_options,
 		misc_wait_for_connections,
 		misc_suspend_wait_stop,
@@ -662,6 +664,47 @@ misc_set_max_connections_badarg(_) ->
 	0 = ranch:get_max_connections(Name),
 	ok = ranch:set_max_connections(Name, infinity),
 	infinity = ranch:get_max_connections(Name),
+	ok = ranch:stop_listener(Name).
+
+misc_set_max_connections(_) ->
+	doc("set_max_connections writes max_connections into the transport options."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, 4),
+	4 = ranch:get_max_connections(Name),
+	#{max_connections := 4} = ranch:get_transport_options(Name),
+	ok = ranch:set_max_connections(Name, infinity),
+	#{max_connections := infinity} = ranch:get_transport_options(Name),
+	TransOpts = ranch:get_transport_options(Name),
+	ok = ranch:set_transport_options(Name, TransOpts#{num_acceptors => 2}),
+	infinity = ranch:get_max_connections(Name),
+	ok = ranch:stop_listener(Name).
+
+misc_set_max_connections_upgrade(_) ->
+	doc("An upgrade copies the max_connections row into the transport options."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
+		echo_protocol, []),
+	%% The 2.4 setter wrote this row and left the map at 10.
+	true = ets:insert(ranch_server, {{max_conns, Name}, 4}),
+	4 = ranch:get_max_connections(Name),
+	#{max_connections := 10} = ranch:get_transport_options(Name),
+	Server = whereis(ranch_server),
+	ok = sys:suspend(Server),
+	try
+		ok = sys:change_code(Server, ranch_server, undefined, mark_embedded),
+		4 = ranch:get_max_connections(Name),
+		#{max_connections := 4} = ranch:get_transport_options(Name)
+	after
+		ok = sys:resume(Server)
+	end,
+	Opts = ranch:get_transport_options(Name),
+	ok = ranch:set_transport_options(Name, Opts#{num_acceptors => 2}),
+	4 = ranch:get_max_connections(Name),
+	#{max_connections := 4} = ranch:get_transport_options(Name),
 	ok = ranch:stop_listener(Name).
 
 misc_stopped_listener_options(_) ->
