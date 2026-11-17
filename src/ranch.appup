@@ -52,6 +52,8 @@
 		{update, ranch_server, {advanced, []}},
 		%% get_proxy_opts/1 is gone. Drop a row inserted during code_change.
 		{apply, {ets, match_delete, [ranch_server, {{proxy_opts, '_'}, '_'}]}},
+		%% get_num_connections_sups/1 is gone. Drop the rows set by ranch_conns_sup_sup.
+		{apply, {ets, match_delete, [ranch_server, {{num_connections_sups, '_'}, '_'}]}},
 		{update, ranch_server_proxy, {advanced, []}},
 		{load_module, ranch_ssl},
 		{update, ranch_sup, supervisor},

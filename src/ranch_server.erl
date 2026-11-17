@@ -21,6 +21,8 @@
 -export([set_new_listener_opts/5]).
 -export([cleanup_listener_opts/1]).
 -export([cleanup_connections_sups/1]).
+-export([set_num_connections_sups/2]).
+-export([get_num_connections_sups/1]).
 -export([set_connections_sup/3]).
 -export([get_connections_sup/2]).
 -export([get_connections_sups/1]).
@@ -83,6 +85,7 @@ cleanup_listener_opts(Ref) ->
 	%% we could end up with the pid still being returned, when we
 	%% expected a crash (because the listener was stopped).
 	%% Deleting it explicitly here removes any possible confusion.
+	_ = ets:delete(?TAB, {num_connections_sups, Ref}),
 	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
 	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	%% Ditto for the listener supervisor.
@@ -95,16 +98,30 @@ cleanup_connections_sups(Ref) ->
 	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	ok.
 
+-spec set_num_connections_sups(ranch:ref(), pos_integer()) -> ok.
+set_num_connections_sups(Ref, N) ->
+	gen_server:call(?MODULE, {set_num_connections_sups, Ref, N}).
+
+-spec get_num_connections_sups(ranch:ref()) -> pos_integer().
+get_num_connections_sups(Ref) ->
+	ets:lookup_element(?TAB, {num_connections_sups, Ref}, 2).
+
 -spec set_connections_sup(ranch:ref(), non_neg_integer(), pid()) -> ok.
 set_connections_sup(Ref, Id, Pid) ->
 	gen_server:call(?MODULE, {set_connections_sup, Ref, Id, Pid}).
 
--spec get_connections_sup(ranch:ref(), pos_integer()) -> pid().
+-spec get_connections_sup(ranch:ref(), pos_integer()) -> pid() | undefined.
 get_connections_sup(Ref, Id) ->
 	ConnsSups = get_connections_sups(Ref),
-	NConnsSups = length(ConnsSups),
-	{_, Pid} = lists:keyfind((Id rem NConnsSups) + 1, 1, ConnsSups),
-	Pid.
+	NConnsSups = get_num_connections_sups(Ref),
+	maybe
+		{_, Pid} ?= lists:keyfind((Id rem NConnsSups) + 1, 1, ConnsSups),
+		true ?= erlang:is_process_alive(Pid),
+		Pid
+	else
+		false ->
+			undefined
+	end.
 
 -spec get_connections_sups(ranch:ref()) -> [{pos_integer(), pid()}].
 get_connections_sups(Ref) ->
@@ -222,6 +239,9 @@ handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartAr
 	ets:insert_new(?TAB, {{proxy_opts, Ref}, proxy_opts(TransOpts)}),
 	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
 	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
+	{reply, ok, State};
+handle_call({set_num_connections_sups, Ref, N}, _, State) ->
+	true = ets:insert(?TAB, {{num_connections_sups, Ref}, N}),
 	{reply, ok, State};
 handle_call({set_connections_sup, Ref, Id, Pid}, _, State0) ->
 	State = set_monitored_process({conns_sup, Ref, Id}, Pid, State0),
