@@ -140,6 +140,7 @@ groups() ->
 		supervisor_changed_options_restart,
 		supervisor_listener_sup_exit,
 		supervisor_embedded_stop_clears_opts,
+		supervisor_embedded_proxy_upgrade,
 		supervisor_clean_child_restart,
 		supervisor_clean_restart,
 		supervisor_restart_acceptors,
@@ -2326,6 +2327,35 @@ supervisor_embedded_stop_clears_opts(_) ->
 		echo_protocol, []),
 	ok = ranch:set_max_connections(Name, 20),
 	20 = ranch:get_max_connections(Name),
+	ok = supervisor:terminate_child(SupPid, {ranch_embedded_sup, Name}),
+	ok = supervisor:delete_child(SupPid, {ranch_embedded_sup, Name}),
+	?assertError(badarg, ranch:get_max_connections(Name)),
+	embedded_sup:stop(SupPid).
+
+supervisor_embedded_proxy_upgrade(_) ->
+	doc("An upgraded embedded proxy still clears options when it stops."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	[{_, _, supervisor, _}, {ranch_server_proxy, ProxyPid, worker, _}] =
+		supervisor:which_children(EmbeddedSupPid),
+	ok = sys:suspend(ProxyPid),
+	true = is_reference(sys:replace_state(ProxyPid, fun({_Ref, Mon}) ->
+		process_flag(trap_exit, false),
+		Mon
+	end)),
+	ok = sys:change_code(ProxyPid, ranch_server_proxy, v1, []),
+	{_Name, Mon} = sys:get_state(ProxyPid),
+	true = is_reference(Mon),
+	{trap_exit, true} = process_info(ProxyPid, trap_exit),
+	ok = sys:change_code(ProxyPid, ranch_server_proxy, {down, v2}, []),
+	true = is_reference(sys:get_state(ProxyPid)),
+	{trap_exit, false} = process_info(ProxyPid, trap_exit),
+	ok = sys:change_code(ProxyPid, ranch_server_proxy, v1, []),
+	ok = sys:resume(ProxyPid),
+	ok = ranch:set_max_connections(Name, 21),
 	ok = supervisor:terminate_child(SupPid, {ranch_embedded_sup, Name}),
 	ok = supervisor:delete_child(SupPid, {ranch_embedded_sup, Name}),
 	?assertError(badarg, ranch:get_max_connections(Name)),

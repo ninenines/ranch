@@ -190,8 +190,8 @@ get_protocol_options(Ref) ->
 get_listener_start_args(Ref) ->
 	ets:lookup_element(?TAB, {listener_start_args, Ref}, 2).
 
-%% Present until stop_listener/1 or a shutdown DOWN.
-%% A crashed listener keeps the row while it restarts.
+%% Present until stop_listener/1 or the embedded proxy stops.
+%% A listener supervisor restart keeps the row.
 -spec listener_start_args_exists(ranch:ref()) -> boolean().
 listener_start_args_exists(Ref) ->
 	ets:member(?TAB, {listener_start_args, Ref}).

@@ -61,10 +61,24 @@ terminate(_Reason, {Ref, _Monitor}) ->
 	%% The table is owned by the ranch application process.
 	ranch_server:cleanup_listener_opts(Ref).
 
--spec code_change(term() | {down, term()}, {ranch:ref(), reference()}, term())
-	-> {ok, {ranch:ref(), reference()}}.
+-spec code_change(term() | {down, term()},
+	reference() | {ranch:ref(), reference()}, term())
+	-> {ok, reference() | {ranch:ref(), reference()}}.
+%% 2.4 kept only the monitor and did not trap exits.
+code_change({down, _}, {_Ref, Monitor}, _) ->
+	process_flag(trap_exit, false),
+	{ok, Monitor};
+code_change(_, Monitor, _) when is_reference(Monitor) ->
+	process_flag(trap_exit, true),
+	{ok, {listener_ref(), Monitor}};
 code_change(_, State, _) ->
 	{ok, State}.
+
+listener_ref() ->
+	[Sup | _] = get('$ancestors'),
+	[{ranch_listener_sup, Ref}] = [Id ||
+		{Id = {ranch_listener_sup, _}, _, _, _} <- supervisor:which_children(Sup)],
+	Ref.
 
 wait_ranch_server(N) ->
 	case whereis(ranch_server) of
