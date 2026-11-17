@@ -408,7 +408,7 @@ of file-descriptors which can be opened by your application. How
 this should be done is operating-system dependent. Please consult
 the documentation of your operating system.
 
-`emfile` and `enfile` are the only accept errors Ranch logs.
+`emfile`, `enfile` and `system_limit` are the only accept errors Ranch logs.
 `ranch:trace_acceptors/1,2` samples every reason returned by
 `Transport:accept/2`.
 
