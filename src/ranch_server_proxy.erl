@@ -35,6 +35,8 @@ init(Ref) ->
 		{ok, Monitor} ->
 			{ok, {Ref, Monitor}, hibernate};
 		{error, Reason} ->
+			%% init/1 does not call terminate/2.
+			ranch_server:cleanup_listener_opts(Ref),
 			{stop, Reason}
 	end.
 
@@ -52,11 +54,15 @@ handle_cast(_, State) ->
 	-> {noreply, {ranch:ref(), reference()}, hibernate}
 		| {stop, term(), {ranch:ref(), reference()}}.
 handle_info({'DOWN', Monitor, process, _, Reason}, {Ref, Monitor}) ->
-	{stop, Reason, {Ref, Monitor}};
+	%% The parent stops this process with the atom shutdown.
+	{stop, {shutdown, {ranch_server_down, Reason}}, {Ref, Monitor}};
 handle_info(_, State) ->
 	{noreply, State, hibernate}.
 
 -spec terminate(term(), {ranch:ref(), reference()}) -> ok.
+terminate({shutdown, {ranch_server_down, _}}, {Ref, _Monitor}) ->
+	%% Option rows stay so a fast ranch_server restart can reattach.
+	ranch_server:cleanup_listener_pids(Ref);
 terminate(_Reason, {Ref, _Monitor}) ->
 	%% The table is owned by the ranch application process.
 	ranch_server:cleanup_listener_opts(Ref).

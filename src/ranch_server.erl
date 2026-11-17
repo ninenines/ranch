@@ -20,6 +20,7 @@
 -export([start_link/0]).
 -export([set_new_listener_opts/5]).
 -export([cleanup_listener_opts/1]).
+-export([cleanup_listener_pids/1]).
 -export([cleanup_connections_sups/1]).
 -export([set_connections_sup/3]).
 -export([get_connections_sup/2]).
@@ -86,6 +87,12 @@ cleanup_listener_opts(Ref) ->
 	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
 	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	%% Ditto for the listener supervisor.
+	_ = ets:delete(?TAB, {listener_sup, Ref}),
+	ok.
+
+-spec cleanup_listener_pids(ranch:ref()) -> ok.
+cleanup_listener_pids(Ref) ->
+	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
 	_ = ets:delete(?TAB, {listener_sup, Ref}),
 	ok.
 

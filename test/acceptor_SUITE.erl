@@ -147,6 +147,7 @@ groups() ->
 		supervisor_suspended_acceptors,
 		supervisor_conns_alive,
 		supervisor_embedded_ranch_server_crash,
+		supervisor_embedded_ranch_server_down,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
 		supervisor_unexpected_message,
@@ -2473,22 +2474,86 @@ supervisor_embedded_ranch_server_crash(_) ->
 	Name = ?FUNCTION_NAME,
 	{ok, SupPid} = embedded_sup:start_link(),
 	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
-		ranch_tcp, #{},
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
 		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, 20),
 	[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
 		{ranch_server_proxy, ProxyPid, worker, _}] = supervisor:which_children(EmbeddedSupPid),
 	ProxyMonitor = monitor(process, ProxyPid),
 	ListenerMonitor = monitor(process, ListenerPid),
 	ok = supervisor:terminate_child(ranch_sup, ranch_server),
-	receive {'DOWN', ProxyMonitor, process, ProxyPid, shutdown} -> ok after 1000 -> exit(timeout) end,
+	receive {'DOWN', ProxyMonitor, process, ProxyPid, {shutdown, {ranch_server_down, shutdown}}} ->
+		ok
+	after 1000 ->
+		exit(timeout)
+	end,
 	receive {'DOWN', ListenerMonitor, process, ListenerPid, shutdown} -> ok after 1000 -> exit(timeout) end,
 	{ok, _} = supervisor:restart_child(ranch_sup, ranch_server),
 	receive after 1000 -> ok end,
 	[{{ranch_listener_sup, Name}, _, supervisor, _},
 		{ranch_server_proxy, _, worker, _}] = supervisor:which_children(EmbeddedSupPid),
+	20 = ranch:get_max_connections(Name),
 	embedded_sup:stop_listener(SupPid, Name),
 	embedded_sup:stop(SupPid),
 	ok.
+
+supervisor_embedded_ranch_server_down(_) ->
+	doc("Embedded options are removed when ranch_server stays down."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, infinity),
+	[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
+		{ranch_server_proxy, ProxyPid, worker, _}] =
+		supervisor:which_children(EmbeddedSupPid),
+	ProxyMonitor = monitor(process, ProxyPid),
+	%% The proxy gives up with noproc once ranch_server stays down.
+	ok = logger:add_primary_filter(?FUNCTION_NAME,
+		{fun (_, _) -> stop end, undefined}),
+	WaitDead = fun WaitDead(0, _) ->
+			error(timeout);
+		WaitDead(Left, Pid) ->
+			case is_process_alive(Pid) of
+				false ->
+					ok;
+				true ->
+					timer:sleep(10),
+					WaitDead(Left - 1, Pid)
+			end
+	end,
+	WaitArgs = fun WaitArgs(0) ->
+			error(timeout);
+		WaitArgs(Left) ->
+			case ranch_server:listener_start_args_exists(Name) of
+				false ->
+					false;
+				true ->
+					timer:sleep(100),
+					WaitArgs(Left - 1)
+			end
+	end,
+	try
+		ok = supervisor:terminate_child(ranch_sup, ranch_server),
+		receive
+			{'DOWN', ProxyMonitor, process, ProxyPid,
+				{shutdown, {ranch_server_down, shutdown}}} ->
+				ok
+		after 1000 ->
+			error(timeout)
+		end,
+		ok = WaitDead(100, ListenerPid),
+		false = maps:is_key(Name, ranch:info()),
+		?assertError(badarg, ranch_server:get_listener_sup(Name)),
+		[] = ranch_server:get_connections_sups(Name),
+		infinity = ranch:get_max_connections(Name),
+		false = WaitArgs(80)
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME),
+		_ = supervisor:restart_child(ranch_sup, ranch_server),
+		embedded_sup:stop(SupPid)
+	end.
 
 supervisor_protocol_start_link_crash(_) ->
 	doc("Ensure a protocol start crash does not kill all connections."),
