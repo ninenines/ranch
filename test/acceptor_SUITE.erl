@@ -148,6 +148,14 @@ groups() ->
 		supervisor_conns_alive,
 		supervisor_embedded_ranch_server_crash,
 		supervisor_embedded_ranch_server_down,
+		supervisor_embedded_intensity_clears_opts,
+		supervisor_embedded_orphan_clears_opts,
+		supervisor_embedded_killed_clears_opts,
+		supervisor_embedded_late_terminate_keeps_opts,
+		supervisor_embedded_dead_claim_keeps_opts,
+		supervisor_embedded_stale_start_keeps_opts,
+		supervisor_embedded_downgrade_drops_owner,
+		supervisor_embedded_server_down_clears_opts,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
 		supervisor_unexpected_message,
@@ -2356,6 +2364,19 @@ supervisor_embedded_proxy_upgrade(_) ->
 	{trap_exit, false} = process_info(ProxyPid, trap_exit),
 	ok = sys:change_code(ProxyPid, ranch_server_proxy, v1, []),
 	ok = sys:resume(ProxyPid),
+	WaitMon = fun WaitMon(0) ->
+			error(timeout);
+		WaitMon(Left) ->
+			{monitors, Found} = erlang:process_info(whereis(ranch_server), monitors),
+			case lists:member({process, EmbeddedSupPid}, Found) of
+				true ->
+					ok;
+				false ->
+					timer:sleep(10),
+					WaitMon(Left - 1)
+			end
+	end,
+	ok = WaitMon(50),
 	ok = ranch:set_max_connections(Name, 21),
 	ok = supervisor:terminate_child(SupPid, {ranch_embedded_sup, Name}),
 	ok = supervisor:delete_child(SupPid, {ranch_embedded_sup, Name}),
@@ -2549,6 +2570,479 @@ supervisor_embedded_ranch_server_down(_) ->
 		[] = ranch_server:get_connections_sups(Name),
 		infinity = ranch:get_max_connections(Name),
 		false = WaitArgs(80)
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME),
+		_ = supervisor:restart_child(ranch_sup, ranch_server),
+		embedded_sup:stop(SupPid)
+	end.
+
+supervisor_embedded_intensity_clears_opts(_) ->
+	doc("An embedded supervisor that gives up drops its options."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	Spec = ranch:child_spec(Name, ranch_tcp,
+		#{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	{ok, EmbeddedSupPid} = supervisor:start_child(SupPid, Spec),
+	{monitors, Mons} = erlang:process_info(whereis(ranch_server), monitors),
+	true = lists:member({process, EmbeddedSupPid}, Mons),
+	ok = ranch:set_max_connections(Name, infinity),
+	ok = logger:add_primary_filter(?FUNCTION_NAME,
+		{fun (_, _) -> stop end, undefined}),
+	WaitUp = fun WaitUp(0, _) ->
+			error(timeout);
+		WaitUp(Left, Sup) ->
+			Children = try supervisor:which_children(Sup) of
+				Result ->
+					Result
+			catch exit:_ ->
+				[]
+			end,
+			case Children of
+				[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
+					{ranch_server_proxy, ProxyPid, worker, _}]
+					when is_pid(ListenerPid), is_pid(ProxyPid) ->
+					ok;
+				_ ->
+					timer:sleep(10),
+					WaitUp(Left - 1, Sup)
+			end
+	end,
+	WaitDead = fun WaitDead(0, _) ->
+			error(timeout);
+		WaitDead(Left, Pid) ->
+			case is_process_alive(Pid) of
+				false ->
+					ok;
+				true ->
+					timer:sleep(10),
+					WaitDead(Left - 1, Pid)
+			end
+	end,
+	WaitNew = fun WaitNew(0, _, _) ->
+			error(timeout);
+		WaitNew(Left, Sup, Old) ->
+			case lists:keyfind({ranch_embedded_sup, Name}, 1,
+					supervisor:which_children(Sup)) of
+				{{ranch_embedded_sup, Name}, NewPid, supervisor, _}
+					when is_pid(NewPid), NewPid =/= Old ->
+					NewPid;
+				_ ->
+					timer:sleep(10),
+					WaitNew(Left - 1, Sup, Old)
+			end
+	end,
+	try
+		%% First ranch_server restart stays inside this supervisor.
+		ok = supervisor:terminate_child(ranch_sup, ranch_server),
+		{ok, _} = supervisor:restart_child(ranch_sup, ranch_server),
+		ok = WaitUp(200, EmbeddedSupPid),
+		infinity = ranch:get_max_connections(Name),
+		%% A second exit in the intensity window stops the supervisor.
+		ok = supervisor:terminate_child(ranch_sup, ranch_server),
+		ok = WaitDead(200, EmbeddedSupPid),
+		{ok, _} = supervisor:restart_child(ranch_sup, ranch_server),
+		%% The parent starts a new supervisor from the child spec.
+		ok = WaitUp(200, WaitNew(200, SupPid, EmbeddedSupPid)),
+		10 = ranch:get_max_connections(Name)
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME),
+		_ = supervisor:restart_child(ranch_sup, ranch_server),
+		embedded_sup:stop(SupPid)
+	end.
+
+supervisor_embedded_orphan_clears_opts(_) ->
+	doc("Options are removed when an embedded supervisor stops for good."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	Spec = ranch:child_spec(Name, ranch_tcp,
+		#{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	{ok, EmbeddedSupPid} = supervisor:start_child(SupPid,
+		Spec#{restart => temporary}),
+	ok = ranch:set_max_connections(Name, infinity),
+	ok = logger:add_primary_filter(?FUNCTION_NAME,
+		{fun (_, _) -> stop end, undefined}),
+	WaitUp = fun WaitUp(0, _) ->
+			error(timeout);
+		WaitUp(Left, Sup) ->
+			Children = try supervisor:which_children(Sup) of
+				Result ->
+					Result
+			catch exit:_ ->
+				[]
+			end,
+			case Children of
+				[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
+					{ranch_server_proxy, ProxyPid, worker, _}]
+					when is_pid(ListenerPid), is_pid(ProxyPid) ->
+					ok;
+				_ ->
+					timer:sleep(10),
+					WaitUp(Left - 1, Sup)
+			end
+	end,
+	WaitDead = fun WaitDead(0, _) ->
+			error(timeout);
+		WaitDead(Left, Pid) ->
+			case is_process_alive(Pid) of
+				false ->
+					ok;
+				true ->
+					timer:sleep(10),
+					WaitDead(Left - 1, Pid)
+			end
+	end,
+	WaitGone = fun WaitGone(0) ->
+			error(timeout);
+		WaitGone(Left) ->
+			case ranch_server:listener_start_args_exists(Name) of
+				false ->
+					false;
+				true ->
+					timer:sleep(10),
+					WaitGone(Left - 1)
+			end
+	end,
+	try
+		ok = supervisor:terminate_child(ranch_sup, ranch_server),
+		{ok, _} = supervisor:restart_child(ranch_sup, ranch_server),
+		ok = WaitUp(200, EmbeddedSupPid),
+		infinity = ranch:get_max_connections(Name),
+		ok = supervisor:terminate_child(ranch_sup, ranch_server),
+		ok = WaitDead(200, EmbeddedSupPid),
+		{ok, _} = supervisor:restart_child(ranch_sup, ranch_server),
+		false = WaitGone(200)
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME),
+		_ = supervisor:restart_child(ranch_sup, ranch_server),
+		embedded_sup:stop(SupPid)
+	end.
+
+supervisor_embedded_killed_clears_opts(_) ->
+	doc("Killing an embedded supervisor drops its options."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, infinity),
+	WaitDead = fun WaitDead(0, _) ->
+			error(timeout);
+		WaitDead(Left, Pid) ->
+			case is_process_alive(Pid) of
+				false ->
+					ok;
+				true ->
+					timer:sleep(10),
+					WaitDead(Left - 1, Pid)
+			end
+	end,
+	WaitNew = fun WaitNew(0, _, _) ->
+			error(timeout);
+		WaitNew(Left, Sup, Old) ->
+			case lists:keyfind({ranch_embedded_sup, Name}, 1,
+					supervisor:which_children(Sup)) of
+				{{ranch_embedded_sup, Name}, NewPid, supervisor, _}
+					when is_pid(NewPid), NewPid =/= Old ->
+					NewPid;
+				_ ->
+					timer:sleep(10),
+					WaitNew(Left - 1, Sup, Old)
+			end
+	end,
+	WaitUp = fun WaitUp(0, _) ->
+			error(timeout);
+		WaitUp(Left, Sup) ->
+			Children = try supervisor:which_children(Sup) of
+				Result ->
+					Result
+			catch exit:_ ->
+				[]
+			end,
+			case Children of
+				[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
+					{ranch_server_proxy, ProxyPid, worker, _}]
+					when is_pid(ListenerPid), is_pid(ProxyPid) ->
+					ok;
+				_ ->
+					timer:sleep(10),
+					WaitUp(Left - 1, Sup)
+			end
+	end,
+	ok = logger:add_primary_filter(?FUNCTION_NAME,
+		{fun (_, _) -> stop end, undefined}),
+	try
+		%% The exit is trappable, so the proxy still runs terminate/2.
+		exit(EmbeddedSupPid, kill),
+		ok = WaitDead(200, EmbeddedSupPid),
+		ok = WaitUp(200, WaitNew(200, SupPid, EmbeddedSupPid)),
+		10 = ranch:get_max_connections(Name)
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME),
+		embedded_sup:stop(SupPid)
+	end.
+
+supervisor_embedded_late_terminate_keeps_opts(_) ->
+	doc("A late proxy terminate must not drop the replacement listener."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, infinity),
+	{ranch_server_proxy, ProxyPid, worker, _} = lists:keyfind(
+		ranch_server_proxy, 1, supervisor:which_children(EmbeddedSupPid)),
+	WaitDead = fun WaitDead(0, _) ->
+			error(timeout);
+		WaitDead(Left, Pid) ->
+			case is_process_alive(Pid) of
+				false ->
+					ok;
+				true ->
+					timer:sleep(10),
+					WaitDead(Left - 1, Pid)
+			end
+	end,
+	WaitNew = fun WaitNew(0, _, _) ->
+			error(timeout);
+		WaitNew(Left, Sup, Old) ->
+			case lists:keyfind({ranch_embedded_sup, Name}, 1,
+					supervisor:which_children(Sup)) of
+				{{ranch_embedded_sup, Name}, NewPid, supervisor, _}
+					when is_pid(NewPid), NewPid =/= Old ->
+					NewPid;
+				_ ->
+					timer:sleep(10),
+					WaitNew(Left - 1, Sup, Old)
+			end
+	end,
+	WaitUp = fun WaitUp(0, _) ->
+			error(timeout);
+		WaitUp(Left, Sup) ->
+			Children = try supervisor:which_children(Sup) of
+				Result ->
+					Result
+			catch exit:_ ->
+				[]
+			end,
+			case Children of
+				[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
+					{ranch_server_proxy, NewProxyPid, worker, _}]
+					when is_pid(ListenerPid), is_pid(NewProxyPid) ->
+					ok;
+				_ ->
+					timer:sleep(10),
+					WaitUp(Left - 1, Sup)
+			end
+	end,
+	WaitOwner = fun WaitOwner(0, _) ->
+			error(timeout);
+		WaitOwner(Left, Sup) ->
+			case ets:lookup(ranch_server, {embedded_sup, Name}) of
+				[{_, Sup}] ->
+					ok;
+				_ ->
+					timer:sleep(10),
+					WaitOwner(Left - 1, Sup)
+			end
+	end,
+	ok = logger:add_primary_filter(?FUNCTION_NAME,
+		{fun (_, _) -> stop end, undefined}),
+	try
+		true = erlang:suspend_process(ProxyPid),
+		exit(EmbeddedSupPid, kill),
+		NewSup = WaitNew(200, SupPid, EmbeddedSupPid),
+		ok = WaitUp(200, NewSup),
+		ok = WaitOwner(200, NewSup),
+		10 = ranch:get_max_connections(Name),
+		true = erlang:resume_process(ProxyPid),
+		ok = WaitDead(200, ProxyPid),
+		10 = ranch:get_max_connections(Name),
+		[{{embedded_sup, Name}, NewSup}] =
+			ets:lookup(ranch_server, {embedded_sup, Name})
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME),
+		embedded_sup:stop(SupPid)
+	end.
+
+supervisor_embedded_dead_claim_keeps_opts(_) ->
+	doc("A dead supervisor must not replace a live embedded owner."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, EmbeddedSupPid} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, infinity),
+	Dead = spawn(fun () -> ok end),
+	WaitDead = fun WaitDead(0, _) ->
+			error(timeout);
+		WaitDead(Left, Pid) ->
+			case is_process_alive(Pid) of
+				false ->
+					ok;
+				true ->
+					timer:sleep(10),
+					WaitDead(Left - 1, Pid)
+			end
+	end,
+	ok = WaitDead(50, Dead),
+	ok = ranch_server:embedded_claim(Name, Dead),
+	infinity = ranch:get_max_connections(Name),
+	[{{embedded_sup, Name}, EmbeddedSupPid}] =
+		ets:lookup(ranch_server, {embedded_sup, Name}),
+	embedded_sup:stop(SupPid).
+
+supervisor_embedded_stale_start_keeps_opts(_) ->
+	doc("A start from a dead or replaced supervisor does not publish options."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, _} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, infinity),
+	Server = whereis(ranch_server),
+	WaitBlocked = fun Wait(0, _) ->
+			error(timeout);
+		Wait(Left, Pid) ->
+			case process_info(Pid, current_function) of
+				{current_function, {gen, do_call, _}} ->
+					ok;
+				undefined ->
+					error(noproc);
+				_ ->
+					timer:sleep(10),
+					Wait(Left - 1, Pid)
+			end
+	end,
+	QueueStale = fun() ->
+		ok = sys:suspend(Server),
+		Pid = spawn(fun() ->
+			ranch_server:set_new_listener_opts(Name, 99,
+				#{max_connections => 99}, [], [stale])
+		end),
+		ok = WaitBlocked(50, Pid),
+		Pid
+	end,
+	try
+		%% The caller is not the live owner. Its start_link must not write.
+		Stale = QueueStale(),
+		exit(Stale, kill),
+		ok = sys:resume(Server),
+		ok = ranch_server:set_addr(Name, ranch_server:get_addr(Name)),
+		infinity = ranch:get_max_connections(Name),
+		%% The caller is the owner, and that owner is already dead.
+		Stale2 = QueueStale(),
+		true = ets:insert(ranch_server, {{embedded_sup, Name}, Stale2}),
+		exit(Stale2, kill),
+		ok = sys:resume(Server),
+		ok = ranch_server:set_addr(Name, ranch_server:get_addr(Name)),
+		infinity = ranch:get_max_connections(Name),
+		[{{embedded_sup, Name}, Stale2}] =
+			ets:lookup(ranch_server, {embedded_sup, Name}),
+		%% A different listener may take the ref from a dead owner.
+		ok = ranch_server:set_new_listener_opts(Name, 4,
+			#{max_connections => 4}, [], [fresh]),
+		4 = ranch:get_max_connections(Name),
+		[] = ets:lookup(ranch_server, {embedded_sup, Name})
+	after
+		case process_info(Server, status) of
+			{status, suspended} ->
+				_ = sys:resume(Server);
+			_ ->
+				ok
+		end,
+		ranch_server:cleanup_listener_opts(Name),
+		embedded_sup:stop(SupPid)
+	end.
+
+supervisor_embedded_downgrade_drops_owner(_) ->
+	doc("Downgrading ranch_server drops the owner key and keeps live options."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, _} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, infinity),
+	Server = whereis(ranch_server),
+	ok = sys:suspend(Server),
+	try
+		ok = sys:change_code(Server, ranch_server, {down, v2}, []),
+		ok = sys:resume(Server),
+		infinity = ranch:get_max_connections(Name),
+		[] = ets:lookup(ranch_server, {embedded_sup, Name})
+	after
+		case process_info(Server, status) of
+			{status, suspended} ->
+				_ = sys:resume(Server);
+			_ ->
+				ok
+		end,
+		ranch_server:cleanup_listener_opts(Name),
+		embedded_sup:stop(SupPid)
+	end.
+
+supervisor_embedded_server_down_clears_opts(_) ->
+	doc("A supervisor that stops while ranch_server is down drops its options."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	Spec = ranch:child_spec(Name, ranch_tcp,
+		#{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	{ok, EmbeddedSupPid} = supervisor:start_child(SupPid, Spec),
+	ok = ranch:set_max_connections(Name, infinity),
+	ok = logger:add_primary_filter(?FUNCTION_NAME,
+		{fun (_, _) -> stop end, undefined}),
+	WaitUp = fun WaitUp(0, _) ->
+			error(timeout);
+		WaitUp(Left, Sup) ->
+			Children = try supervisor:which_children(Sup) of
+				Result ->
+					Result
+			catch exit:_ ->
+				[]
+			end,
+			case Children of
+				[{{ranch_listener_sup, Name}, ListenerPid, supervisor, _},
+					{ranch_server_proxy, ProxyPid, worker, _}]
+					when is_pid(ListenerPid), is_pid(ProxyPid) ->
+					ok;
+				_ ->
+					timer:sleep(10),
+					WaitUp(Left - 1, Sup)
+			end
+	end,
+	WaitDead = fun WaitDead(0, _) ->
+			error(timeout);
+		WaitDead(Left, Pid) ->
+			case is_process_alive(Pid) of
+				false ->
+					ok;
+				true ->
+					timer:sleep(10),
+					WaitDead(Left - 1, Pid)
+			end
+	end,
+	WaitGone = fun WaitGone(0) ->
+			error(timeout);
+		WaitGone(Left) ->
+			case ranch_server:listener_start_args_exists(Name) of
+				false ->
+					false;
+				true ->
+					timer:sleep(10),
+					WaitGone(Left - 1)
+			end
+	end,
+	try
+		ok = supervisor:terminate_child(ranch_sup, ranch_server),
+		{ok, _} = supervisor:restart_child(ranch_sup, ranch_server),
+		ok = WaitUp(200, EmbeddedSupPid),
+		infinity = ranch:get_max_connections(Name),
+		ok = supervisor:terminate_child(ranch_sup, ranch_server),
+		ok = WaitDead(200, EmbeddedSupPid),
+		%% Do not restart ranch_server. The give-up path is 5s.
+		false = WaitGone(200)
 	after
 		ok = logger:remove_primary_filter(?FUNCTION_NAME),
 		_ = supervisor:restart_child(ranch_sup, ranch_server),
