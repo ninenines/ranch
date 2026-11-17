@@ -107,7 +107,7 @@ groups() ->
 		misc_info_embedded,
 		misc_process_labels,
 		misc_metrics,
-		misc_stats_counters_upgrade,
+		misc_conns_sup_sup_upgrade,
 		misc_opts_logger,
 		misc_post_listen_callback,
 		misc_post_listen_callback_error,
@@ -448,11 +448,13 @@ misc_metrics(_) ->
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
 
-misc_stats_counters_upgrade(_) ->
-	doc("A supervisor upgrade does not reset connection counters."),
+misc_conns_sup_sup_upgrade(_) ->
+	doc("A supervisor upgrade does not reset connection counters and keeps "
+		"the number of running connection supervisors, even when "
+		"num_acceptors was raised before."),
 	Name = ?FUNCTION_NAME,
 	{ok, ListenerSup} = ranch:start_listener(Name, ranch_tcp,
-		#{num_conns_sups => 1}, echo_protocol, []),
+		#{num_acceptors => 2}, echo_protocol, []),
 	Port = ranch:get_port(Name),
 	{ok, Socket1} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
 	ok = gen_tcp:send(Socket1, <<"a">>),
@@ -460,20 +462,43 @@ misc_stats_counters_upgrade(_) ->
 	#{metrics := Metrics1} = ranch:info(Name),
 	{1, 0} = do_accumulate_metrics(Metrics1),
 	Counters = ranch_server:get_stats_counters(Name),
+	ConnsSups = ranch_server:get_connections_sups(Name),
+	2 = length(ConnsSups),
+	{_, AcceptorsSup, _, _} = lists:keyfind(ranch_acceptors_sup, 1,
+		supervisor:which_children(ListenerSup)),
 	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
 		supervisor:which_children(ListenerSup)),
 	try
-		ok = sys:suspend(ConnsSupSup),
-		ok = sys:change_code(ConnsSupSup, ranch_conns_sup_sup, undefined, []),
-		ok = sys:resume(ConnsSupSup),
+		ok = ranch:set_transport_options(Name, #{num_acceptors => 4}),
+		%% Same steps as the appup.
+		ok = ranch:stop_all_acceptors(),
+		_ = [begin
+			ok = sys:suspend(Sup),
+			ok = sys:change_code(Sup, Mod, undefined, []),
+			ok = sys:resume(Sup)
+		     end || {Sup, Mod} <- [{AcceptorsSup, ranch_acceptors_sup},
+					   {ConnsSupSup, ranch_conns_sup_sup}]],
+		ok = ranch:restart_all_acceptors(),
 		Counters = ranch_server:get_stats_counters(Name),
+		2 = ranch_server:get_num_connections_sups(Name),
+		ConnsSups = ranch_server:get_connections_sups(Name),
 		{ok, Socket2} = gen_tcp:connect("localhost", Port,
 			[binary, {active, false}]),
 		ok = gen_tcp:send(Socket2, <<"b">>),
 		{ok, <<"b">>} = gen_tcp:recv(Socket2, 1, 1000),
 		#{metrics := Metrics2} = ranch:info(Name),
 		{2, 0} = do_accumulate_metrics(Metrics2),
-		ok = gen_tcp:close(Socket2)
+		ok = gen_tcp:close(Socket2),
+		%% Acceptors without a connection supervisor give up after 1s.
+		receive after 1500 -> ok end,
+		Acceptors = ranch:procs(Name, acceptors),
+		4 = length(Acceptors),
+		[ok = do_echo(Port) || _ <- lists:seq(1, 8)],
+		%% Nothing was restarted.
+		Acceptors = ranch:procs(Name, acceptors),
+		{_, AcceptorsSup, _, _} = lists:keyfind(ranch_acceptors_sup, 1,
+			supervisor:which_children(ListenerSup)),
+		ListenerSup = ranch_server:get_listener_sup(Name)
 	after
 		ok = gen_tcp:close(Socket1),
 		ok = ranch:stop_listener(Name)
@@ -2438,9 +2463,9 @@ supervisor_conns_sup_crash_sleeping_acceptors(_) ->
 	%% Every accepted connection is started, but its acceptor then
 	%% waits in ranch_conns_sup:start_protocol/3.
 	Sockets = [begin
-		{ok, S} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
-		S
-	end || _ <- lists:seq(1, NumSleeping)],
+			{ok, S} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+			S
+	           end || _ <- lists:seq(1, NumSleeping)],
 	ok = ranch:wait_for_connections(Name, '==', NumSleeping, 10),
 	[{1, ConnsSup0}] = ranch_server:get_connections_sups(Name),
 	exit(ConnsSup0, kill),

@@ -31,18 +31,21 @@ start_link(Ref, Transport, Protocol, Logger) ->
 init({Ref, Transport, Protocol, Logger}) ->
 	proc_lib:set_label({ranch_conns_sup_sup, Ref}),
 	TransOpts = ranch_server:get_transport_options(Ref),
-	NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
-	NumConnsSups = maps:get(num_conns_sups, TransOpts, NumAcceptors),
 	%% A supervisor upgrade calls init/1 again and does not restart
-	%% connection supervisors. They already hold this ref. start_link/4
+	%% connection supervisors. They already hold this ref, which has
+	%% 2 counters per running connection supervisor. start_link/4
 	%% deletes it before the first init, which is when the count is fixed.
+	NumConnsSups =
 	try ranch_server:get_stats_counters(Ref) of
-		_ ->
-			ok
+		StatsCounters ->
+			maps:get(size, counters:info(StatsCounters)) div 2
 	catch
 		error:badarg ->
+			NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
+			NumConnsSups0 = maps:get(num_conns_sups, TransOpts, NumAcceptors),
 			ok = ranch_server:set_stats_counters(Ref,
-				counters:new(2*NumConnsSups, []))
+				counters:new(2*NumConnsSups0, [])),
+			NumConnsSups0
 	end,
 	ok = ranch_server:set_num_connections_sups(Ref, NumConnsSups),
 	%% The supervisor logs this MFA. connection_type is fixed until the
