@@ -161,10 +161,19 @@ prepare_socket_opts([Backend = {inet_backend, _}|SocketOpts], Logger) ->
 	end;
 prepare_socket_opts(SocketOpts0, Logger) ->
 	SocketOpts = set_default_options(SocketOpts0),
-	DisallowedOpts0 = disallowed_listen_options(),
+	{DisallowedOpts0, Defaults} =
+		case proplists:get_value(protocol, SocketOpts, tls) of
+			%% SO_REUSEADDR on UDP lets another socket bind the same
+			%% address and port and receive datagrams.
+			dtls ->
+				{disallowed_listen_options() -- [reuseaddr],
+					[binary, {active, false}]};
+			tls ->
+				{disallowed_listen_options(),
+					[binary, {active, false}, {reuseaddr, true}]}
+		end,
 	DisallowedOpts = unsupported_tls_options(SocketOpts) ++ DisallowedOpts0,
-	ranch:filter_options(SocketOpts, DisallowedOpts,
-		[binary, {active, false}, {reuseaddr, true}], Logger).
+	ranch:filter_options(SocketOpts, DisallowedOpts, Defaults, Logger).
 
 ssl_preserves_socket_opt_order() ->
 	{ok, Vsn} = application:get_key(ssl, vsn),

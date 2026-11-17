@@ -81,6 +81,7 @@ groups() ->
 		ssl_inet_backend_socket,
 		ssl_local_echo,
 		ssl_dtls_echo,
+		ssl_dtls_reuseaddr,
 		ssl_graceful,
 		ssl_handshake,
 		ssl_handshake_error,
@@ -1255,6 +1256,66 @@ ssl_dtls_echo(_) ->
 	%% Make sure the listener stopped.
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
+
+ssl_dtls_reuseaddr(_) ->
+	doc("DTLS does not force SO_REUSEADDR."),
+	Opts = ct_helper:get_certs_from_ets() -- [{versions, ['tlsv1.2']}],
+	case ssl:listen(0, Opts ++ [{protocol, dtls}, {verify, verify_none}]) of
+		{error, _} ->
+			{skip, "No DTLS support."};
+		{ok, Sock} ->
+			ok = ssl:close(Sock),
+			Name = ?FUNCTION_NAME,
+			Self = self(),
+			Tag = make_ref(),
+			Cb = fun (LSock) ->
+				Self ! {Tag, ssl:getopts(LSock, [reuseaddr])},
+				ok
+			end,
+			%% Unset. The UDP socket must not have SO_REUSEADDR.
+			{ok, _} = ranch:start_listener(Name,
+				ranch_ssl, #{
+					post_listen_callback => Cb,
+					socket_opts => Opts ++ [{protocol, dtls}, {verify, verify_none}]
+				},
+				echo_protocol, []),
+			{ok, [{reuseaddr, false}]} = receive
+				{Tag, Res} ->
+					Res
+			after 1000 ->
+				error(timeout)
+			end,
+			ok = ranch:stop_listener(Name),
+			%% An explicit true is kept.
+			{ok, _} = ranch:start_listener(Name,
+				ranch_ssl, #{
+					post_listen_callback => Cb,
+					socket_opts => Opts ++ [{protocol, dtls}, {verify, verify_none},
+						{reuseaddr, true}]
+				},
+				echo_protocol, []),
+			{ok, [{reuseaddr, true}]} = receive
+				{Tag, Res2} ->
+					Res2
+			after 1000 ->
+				error(timeout)
+			end,
+			ok = ranch:stop_listener(Name),
+			%% TLS still forces it.
+			{ok, _} = ranch:start_listener(Name,
+				ranch_ssl, #{
+					post_listen_callback => Cb,
+					socket_opts => ct_helper:get_certs_from_ets()
+				},
+				echo_protocol, []),
+			{ok, [{reuseaddr, true}]} = receive
+				{Tag, Res3} ->
+					Res3
+			after 1000 ->
+				error(timeout)
+			end,
+			ok = ranch:stop_listener(Name)
+	end.
 
 ssl_handshake(_) ->
 	doc("Ensure that multiple steps handshake works with SSL transport."),
