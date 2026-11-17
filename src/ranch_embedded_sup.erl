@@ -28,8 +28,8 @@ start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 	-> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init({Ref, Transport, TransOpts, Protocol, ProtoOpts}) ->
 	Proxy = #{id => ranch_server_proxy,
-		start => {ranch_server_proxy, start_link, []},
-		shutdown => brutal_kill},
+		start => {ranch_server_proxy, start_link, [Ref]},
+		shutdown => 5000},
 	Listener = #{id => {ranch_listener_sup, Ref},
 		start => {ranch_listener_sup, start_link, [Ref, Transport, TransOpts, Protocol, ProtoOpts]},
 		type => supervisor},

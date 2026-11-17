@@ -263,10 +263,6 @@ handle_info({'DOWN', MonitorRef, process, Pid, Reason},
 	ok = case {TypeRef, Reason} of
 		{{listener_sup, Ref}, normal} ->
 			cleanup_listener_opts(Ref);
-		{{listener_sup, Ref}, shutdown} ->
-			cleanup_listener_opts(Ref);
-		{{listener_sup, Ref}, {shutdown, _}} ->
-			cleanup_listener_opts(Ref);
 		_ ->
 			_ = ets:delete(?TAB, TypeRef),
 			ok

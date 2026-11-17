@@ -138,6 +138,8 @@ groups() ->
 		supervisor_10_acceptors_10_conns_sups,
 		supervisor_1_acceptor_10_conns_sups,
 		supervisor_changed_options_restart,
+		supervisor_listener_sup_exit,
+		supervisor_embedded_stop_clears_opts,
 		supervisor_clean_child_restart,
 		supervisor_clean_restart,
 		supervisor_restart_acceptors,
@@ -2264,6 +2266,70 @@ supervisor_changed_options_restart(_) ->
 	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
+
+supervisor_listener_sup_exit(_) ->
+	doc("A listener supervisor restart keeps updated options."),
+	Name = ?FUNCTION_NAME,
+	%% Supervisors trap exits, so exit/2 with crash or shutdown is only
+	%% a message. proc_lib:stop/3 exits with that reason.
+	Wait = fun Wait(0, _) ->
+			error(timeout);
+		Wait(Left, Old) ->
+			Pid = try
+				ranch_server:get_listener_sup(Name)
+			catch error:badarg ->
+				Old
+			end,
+			case Pid =:= Old of
+				true ->
+					timer:sleep(10),
+					Wait(Left - 1, Old);
+				false ->
+					Pid
+			end
+	end,
+	OrigOpts = #{num_acceptors => 1, handshake_timeout => 5000,
+		max_connections => 10},
+	{ok, _} = ranch:start_listener(Name, ranch_tcp, OrigOpts,
+		echo_protocol, []),
+	RanchSup = whereis(ranch_sup),
+	Updated = #{num_acceptors => 1, handshake_timeout => 5001,
+		max_connections => 20},
+	ok = ranch:set_transport_options(Name, Updated),
+	%% Silence the expected supervisor crash report.
+	ok = logger:add_primary_filter(?FUNCTION_NAME, {fun (_, _) -> stop end, undefined}),
+	try
+		%% crash is not a shutdown. The updated rows must survive the restart.
+		Sup0 = ranch_server:get_listener_sup(Name),
+		ok = proc_lib:stop(Sup0, crash, 5000),
+		Sup1 = Wait(200, Sup0),
+		Updated = ranch:get_transport_options(Name),
+		20 = ranch:get_max_connections(Name),
+		RanchSup = whereis(ranch_sup),
+		%% An intensity shutdown is the same reason. The live rows stay.
+		ok = proc_lib:stop(Sup1, shutdown, 5000),
+		_Sup2 = Wait(200, Sup1),
+		Updated = ranch:get_transport_options(Name),
+		20 = ranch:get_max_connections(Name),
+		RanchSup = whereis(ranch_sup)
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME)
+	end,
+	ok = ranch:stop_listener(Name).
+
+supervisor_embedded_stop_clears_opts(_) ->
+	doc("Stopping an embedded listener clears its options."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, _} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{num_acceptors => 1, max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, 20),
+	20 = ranch:get_max_connections(Name),
+	ok = supervisor:terminate_child(SupPid, {ranch_embedded_sup, Name}),
+	ok = supervisor:delete_child(SupPid, {ranch_embedded_sup, Name}),
+	?assertError(badarg, ranch:get_max_connections(Name)),
+	embedded_sup:stop(SupPid).
 
 supervisor_clean_child_restart(_) ->
 	doc("Verify that only the relevant parts of the supervision tree restarted "
