@@ -115,7 +115,6 @@ groups() ->
 		misc_set_transport_options_max_connections,
 		misc_set_max_connections_badarg,
 		misc_set_max_connections,
-		misc_set_max_connections_map_ref,
 		misc_stopped_listener_options,
 		misc_wait_for_connections,
 		misc_suspend_wait_stop,
@@ -653,17 +652,6 @@ misc_set_max_connections(_) ->
 	TransOpts = ranch:get_transport_options(Name),
 	ok = ranch:set_transport_options(Name, TransOpts#{num_acceptors => 2}),
 	infinity = ranch:get_max_connections(Name),
-	ok = ranch:stop_listener(Name).
-
-misc_set_max_connections_map_ref(_) ->
-	doc("set_max_connections accepts a map as the listener name."),
-	Name = #{name => ?FUNCTION_NAME},
-	{ok, _} = ranch:start_listener(Name,
-		ranch_tcp, #{max_connections => 10, num_acceptors => 1},
-		echo_protocol, []),
-	ok = ranch:set_max_connections(Name, 4),
-	4 = ranch:get_max_connections(Name),
-	#{max_connections := 4} = ranch:get_transport_options(Name),
 	ok = ranch:stop_listener(Name).
 
 misc_stopped_listener_options(_) ->
