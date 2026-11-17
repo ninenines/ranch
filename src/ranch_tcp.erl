@@ -59,6 +59,7 @@
 	| {high_watermark, non_neg_integer()}
 	| inet
 	| inet6
+	| {inet_backend, inet | socket}
 	| {ip, inet:ip_address() | inet:local_address()}
 	| {ipv6_v6only, boolean()}
 	| {keepalive, boolean()}
