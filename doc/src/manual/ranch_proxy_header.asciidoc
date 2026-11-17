@@ -192,6 +192,8 @@ forces it to be absent when neither `cert_conn` nor
 raw_tlvs::
 
 The non-standard TLVs that Ranch was not able to parse.
+Their combined size must not exceed 1024 bytes.
+That size includes the type and the length of each TLV.
 
 == Changelog
 

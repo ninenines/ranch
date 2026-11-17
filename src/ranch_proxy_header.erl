@@ -744,10 +744,17 @@ parse_tlv(<<16#20, _/bits>>, _, _, _) ->
 %% PP2_TYPE_NETNS.
 parse_tlv(<<16#30, TLVLen:16, NetNS:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	parse_tlv(Rest, Len - TLVLen - 3, Info#{netns => NetNS}, Header);
-%% Unknown TLV.
+%% Unknown TLV. The total on-wire size, including each type
+%% and length, is at most 1024 bytes.
 parse_tlv(<<TLVType, TLVLen:16, TLVValue:TLVLen/binary, Rest/bits>>, Len, Info, Header) ->
 	RawTLVs = maps:get(raw_tlvs, Info, []),
-	parse_tlv(Rest, Len - TLVLen - 3, Info#{raw_tlvs => [{TLVType, TLVValue}|RawTLVs]}, Header);
+	case raw_tlv_size(RawTLVs) + TLVLen + 3 > 1024 of
+		true ->
+			{error, 'Unknown TLV exceeds 1024 bytes in PROXY protocol binary header. (PP 2.2)'};
+		false ->
+			parse_tlv(Rest, Len - TLVLen - 3,
+				Info#{raw_tlvs => [{TLVType, TLVValue}|RawTLVs]}, Header)
+	end;
 %% Invalid TLV length.
 parse_tlv(_, _, _, _) ->
 	{error, 'Invalid TLV length in the PROXY protocol binary header. (PP 2.2)'}.
@@ -1024,10 +1031,16 @@ client([cert_conn|Tail], Client) -> client(Tail, Client bor 16#2);
 client([cert_sess|Tail], Client) -> client(Tail, Client bor 16#4).
 
 raw_tlvs(Info) ->
+	TLVs = maps:get(raw_tlvs, Info, []),
+	raw_tlv_size(TLVs) > 1024 andalso error(badarg),
 	[begin
 		Len = byte_size(Bin),
 		<<Type, Len:16, Bin/binary>>
-	end || {Type, Bin} <- maps:get(raw_tlvs, Info, [])].
+	end || {Type, Bin} <- TLVs].
+
+%% Type byte plus 16-bit length.
+raw_tlv_size(TLVs) ->
+	lists:sum([3 + byte_size(Bin) || {_, Bin} <- TLVs]).
 
 -ifdef(TEST).
 v1_test() ->
@@ -1336,6 +1349,50 @@ v2_tlvs_test() ->
 	{ok, MaxCert, <<>>} = parse(iolist_to_binary(header(MaxCert))),
 	OverCert = Common#{ssl => CertInfo#{client_cert => binary:copy(<<$a>>, 65513)}},
 	?assertError(badarg, header(OverCert)),
+	ok.
+
+v2_raw_tlv_limit_test() ->
+	Common = #{
+		version => 2,
+		command => proxy,
+		transport_family => ipv4,
+		transport_protocol => stream,
+		src_address => {127, 0, 0, 1},
+		src_port => 1234,
+		dest_address => {10, 11, 12, 13},
+		dest_port => 23456
+	},
+	%% 1021 bytes of value plus the 3-byte TLV header is 1024.
+	ExactVal = binary:copy(<<$a>>, 1021),
+	Exact = Common#{raw_tlvs => [{16#ea, ExactVal}]},
+	{ok, Exact, <<>>} = parse(iolist_to_binary(header(Exact))),
+	%% A known TLV and NOOP padding do not count toward that cap.
+	WithKnown = Exact#{authority => binary:copy(<<$b>>, 200)},
+	{ok, WithKnown, <<>>} = parse(iolist_to_binary(
+		header(WithKnown, #{padding => 64}))),
+	%% One more value byte is 1025 bytes on the wire.
+	OverVal = binary:copy(<<$a>>, 1022),
+	{error, _} = parse(<<
+		"\r\n\r\n\0\r\nQUIT\n",
+		16#21, 16#11, (12 + 3 + 1022):16,
+		127, 0, 0, 1, 10, 11, 12, 13,
+		1234:16, 23456:16,
+		16#ea, 1022:16, OverVal/binary
+	>>),
+	?assertError(badarg, header(Common#{raw_tlvs => [{16#ea, OverVal}]})),
+	%% An empty unknown TLV is 3 bytes and crosses the cap.
+	{error, _} = parse(<<
+		"\r\n\r\n\0\r\nQUIT\n",
+		16#21, 16#11, (12 + 1024 + 3):16,
+		127, 0, 0, 1, 10, 11, 12, 13,
+		1234:16, 23456:16,
+		16#ea, 1021:16, ExactVal/binary,
+		16#eb, 0:16
+	>>),
+	?assertError(badarg, header(Common#{raw_tlvs => [
+		{16#ea, ExactVal},
+		{16#eb, <<>>}
+	]})),
 	ok.
 
 v2_checksum_test() ->
