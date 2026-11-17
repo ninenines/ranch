@@ -243,7 +243,17 @@ handle_call({set_addr, Ref, Addr}, _, State) ->
 	true = ets:insert(?TAB, {{addr, Ref}, Addr}),
 	{reply, ok, State};
 handle_call({set_max_conns, Ref, MaxConns}, _, State) ->
-	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),
+	%% Update stored objects only. update_element does not insert a
+	%% row cleanup_listener_opts/1 has deleted. A match spec cannot
+	%% be built from Ref: a map, '_' or '$N' makes select_replace badarg.
+	_ = ets:update_element(?TAB, {max_conns, Ref}, {2, MaxConns}),
+	_ = case ets:lookup(?TAB, {trans_opts, Ref}) of
+		[{_, TransOpts}] ->
+			ets:update_element(?TAB, {trans_opts, Ref},
+				{2, TransOpts#{max_connections => MaxConns}});
+		[] ->
+			false
+	end,
 	_ = [ConnsSup ! {set_max_conns, MaxConns} || {_, ConnsSup} <- get_connections_sups(Ref)],
 	{reply, ok, State};
 handle_call({set_stats_counters, Ref, Counters}, _, State) ->
