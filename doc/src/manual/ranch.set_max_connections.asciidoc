@@ -43,6 +43,9 @@ An error tuple is returned when the listener is not found.
 
 * *2.5*: A listener started with `start_listener/5` keeps this
          value when its supervisor restarts.
+* *2.5*: This value is copied into the `max_connections`
+         transport option. Setting transport options
+         without that key resets the limit to 1024.
 * *2.5*: The function returns `{error, not_found}` when the listener does not exist.
 * *2.0*: The maximum number of connections is now per connection supervisor.
 

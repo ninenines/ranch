@@ -244,6 +244,13 @@ handle_call({set_addr, Ref, Addr}, _, State) ->
 	{reply, ok, State};
 handle_call({set_max_conns, Ref, MaxConns}, _, State) ->
 	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),
+	_ = case ets:lookup(?TAB, {trans_opts, Ref}) of
+		[{_, TransOpts}] ->
+			ets:update_element(?TAB, {trans_opts, Ref},
+				{2, TransOpts#{max_connections => MaxConns}});
+		[] ->
+			false
+	end,
 	_ = [ConnsSup ! {set_max_conns, MaxConns} || {_, ConnsSup} <- get_connections_sups(Ref)],
 	{reply, ok, State};
 handle_call({set_stats_counters, Ref, Counters}, _, State) ->
@@ -301,10 +308,13 @@ code_change({down, _}, State, Extra) ->
 	end,
 	{ok, State};
 code_change(_OldVsn, State, mark_embedded) ->
+	%% The 2.4 setter wrote the limit only in {max_conns, Ref}.
+	ok = sync_max_conns(mark_embedded),
 	_ = [ets:insert(?TAB, {{listener_embedded, Ref}, true})
 		|| {Ref, _} <- get_listener_sups()],
 	{ok, State};
-code_change(_OldVsn, State, _Extra) ->
+code_change(_OldVsn, State, Extra) ->
+	ok = sync_max_conns(Extra),
 	{ok, State}.
 
 %% Internal.
@@ -320,6 +330,17 @@ cleanup_down_listener(Ref) ->
 			_ = ets:delete(?TAB, {listener_sup, Ref}),
 			ok
 	end.
+
+%% Do not copy the row back on downgrade.
+sync_max_conns(Extra) when Extra =:= downgrade; Extra =:= unmark_embedded ->
+	ok;
+sync_max_conns(_Extra) ->
+	_ = [ets:update_element(?TAB, {trans_opts, Ref},
+			{2, TransOpts#{max_connections => MaxConns}})
+		|| [Ref, MaxConns] <- ets:match(?TAB, {{max_conns, '$1'}, '$2'}),
+			[{_, TransOpts}] <- [ets:lookup(?TAB, {trans_opts, Ref})],
+			maps:get(max_connections, TransOpts, 1024) =/= MaxConns],
+	ok.
 
 %% Fields read on every PROXY header. The rest of the transport
 %% options, including socket options, stay on {trans_opts, Ref}.
