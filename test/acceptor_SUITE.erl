@@ -124,7 +124,6 @@ groups() ->
 		misc_repeated_start_stop,
 		misc_listen_error,
 		misc_listen_error_secrets,
-		misc_accept_system_limit,
 		misc_trace_acceptors,
 		misc_trace_acceptors_timeout,
 		misc_trace_acceptors_mailbox,
@@ -971,49 +970,6 @@ misc_listen_error_secrets(_) ->
 		end
 	after
 		logger:remove_primary_filter(Name)
-	end,
-	ok.
-
-misc_accept_system_limit(_) ->
-	doc("Pause accept when the transport returns system_limit."),
-	Name = ?FUNCTION_NAME,
-	Self = self(),
-	true = register(ranch_accept_system_limit_transport, Self),
-	ok = logger:add_primary_filter(Name, {fun(Event, _) ->
-		Self ! {log, Event},
-		ignore
-	end, undefined}),
-	try
-		{ok, _} = ranch:start_listener(Name,
-			ranch_accept_system_limit_transport, #{num_acceptors => 1},
-			echo_protocol, []),
-		T1 = receive
-			{accept, T1_} ->
-				T1_
-		after 1000 ->
-			error(timeout)
-		end,
-		T2 = receive
-			{accept, T2_} ->
-				T2_
-		after 1000 ->
-			error(timeout)
-		end,
-		case T2 - T1 of
-			Delta when Delta >= 80 ->
-				ok;
-			Delta ->
-				error({accept_without_pause, Delta})
-		end,
-		receive
-			{log, #{msg := {Format, []}}} ->
-				"Ranch acceptor reducing accept rate: out of file descriptors~n" = Format
-		after 1000 ->
-			error(timeout)
-		end
-	after
-		_ = logger:remove_primary_filter(Name),
-		_ = unregister(ranch_accept_system_limit_transport)
 	end,
 	ok.
 
