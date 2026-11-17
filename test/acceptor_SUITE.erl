@@ -104,6 +104,7 @@ groups() ->
 		misc_bad_child_spec,
 		misc_repeated_remove,
 		misc_info,
+		misc_procs_undefined_conns_sup,
 		misc_info_embedded,
 		misc_process_labels,
 		misc_metrics,
@@ -299,6 +300,31 @@ misc_info(_) ->
 	[] = ranch:procs({misc_info, act}, connections),
 	[] = ranch:procs({misc_info, ssl}, connections),
 	ok.
+
+misc_procs_undefined_conns_sup(_) ->
+	doc("procs skips a connection supervisor that is not running."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1, num_conns_sups => 2},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	ok = gen_tcp:send(Socket, <<"Hello!">>),
+	{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 0, 1000),
+	ListenerSup = ranch_server:get_listener_sup(Name),
+	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
+		supervisor:which_children(ListenerSup)),
+	Children = supervisor:which_children(ConnsSupSup),
+	%% The acceptor uses one supervisor. Leave that one running.
+	[LiveSup] = [Pid || {_, Pid, _, _} <- Children, is_pid(Pid),
+		supervisor:which_children(Pid) =/= []],
+	[DeadId] = [Id || {Id, Pid, _, _} <- Children, Pid =/= LiveSup],
+	ok = supervisor:terminate_child(ConnsSupSup, DeadId),
+	{_, undefined, _, _} = lists:keyfind(DeadId, 1,
+		supervisor:which_children(ConnsSupSup)),
+	[{_, ConnPid, _, _}] = supervisor:which_children(LiveSup),
+	[ConnPid] = ranch:procs(Name, connections),
+	ok = ranch:stop_listener(Name).
 
 misc_info_embedded(_) ->
 	doc("Information about listeners in embedded mode."),

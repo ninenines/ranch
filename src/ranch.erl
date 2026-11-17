@@ -694,12 +694,9 @@ procs1(ListenerSup, acceptors) ->
 procs1(ListenerSup, connections) ->
 	{_, SupSupPid, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
 		supervisor:which_children(ListenerSup)),
-	Conns=
-	lists:map(fun ({_, SupPid, _, _}) ->
-			[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)]
-		end,
-		supervisor:which_children(SupSupPid)
-	),
+	Conns = [[Pid || {_, Pid, _, _} <- supervisor:which_children(SupPid)]
+		|| {_, SupPid, _, _} <- supervisor:which_children(SupSupPid),
+			is_pid(SupPid)],
 	lists:flatten(Conns).
 
 -spec trace_acceptors(ref()) ->
