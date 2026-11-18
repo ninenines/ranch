@@ -140,6 +140,7 @@ groups() ->
 		supervisor_changed_options_restart,
 		supervisor_listener_sup_exit,
 		supervisor_failed_restart_keeps_opts,
+		supervisor_failed_local_start_removes_socket,
 		supervisor_embedded_failed_start_keeps_opts,
 		supervisor_embedded_stop_clears_opts,
 		supervisor_embedded_proxy_upgrade,
@@ -2370,6 +2371,42 @@ supervisor_failed_restart_keeps_opts(_) ->
 		ok = logger:remove_primary_filter(?FUNCTION_NAME),
 		ets:delete(Name),
 		ranch:stop_listener(Name)
+	end.
+
+supervisor_failed_local_start_removes_socket(_) ->
+	doc("A failed first start removes the UNIX socket file it created."),
+	case do_os_supports_local_sockets() of
+		true ->
+			Name = ?FUNCTION_NAME,
+			SockFile = do_tempname(),
+			Cb = fun (_) -> {error, induced} end,
+			try
+				{error, _} = ranch:start_listener(Name, ranch_tcp,
+					#{socket_opts => [{ip, {local, SockFile}}],
+						post_listen_callback => Cb},
+					echo_protocol, []),
+				false = ranch_server:listener_start_args_exists(Name),
+				{error, enoent} = file:read_file_info(SockFile),
+				%% The embedded owner is alive while its listener fails.
+				Embedded = do_tempname(),
+				{ok, SupPid} = embedded_sup:start_link(),
+				try
+					{error, _} = embedded_sup:start_listener(SupPid, Name,
+						ranch_tcp, #{num_acceptors => 1,
+							socket_opts => [{ip, {local, Embedded}}],
+							post_listen_callback => Cb},
+						echo_protocol, []),
+					{error, enoent} = file:read_file_info(Embedded)
+				after
+					file:delete(Embedded),
+					embedded_sup:stop(SupPid)
+				end
+			after
+				file:delete(SockFile),
+				ranch:stop_listener(Name)
+			end;
+		false ->
+			{skip, "No local socket support."}
 	end.
 
 supervisor_embedded_failed_start_keeps_opts(_) ->

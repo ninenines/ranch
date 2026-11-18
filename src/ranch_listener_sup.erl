@@ -25,10 +25,12 @@ start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 	Logger = maps:get(logger, TransOpts, logger),
 	Inserted = ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
 		[Ref, Transport, TransOpts, Protocol, ProtoOpts]),
+	ok = ranch_server:mark_listener_inserted(Ref, Inserted),
 	case supervisor:start_link(?MODULE, {
 		Ref, Transport, Protocol, Logger
 	}) of
 		{ok, _} = Ok ->
+			ok = ranch_server:clear_listener_inserted(Ref),
 			Ok;
 		Error ->
 			%% Still inside ranch_sup's start or restart. The next

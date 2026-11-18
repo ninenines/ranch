@@ -65,6 +65,9 @@ start_listen_sockets(Ref, NumListenSockets, Transport, TransOpts0, Logger) when 
 	{ok, Addr} = Transport:sockname(BaseSocket),
 	ExtraSockets = case Addr of
 		{local, _} when NumListenSockets > 1 ->
+			%% The base socket is already bound. Its file stays
+			%% after this process exits unless this start owns it.
+			ok = ranch_server:unlink_inserted_listener(Ref, Transport, TransOpts0),
 			listen_error(Ref, Transport, TransOpts0, reuseport_local, Logger);
 		{local, _} ->
 			[];
@@ -87,6 +90,7 @@ start_listen_socket(Ref, Transport, TransOpts, Logger) ->
 				ok ->
 					Socket;
 				{error, Reason} ->
+					ok = ranch_server:unlink_inserted_listener(Ref, Transport, TransOpts),
 					listen_error(Ref, Transport, TransOpts, Reason, Logger)
 			end;
 		{error, Reason} ->

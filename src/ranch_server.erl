@@ -21,6 +21,9 @@
 -export([set_new_listener_opts/5]).
 -export([cleanup_listener_opts/1]).
 -export([cleanup_inserted_listener/2]).
+-export([mark_listener_inserted/2]).
+-export([clear_listener_inserted/1]).
+-export([unlink_inserted_listener/3]).
 -export([cleanup_listener_pids/1]).
 -export([embedded_claim/2]).
 -export([note_embedded/2]).
@@ -91,6 +94,10 @@ cleanup_inserted_listener(Ref, true) ->
 			[{_, Sup}] ->
 				case is_process_alive(Sup) of
 					true ->
+						%% The owner releases the rows. Drop the
+						%% insert flag so a later listen does not
+						%% unlink that owner's socket.
+						_ = ets:delete(?TAB, {listener_inserted, Ref}),
 						ok;
 					false ->
 						cleanup_listener_opts(Ref)
@@ -99,6 +106,37 @@ cleanup_inserted_listener(Ref, true) ->
 				cleanup_listener_opts(Ref)
 		end
 	end).
+
+%% Called from the current start_link/5 only. ranch_server is
+%% updated first, and the previous start_link does not clear
+%% a flag set inside insert_new.
+-spec mark_listener_inserted(ranch:ref(), boolean()) -> ok.
+mark_listener_inserted(_Ref, false) ->
+	ok;
+mark_listener_inserted(Ref, true) ->
+	ets:insert(?TAB, {{listener_inserted, Ref}, true}),
+	ok.
+
+%% The acceptor supervisor created this socket, then failed.
+%% The fd dies with that process. Unlink a {local, Path}
+%% file only when this start inserted the rows. The embedded
+%% owner is already alive here: it is the start that bound
+%% the socket. A restart did not insert, so it does not unlink.
+-spec unlink_inserted_listener(ranch:ref(), module(), map()) -> ok.
+unlink_inserted_listener(Ref, Transport, TransOpts) ->
+	with_embedded_lock(Ref, fun() ->
+		case ets:lookup(?TAB, {listener_inserted, Ref}) of
+			[{_, true}] ->
+				Transport:cleanup(TransOpts);
+			_ ->
+				ok
+		end
+	end).
+
+-spec clear_listener_inserted(ranch:ref()) -> ok.
+clear_listener_inserted(Ref) ->
+	_ = ets:delete(?TAB, {listener_inserted, Ref}),
+	ok.
 
 -spec cleanup_listener_pids(ranch:ref()) -> ok.
 cleanup_listener_pids(Ref) ->
@@ -295,6 +333,8 @@ count_connections(Ref) ->
 
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
+	%% A start that died with ranch_server must not unlink later.
+	_ = ets:match_delete(?TAB, {{listener_inserted, '_'}, '_'}),
 	EmbeddedMonitors = [{{erlang:monitor(process, Pid), Pid}, {embedded_sup, Ref}} ||
 		[Ref, Pid] <- ets:match(?TAB, {{embedded_sup, '$1'}, '$2'}),
 		is_pid(Pid)],
@@ -401,6 +441,7 @@ code_change({down, _}, State=#state{monitors=Monitors}, _Extra) ->
 	cleanup_dead_embedded(),
 	_ = ets:match_delete(?TAB, {{embedded_sup, '_'}, '_'}),
 	_ = ets:match_delete(?TAB, {{embedded_lock, '_'}, '_'}),
+	_ = ets:match_delete(?TAB, {{listener_inserted, '_'}, '_'}),
 	{ok, State#state{monitors=drop_embedded_monitors(Monitors)}};
 code_change(_OldVsn, State, _Extra) ->
 	cleanup_dead_embedded(),
@@ -491,6 +532,7 @@ delete_listener_rows(Ref) ->
 	_ = ets:delete(?TAB, {proxy_opts, Ref}),
 	_ = ets:delete(?TAB, {proto_opts, Ref}),
 	_ = ets:delete(?TAB, {listener_start_args, Ref}),
+	_ = ets:delete(?TAB, {listener_inserted, Ref}),
 	%% We also remove the pid of the connection supervisors.
 	%% Depending on the timing, they might already have been deleted
 	%% when we handled the monitor DOWN message. However, in some

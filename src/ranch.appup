@@ -13,7 +13,6 @@
 	[{<<"2\\.4\\.[0-9]+.*">>, [
 		{apply, {ranch, stop_all_acceptors, []}},
 		{load_module, ranch_acceptor},
-		{update, ranch_acceptors_sup, supervisor},
 		{load_module, ranch_app},
 		%% 2.4.0 is still current, so nothing calls get_proxy_opts/1.
 		{apply, {ets, match_delete, [ranch_server, {{proxy_opts, '_'}, '_'}]}},
@@ -25,7 +24,11 @@
 		{update, ranch_conns_sup, {advanced, []}},
 		{load_module, ranch_crc32c},
 		{update, ranch_embedded_sup, supervisor},
+		%% ranch_server is already the new module. start_link/5
+		%% sets the insert flag, then ranch_acceptors_sup may
+		%% call unlink_inserted_listener/3.
 		{update, ranch_listener_sup, supervisor},
+		{update, ranch_acceptors_sup, supervisor},
 		{load_module, ranch_protocol},
 		{load_module, ranch_proxy_header},
 		{update, ranch_server_proxy, {advanced, []}},
