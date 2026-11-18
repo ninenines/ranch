@@ -19,15 +19,23 @@
 -export([init/1]).
 
 -spec start_link(ranch:ref(), module(), any(), module(), any())
-	-> {ok, pid()}.
+	-> {ok, pid()} | {error, term()}.
 start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
 	MaxConns = maps:get(max_connections, TransOpts, 1024),
 	Logger = maps:get(logger, TransOpts, logger),
-	ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
+	Inserted = ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
 		[Ref, Transport, TransOpts, Protocol, ProtoOpts]),
-	supervisor:start_link(?MODULE, {
+	case supervisor:start_link(?MODULE, {
 		Ref, Transport, Protocol, Logger
-	}).
+	}) of
+		{ok, _} = Ok ->
+			Ok;
+		Error ->
+			%% Still inside ranch_sup's start or restart. The next
+			%% start cannot publish until this call returns.
+			ok = ranch_server:cleanup_inserted_listener(Ref, Inserted),
+			Error
+	end.
 
 -spec init({ranch:ref(), module(), module(), module()})
 	-> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.

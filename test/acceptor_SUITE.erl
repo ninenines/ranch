@@ -139,6 +139,8 @@ groups() ->
 		supervisor_1_acceptor_10_conns_sups,
 		supervisor_changed_options_restart,
 		supervisor_listener_sup_exit,
+		supervisor_failed_restart_keeps_opts,
+		supervisor_embedded_failed_start_keeps_opts,
 		supervisor_embedded_stop_clears_opts,
 		supervisor_embedded_proxy_upgrade,
 		supervisor_clean_child_restart,
@@ -2050,6 +2052,9 @@ tcp_error_eaddrinuse(Config) ->
 	{error, eaddrinuse} = ranch:start_listener({Name, fails},
 		ranch_tcp, [{port, Port}],
 		active_echo_protocol, []),
+	%% The failed start must not keep its rows.
+	ok = ranch_server:set_addr(Name, ranch_server:get_addr(Name)),
+	false = ranch_server:listener_start_args_exists({Name, fails}),
 	ok = ranch:stop_listener(Name),
 	%% Make sure the listener stopped.
 	?assertError(badarg, ranch:get_port(Name)),
@@ -2326,6 +2331,74 @@ supervisor_listener_sup_exit(_) ->
 		ok = logger:remove_primary_filter(?FUNCTION_NAME)
 	end,
 	ok = ranch:stop_listener(Name).
+
+supervisor_failed_restart_keeps_opts(_) ->
+	doc("A listener restart that fails to listen keeps updated options."),
+	Name = ?FUNCTION_NAME,
+	ets:new(Name, [named_table, public]),
+	ets:insert(Name, {n, 0}),
+	Cb = fun (_) ->
+		case ets:update_counter(Name, n, 1) of
+			2 -> {error, induced};
+			_ -> ok
+		end
+	end,
+	{ok, Sup0} = ranch:start_listener(Name, ranch_tcp,
+		#{num_acceptors => 1, max_connections => 10,
+			post_listen_callback => Cb},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, 20),
+	Wait = fun Wait(0) ->
+			error(timeout);
+		Wait(Left) ->
+			case ets:lookup(Name, n) of
+				[{n, N}] when N >= 3 ->
+					ok;
+				_ ->
+					timer:sleep(10),
+					Wait(Left - 1)
+			end
+	end,
+	%% The first restart fails to listen. The next one must keep 20.
+	ok = logger:add_primary_filter(?FUNCTION_NAME, {fun (_, _) -> stop end, undefined}),
+	try
+		%% Supervisors trap exits. proc_lib:stop/3 shuts the children down.
+		ok = proc_lib:stop(Sup0, crash, 5000),
+		ok = Wait(200),
+		20 = ranch:get_max_connections(Name)
+	after
+		ok = logger:remove_primary_filter(?FUNCTION_NAME),
+		ets:delete(Name),
+		ranch:stop_listener(Name)
+	end.
+
+supervisor_embedded_failed_start_keeps_opts(_) ->
+	doc("A failed start_listener keeps an embedded listener's rows."),
+	Name = ?FUNCTION_NAME,
+	ets:new(Name, [named_table, public]),
+	ets:insert(Name, {n, 0}),
+	Cb = fun (_) ->
+		case ets:update_counter(Name, n, 1) of
+			1 -> ok;
+			_ -> {error, induced}
+		end
+	end,
+	Opts = #{num_acceptors => 1, max_connections => 10,
+		post_listen_callback => Cb},
+	{ok, SupPid} = embedded_sup:start_link(),
+	try
+		{ok, _} = embedded_sup:start_listener(SupPid, Name,
+			ranch_tcp, Opts, echo_protocol, []),
+		ok = ranch:set_max_connections(Name, 20),
+		{error, _} = ranch:start_listener(Name, ranch_tcp, Opts,
+			echo_protocol, []),
+		20 = ranch:get_max_connections(Name),
+		[{_, Owner}] = ets:lookup(ranch_server, {embedded_sup, Name}),
+		true = is_process_alive(Owner)
+	after
+		ets:delete(Name),
+		embedded_sup:stop(SupPid)
+	end.
 
 supervisor_embedded_stop_clears_opts(_) ->
 	doc("Stopping an embedded listener clears its options."),
@@ -2941,7 +3014,7 @@ supervisor_embedded_stale_start_keeps_opts(_) ->
 		[{{embedded_sup, Name}, Stale2}] =
 			ets:lookup(ranch_server, {embedded_sup, Name}),
 		%% A different listener may take the ref from a dead owner.
-		ok = ranch_server:set_new_listener_opts(Name, 4,
+		true = ranch_server:set_new_listener_opts(Name, 4,
 			#{max_connections => 4}, [], [fresh]),
 		4 = ranch:get_max_connections(Name),
 		[] = ets:lookup(ranch_server, {embedded_sup, Name})
@@ -3040,7 +3113,9 @@ supervisor_embedded_server_down_clears_opts(_) ->
 		ok = WaitUp(200, EmbeddedSupPid),
 		infinity = ranch:get_max_connections(Name),
 		ok = supervisor:terminate_child(ranch_sup, ranch_server),
-		ok = WaitDead(200, EmbeddedSupPid),
+		%% The proxy may use its 5s give-up before the
+		%% supervisor reaches its intensity.
+		ok = WaitDead(800, EmbeddedSupPid),
 		%% Do not restart ranch_server. The give-up path is 5s.
 		false = WaitGone(200)
 	after

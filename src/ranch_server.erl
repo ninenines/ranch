@@ -20,6 +20,7 @@
 -export([start_link/0]).
 -export([set_new_listener_opts/5]).
 -export([cleanup_listener_opts/1]).
+-export([cleanup_inserted_listener/2]).
 -export([cleanup_listener_pids/1]).
 -export([embedded_claim/2]).
 -export([note_embedded/2]).
@@ -67,7 +68,8 @@
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any(), any(), [any()]) -> ok.
+%% true when this call inserted {listener_start_args, Ref}.
+-spec set_new_listener_opts(ranch:ref(), ranch:max_conns(), any(), any(), [any()]) -> boolean().
 set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts, StartArgs) ->
 	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}).
 
@@ -76,6 +78,27 @@ cleanup_listener_opts(Ref) ->
 	ok = delete_listener_rows(Ref),
 	_ = ets:delete(?TAB, {embedded_sup, Ref}),
 	ok.
+
+%% Inserted is this call's listener_start_args insert.
+%% A restart did not insert and must keep its rows.
+%% A live embedded owner releases its own rows.
+-spec cleanup_inserted_listener(ranch:ref(), boolean()) -> ok.
+cleanup_inserted_listener(_Ref, false) ->
+	ok;
+cleanup_inserted_listener(Ref, true) ->
+	with_embedded_lock(Ref, fun() ->
+		case ets:lookup(?TAB, {embedded_sup, Ref}) of
+			[{_, Sup}] ->
+				case is_process_alive(Sup) of
+					true ->
+						ok;
+					false ->
+						cleanup_listener_opts(Ref)
+				end;
+			[] ->
+				cleanup_listener_opts(Ref)
+		end
+	end).
 
 -spec cleanup_listener_pids(ranch:ref()) -> ok.
 cleanup_listener_pids(Ref) ->
@@ -253,8 +276,8 @@ get_protocol_options(Ref) ->
 get_listener_start_args(Ref) ->
 	ets:lookup_element(?TAB, {listener_start_args, Ref}, 2).
 
-%% Present until stop_listener/1 or the embedded proxy stops.
-%% A listener supervisor restart keeps the row.
+%% Present until stop_listener/1, a failed start_listener/5
+%% or the embedded proxy stops. A restart keeps the row.
 -spec listener_start_args_exists(ranch:ref()) -> boolean().
 listener_start_args_exists(Ref) ->
 	ets:member(?TAB, {listener_start_args, Ref}).
@@ -281,34 +304,31 @@ init([]) ->
 		[Ref, Pid] <- ets:match(?TAB, {{listener_sup, '$1'}, '$2'})],
 	{ok, #state{monitors=EmbeddedMonitors++ConnMonitors++ListenerMonitors}}.
 
--spec handle_call(term(), {pid(), reference()}, #state{}) -> {reply, ok | ignore, #state{}}.
+-spec handle_call(term(), {pid(), reference()}, #state{}) -> {reply, ok | boolean() | ignore, #state{}}.
 handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs},
 		{Caller, _}, State0) ->
 	%% Hold the owner lock across the check and the insert. A start_link
 	%% still running for a dead or replaced supervisor must not publish.
-	State = with_embedded_lock(Ref, fun() ->
+	{Inserted, State} = with_embedded_lock(Ref, fun() ->
 		case ets:lookup(?TAB, {embedded_sup, Ref}) of
 			[{_, Sup}] ->
 				case {is_process_alive(Sup), Caller =:= Sup} of
 					{true, true} ->
-						ok = insert_new_listener_opts(Ref, MaxConns,
-							TransOpts, ProtoOpts, StartArgs),
-						State0;
+						{insert_new_listener_opts(Ref, MaxConns,
+							TransOpts, ProtoOpts, StartArgs), State0};
 					{false, false} ->
 						State1 = drop_dead_embedded(Ref, State0),
-						ok = insert_new_listener_opts(Ref, MaxConns,
-							TransOpts, ProtoOpts, StartArgs),
-						State1;
+						{insert_new_listener_opts(Ref, MaxConns,
+							TransOpts, ProtoOpts, StartArgs), State1};
 					_ ->
-						State0
+						{false, State0}
 				end;
 			[] ->
-				ok = insert_new_listener_opts(Ref, MaxConns,
-					TransOpts, ProtoOpts, StartArgs),
-				State0
+				{insert_new_listener_opts(Ref, MaxConns,
+					TransOpts, ProtoOpts, StartArgs), State0}
 		end
 	end),
-	{reply, ok, State};
+	{reply, Inserted, State};
 handle_call({embedded_claim, Ref, Sup}, _, State) ->
 	ok = note_embedded(Ref, Sup),
 	{reply, ok, ensure_embedded_monitor(Ref, Sup, State)};
@@ -427,8 +447,7 @@ insert_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts, StartArgs) ->
 	ets:insert_new(?TAB, {{trans_opts, Ref}, TransOpts}),
 	ets:insert_new(?TAB, {{proxy_opts, Ref}, proxy_opts(TransOpts)}),
 	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
-	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
-	ok.
+	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}).
 
 %% Install the monitor only while Sup still owns the ref.
 %% set_monitored_process/3 writes the owner row.
