@@ -19,6 +19,7 @@
 %% API.
 -export([start_link/0]).
 -export([set_new_listener_opts/5]).
+-export([set_listener_embedded/1]).
 -export([cleanup_listener_opts/1]).
 -export([cleanup_connections_sups/1]).
 -export([set_connections_sup/3]).
@@ -68,6 +69,10 @@ start_link() ->
 set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts, StartArgs) ->
 	gen_server:call(?MODULE, {set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}).
 
+-spec set_listener_embedded(ranch:ref()) -> ok.
+set_listener_embedded(Ref) ->
+	gen_server:call(?MODULE, {set_listener_embedded, Ref}).
+
 -spec cleanup_listener_opts(ranch:ref()) -> ok.
 cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {addr, Ref}),
@@ -76,6 +81,7 @@ cleanup_listener_opts(Ref) ->
 	_ = ets:delete(?TAB, {proxy_opts, Ref}),
 	_ = ets:delete(?TAB, {proto_opts, Ref}),
 	_ = ets:delete(?TAB, {listener_start_args, Ref}),
+	_ = ets:delete(?TAB, {listener_embedded, Ref}),
 	%% We also remove the pid of the connection supervisors.
 	%% Depending on the timing, they might already have been deleted
 	%% when we handled the monitor DOWN message. However, in some
@@ -190,8 +196,9 @@ get_protocol_options(Ref) ->
 get_listener_start_args(Ref) ->
 	ets:lookup_element(?TAB, {listener_start_args, Ref}, 2).
 
-%% Present until stop_listener/1 or a shutdown DOWN.
-%% A crashed listener keeps the row while it restarts.
+%% Present until stop_listener/1. A normal listener keeps the
+%% row across restarts. An embedded listener drops it when its
+%% supervisor exits with reason shutdown.
 -spec listener_start_args_exists(ranch:ref()) -> boolean().
 listener_start_args_exists(Ref) ->
 	ets:member(?TAB, {listener_start_args, Ref}).
@@ -222,6 +229,9 @@ handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartAr
 	ets:insert_new(?TAB, {{proxy_opts, Ref}, proxy_opts(TransOpts)}),
 	ets:insert_new(?TAB, {{proto_opts, Ref}, ProtoOpts}),
 	ets:insert_new(?TAB, {{listener_start_args, Ref}, StartArgs}),
+	{reply, ok, State};
+handle_call({set_listener_embedded, Ref}, _, State) ->
+	ets:insert(?TAB, {{listener_embedded, Ref}, true}),
 	{reply, ok, State};
 handle_call({set_connections_sup, Ref, Id, Pid}, _, State0) ->
 	State = set_monitored_process({conns_sup, Ref, Id}, Pid, State0),
@@ -262,11 +272,11 @@ handle_info({'DOWN', MonitorRef, process, Pid, Reason},
 	{_, TypeRef} = lists:keyfind({MonitorRef, Pid}, 1, Monitors),
 	ok = case {TypeRef, Reason} of
 		{{listener_sup, Ref}, normal} ->
-			cleanup_listener_opts(Ref);
+			cleanup_down_listener(Ref);
 		{{listener_sup, Ref}, shutdown} ->
-			cleanup_listener_opts(Ref);
+			cleanup_down_listener(Ref);
 		{{listener_sup, Ref}, {shutdown, _}} ->
-			cleanup_listener_opts(Ref);
+			cleanup_down_listener(Ref);
 		_ ->
 			_ = ets:delete(?TAB, TypeRef),
 			ok
@@ -281,13 +291,35 @@ terminate(_Reason, _State) ->
 	ok.
 
 -spec code_change(term() | {down, term()}, #state{}, term()) -> {ok, term()}.
-code_change({down, _}, State, _Extra) ->
+code_change({down, _}, State, Extra) ->
 	true = ets:match_delete(?TAB, {{proxy_opts, '_'}, '_'}),
+	case Extra of
+		unmark_embedded ->
+			true = ets:match_delete(?TAB, {{listener_embedded, '_'}, '_'});
+		_ ->
+			true
+	end,
+	{ok, State};
+code_change(_OldVsn, State, mark_embedded) ->
+	_ = [ets:insert(?TAB, {{listener_embedded, Ref}, true})
+		|| {Ref, _} <- get_listener_sups()],
 	{ok, State};
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 %% Internal.
+
+%% A normal listener keeps its rows until stop_listener/1.
+%% Embedded listeners don't call stop_listener/1, so their
+%% options are cleaned up on 'DOWN'.
+cleanup_down_listener(Ref) ->
+	case ets:member(?TAB, {listener_embedded, Ref}) of
+		true ->
+			cleanup_listener_opts(Ref);
+		false ->
+			_ = ets:delete(?TAB, {listener_sup, Ref}),
+			ok
+	end.
 
 %% Fields read on every PROXY header. The rest of the transport
 %% options, including socket options, stay on {trans_opts, Ref}.

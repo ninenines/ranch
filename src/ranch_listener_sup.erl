@@ -15,15 +15,25 @@
 -module(ranch_listener_sup).
 -behaviour(supervisor).
 
+-export([start_link/3]).
 -export([start_link/5]).
 -export([init/1]).
 
+-spec start_link(ranch:ref(), module(), module()) -> {ok, pid()} | {error, term()}.
+start_link(Ref, Transport, Protocol) ->
+	TransOpts = ranch_server:get_transport_options(Ref),
+	Logger = maps:get(logger, TransOpts, logger),
+	supervisor:start_link(?MODULE, {Ref, Transport, Protocol, Logger}).
+
+%% Embedded, or still on the child spec from before the options
+%% were taken out of it.
 -spec start_link(ranch:ref(), module(), any(), module(), any())
 	-> {ok, pid()}.
 start_link(Ref, Transport, TransOpts, Protocol, ProtoOpts) ->
+	ok = ranch_server:set_listener_embedded(Ref),
 	MaxConns = maps:get(max_connections, TransOpts, 1024),
 	Logger = maps:get(logger, TransOpts, logger),
-	ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
+	ok = ranch_server:set_new_listener_opts(Ref, MaxConns, TransOpts, ProtoOpts,
 		[Ref, Transport, TransOpts, Protocol, ProtoOpts]),
 	supervisor:start_link(?MODULE, {
 		Ref, Transport, Protocol, Logger

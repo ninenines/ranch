@@ -22,6 +22,14 @@ Start a listener.
 A listener is a set of processes that accepts and manages
 connections using the given transport and protocol modules.
 
+The transport and protocol options are not part of the
+supervisor specification. A restart of the listener supervisor
+uses the current options, including changes made after the
+listener was started.
+
+Do not call this function more than once at the same time
+for the same listener name.
+
 == Arguments
 
 Ref::
@@ -82,6 +90,8 @@ configured for Ranch is already in use.
 
 == Changelog
 
+* *2.5*: The supervisor specification no longer includes the
+         transport or protocol options.
 * *2.0*: The `TransOpts` argument must no longer contain
          Ranch-specific options if given as a list. Use a map.
 * *1.4*: The `NumAcceptors` argument was moved to the transport options.

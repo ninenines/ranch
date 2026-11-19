@@ -101,15 +101,41 @@ start_listener(Ref, Transport, TransOpts0, Protocol, ProtoOpts)
 		when is_atom(Transport), is_atom(Protocol) ->
 	TransOpts = normalize_opts(TransOpts0),
 	_ = code:ensure_loaded(Transport),
-	case {erlang:function_exported(Transport, name, 0), validate_transport_opts(TransOpts)} of
-		{true, ok} ->
+	case {erlang:function_exported(Transport, name, 0),
+			validate_transport_opts(TransOpts),
+			ranch_server:listener_start_args_exists(Ref)} of
+		{true, ok, false} ->
+			MaxConns = maps:get(max_connections, TransOpts, 1024),
+			ok = ranch_server:set_new_listener_opts(Ref, MaxConns,
+				TransOpts, ProtoOpts,
+				[Ref, Transport, TransOpts, Protocol, ProtoOpts]),
 			ChildSpec = #{id => {ranch_listener_sup, Ref}, start => {ranch_listener_sup, start_link, [
-				Ref, Transport, TransOpts, Protocol, ProtoOpts
+				Ref, Transport, Protocol
 			]}, type => supervisor},
-			maybe_started(supervisor:start_child(ranch_sup, ChildSpec));
-		{false, _} ->
+			case maybe_started(supervisor:start_child(ranch_sup, ChildSpec)) of
+				{ok, _} = OK ->
+					OK;
+				%% A child already exists. Do not delete its rows.
+				{error, {already_started, _}} = Error ->
+					Error;
+				{error, already_present} = Error ->
+					Error;
+				Error ->
+					ok = ranch_server:cleanup_listener_opts(Ref),
+					Error
+			end;
+		{true, ok, true} ->
+			%% The pid row is removed on DOWN and written again
+			%% when the listener supervisor restarts.
+			try ranch_server:get_listener_sup(Ref) of
+				Pid ->
+					{error, {already_started, Pid}}
+			catch error:badarg ->
+				{error, already_present}
+			end;
+		{false, _, _} ->
 			{error, {bad_transport, Transport}};
-		{_, TransOptsError} ->
+		{_, TransOptsError, _} ->
 			TransOptsError
 	end.
 

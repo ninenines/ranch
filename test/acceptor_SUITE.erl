@@ -138,6 +138,11 @@ groups() ->
 		supervisor_10_acceptors_10_conns_sups,
 		supervisor_1_acceptor_10_conns_sups,
 		supervisor_changed_options_restart,
+		supervisor_shutdown_keeps_opts,
+		supervisor_restarting_already_present,
+		supervisor_embedded_shutdown_drops_opts,
+		supervisor_failed_start_clears_opts,
+		supervisor_upgrade_marks_embedded,
 		supervisor_clean_child_restart,
 		supervisor_clean_restart,
 		supervisor_restart_acceptors,
@@ -2264,6 +2269,191 @@ supervisor_changed_options_restart(_) ->
 	ok = ranch:stop_listener(Name),
 	?assertError(badarg, ranch:get_port(Name)),
 	ok.
+
+supervisor_shutdown_keeps_opts(_) ->
+	doc("A start_listener supervisor restart keeps updated options."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 10},
+		echo_protocol, [{initial, true}]),
+	{ok, #{start := {ranch_listener_sup, start_link, StartArgs}}} =
+		supervisor:get_childspec(ranch_sup, {ranch_listener_sup, Name}),
+	[Name, ranch_tcp, echo_protocol] = StartArgs,
+	ok = ranch:set_max_connections(Name, 40),
+	ok = ranch:set_protocol_options(Name, [{updated, true}]),
+	Listener = ranch_server:get_listener_sup(Name),
+	ok = proc_lib:stop(Listener, shutdown, 5000),
+	Wait = fun Wait(0) ->
+			error(timeout);
+		Wait(N) ->
+			case [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _}
+					<- supervisor:which_children(ranch_sup),
+					Ref =:= Name, is_pid(Pid), Pid =/= Listener] of
+				[Pid] ->
+					Pid;
+				[] ->
+					receive after 50 -> Wait(N - 1) end
+			end
+	end,
+	Pid = Wait(50),
+	40 = ranch:get_max_connections(Name),
+	[{updated, true}] = ranch:get_protocol_options(Name),
+	{error, {already_started, Pid}} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 1},
+		echo_protocol, []),
+	40 = ranch:get_max_connections(Name),
+	ok = ranch:stop_listener(Name).
+
+supervisor_restarting_already_present(_) ->
+	doc("start_listener returns already_present while the listener supervisor is down."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{max_connections => 10},
+		echo_protocol, []),
+	ok = ranch:set_max_connections(Name, 40),
+	Listener = ranch_server:get_listener_sup(Name),
+	ok = sys:suspend(ranch_sup),
+	try
+		ok = proc_lib:stop(Listener, shutdown, 5000),
+		WaitGone = fun WaitGone(0) ->
+				error(timeout);
+			WaitGone(N) ->
+				try ranch_server:get_listener_sup(Name) of
+					_ ->
+						receive after 50 -> WaitGone(N - 1) end
+				catch error:badarg ->
+					ok
+				end
+		end,
+		ok = WaitGone(50),
+		{error, already_present} = ranch:start_listener(Name,
+			ranch_tcp, #{max_connections => 1},
+			echo_protocol, []),
+		40 = ranch:get_max_connections(Name)
+	after
+		ok = sys:resume(ranch_sup)
+	end,
+	Wait = fun Wait(0) ->
+			error(timeout);
+		Wait(N) ->
+			case [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _}
+					<- supervisor:which_children(ranch_sup),
+					Ref =:= Name, is_pid(Pid), Pid =/= Listener] of
+				[Pid] ->
+					Pid;
+				[] ->
+					receive after 50 -> Wait(N - 1) end
+			end
+	end,
+	_ = Wait(50),
+	ok = ranch:stop_listener(Name).
+
+supervisor_embedded_shutdown_drops_opts(_) ->
+	doc("An embedded listener restarts with the options from its child spec."),
+	Name = ?FUNCTION_NAME,
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, EmbSup} = embedded_sup:start_listener(SupPid, Name,
+		ranch_tcp, #{max_connections => 10},
+		echo_protocol, [{initial, true}]),
+	ok = ranch:set_max_connections(Name, 40),
+	ok = ranch:set_protocol_options(Name, [{updated, true}]),
+	Listener = ranch_server:get_listener_sup(Name),
+	ok = proc_lib:stop(Listener, shutdown, 5000),
+	Wait = fun Wait(0) ->
+			error(timeout);
+		Wait(N) ->
+			case [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _}
+					<- supervisor:which_children(EmbSup),
+					Ref =:= Name, is_pid(Pid), Pid =/= Listener] of
+				[Pid] ->
+					Pid;
+				[] ->
+					receive after 50 -> Wait(N - 1) end
+			end
+	end,
+	_ = Wait(50),
+	10 = ranch:get_max_connections(Name),
+	[{initial, true}] = ranch:get_protocol_options(Name),
+	ok = embedded_sup:stop_listener(SupPid, Name),
+	unlink(SupPid),
+	ok = proc_lib:stop(SupPid, shutdown, 5000).
+
+supervisor_failed_start_clears_opts(_) ->
+	doc("A failed start_listener does not leave options behind."),
+	Name = ?FUNCTION_NAME,
+	{ok, Probe} = gen_tcp:listen(0, []),
+	{ok, Port} = inet:port(Probe),
+	{error, eaddrinuse} = ranch:start_listener(Name,
+		ranch_tcp, #{socket_opts => [{port, Port}]},
+		echo_protocol, []),
+	false = ranch_server:listener_start_args_exists(Name),
+	ok = gen_tcp:close(Probe).
+
+supervisor_upgrade_marks_embedded(_) ->
+	doc("The 2.4.1 upgrade marks running listeners and the downgrade removes the marks."),
+	Name = ?FUNCTION_NAME,
+	Emb = {Name, embedded},
+	Opts = #{max_connections => 10},
+	{ok, _} = supervisor:start_child(ranch_sup, #{
+		id => {ranch_listener_sup, Name},
+		start => {ranch_listener_sup, start_link, [
+			Name, ranch_tcp, Opts, echo_protocol, []
+		]},
+		type => supervisor
+	}),
+	{ok, SupPid} = embedded_sup:start_link(),
+	{ok, _} = embedded_sup:start_listener(SupPid, Emb,
+		ranch_tcp, Opts, echo_protocol, []),
+	%% start_link/5 marked them. The upgrade runs against listeners
+	%% that were not marked by this module.
+	true = ets:delete(ranch_server, {listener_embedded, Name}),
+	true = ets:delete(ranch_server, {listener_embedded, Emb}),
+	Server = whereis(ranch_server),
+	ok = sys:suspend(Server),
+	try sys:change_code(Server, ranch_server, undefined, []) of
+		ok -> ok
+	after
+		ok = sys:resume(Server)
+	end,
+	false = ets:member(ranch_server, {listener_embedded, Name}),
+	false = ets:member(ranch_server, {listener_embedded, Emb}),
+	ok = sys:suspend(Server),
+	try sys:change_code(Server, ranch_server, undefined, mark_embedded) of
+		ok -> ok
+	after
+		ok = sys:resume(Server)
+	end,
+	true = ets:member(ranch_server, {listener_embedded, Name}),
+	true = ets:member(ranch_server, {listener_embedded, Emb}),
+	ok = ranch:set_max_connections(Name, 40),
+	Listener = ranch_server:get_listener_sup(Name),
+	ok = proc_lib:stop(Listener, shutdown, 5000),
+	Wait = fun Wait(0) ->
+			error(timeout);
+		Wait(N) ->
+			case [Pid || {{ranch_listener_sup, Ref}, Pid, supervisor, _}
+					<- supervisor:which_children(ranch_sup),
+					Ref =:= Name, is_pid(Pid), Pid =/= Listener] of
+				[Pid] ->
+					Pid;
+				[] ->
+					receive after 50 -> Wait(N - 1) end
+			end
+	end,
+	_ = Wait(50),
+	10 = ranch:get_max_connections(Name),
+	ok = sys:suspend(Server),
+	try sys:change_code(Server, ranch_server, {down, undefined}, unmark_embedded) of
+		ok -> ok
+	after
+		ok = sys:resume(Server)
+	end,
+	false = ets:member(ranch_server, {listener_embedded, Name}),
+	false = ets:member(ranch_server, {listener_embedded, Emb}),
+	ok = ranch:stop_listener(Name),
+	ok = embedded_sup:stop_listener(SupPid, Emb),
+	unlink(SupPid),
+	ok = proc_lib:stop(SupPid, shutdown, 5000).
 
 supervisor_clean_child_restart(_) ->
 	doc("Verify that only the relevant parts of the supervision tree restarted "
