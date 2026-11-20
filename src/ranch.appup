@@ -9,7 +9,7 @@
 %% module then call system_code_change; and when downgrading,
 %% call system_code_change and then load the module.
 
-{"2.4.1",
+{"2.5.0",
 	[{<<"2\\.4\\.[0-9]+.*">>, [
 		{apply, {ranch, stop_all_acceptors, []}},
 		{load_module, ranch_acceptor},
