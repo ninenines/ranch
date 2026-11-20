@@ -243,17 +243,28 @@ handle_call({set_addr, Ref, Addr}, _, State) ->
 	true = ets:insert(?TAB, {{addr, Ref}, Addr}),
 	{reply, ok, State};
 handle_call({set_max_conns, Ref, MaxConns}, _, State) ->
-	ets:insert(?TAB, {{max_conns, Ref}, MaxConns}),
+	%% Update stored objects only. update_element does not insert a
+	%% row cleanup_listener_opts/1 has deleted. A match spec cannot
+	%% be built from Ref: a map, '_' or '$N' makes select_replace badarg.
+	_ = ets:update_element(?TAB, {max_conns, Ref}, {2, MaxConns}),
+	_ = case ets:lookup(?TAB, {trans_opts, Ref}) of
+		[{_, TransOpts}] ->
+			ets:update_element(?TAB, {trans_opts, Ref},
+				{2, TransOpts#{max_connections => MaxConns}});
+		[] ->
+			false
+	end,
 	_ = [ConnsSup ! {set_max_conns, MaxConns} || {_, ConnsSup} <- get_connections_sups(Ref)],
 	{reply, ok, State};
 handle_call({set_stats_counters, Ref, Counters}, _, State) ->
 	ets:insert(?TAB, {{stats_counters, Ref}, Counters}),
 	{reply, ok, State};
 handle_call({set_trans_opts, Ref, Opts}, _, State) ->
-	ets:insert(?TAB, [
-		{{trans_opts, Ref}, Opts},
-		{{proxy_opts, Ref}, proxy_opts(Opts)}
-	]),
+	%% update_element does not insert a row cleanup_listener_opts/1
+	%% has deleted. insert would put trusted_proxies back for the
+	%% next start_listener/5, which uses insert_new.
+	_ = ets:update_element(?TAB, {trans_opts, Ref}, {2, Opts}),
+	_ = ets:update_element(?TAB, {proxy_opts, Ref}, {2, proxy_opts(Opts)}),
 	{reply, ok, State};
 handle_call({set_proto_opts, Ref, Opts}, _, State) ->
 	ets:insert(?TAB, {{proto_opts, Ref}, Opts}),
@@ -301,10 +312,13 @@ code_change({down, _}, State, Extra) ->
 	end,
 	{ok, State};
 code_change(_OldVsn, State, mark_embedded) ->
+	%% The 2.4 setter wrote the limit only in {max_conns, Ref}.
+	ok = sync_max_conns(mark_embedded),
 	_ = [ets:insert(?TAB, {{listener_embedded, Ref}, true})
 		|| {Ref, _} <- get_listener_sups()],
 	{ok, State};
-code_change(_OldVsn, State, _Extra) ->
+code_change(_OldVsn, State, Extra) ->
+	ok = sync_max_conns(Extra),
 	{ok, State}.
 
 %% Internal.
@@ -320,6 +334,17 @@ cleanup_down_listener(Ref) ->
 			_ = ets:delete(?TAB, {listener_sup, Ref}),
 			ok
 	end.
+
+%% Do not copy the row back on downgrade.
+sync_max_conns(Extra) when Extra =:= downgrade; Extra =:= unmark_embedded ->
+	ok;
+sync_max_conns(_Extra) ->
+	_ = [ets:update_element(?TAB, {trans_opts, Ref},
+			{2, TransOpts#{max_connections => MaxConns}})
+		|| [Ref, MaxConns] <- ets:match(?TAB, {{max_conns, '$1'}, '$2'}),
+			[{_, TransOpts}] <- [ets:lookup(?TAB, {trans_opts, Ref})],
+			maps:get(max_connections, TransOpts, 1024) =/= MaxConns],
+	ok.
 
 %% Fields read on every PROXY header. The rest of the transport
 %% options, including socket options, stay on {trans_opts, Ref}.
