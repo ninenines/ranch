@@ -14,9 +14,12 @@ suspend_listener(Ref :: ranch:ref())
 
 Suspend a running listener.
 
-Ranch will stop listening for and accepting connections and
-the listening socket will be closed. Existing connections
-will continue undisturbed. The function
+Ranch will stop listening for and accepting connections.
+The listening socket is closed, except for a DTLS listener on
+a fixed port: that UDP socket stays open so existing connections
+still receive datagrams, and the port stays in use until the
+listener stops. Existing connections continue undisturbed.
+The function
 link:man:ranch:wait_for_connections(3)[ranch:wait_for_connections(3)]
 can be used to wait for connections to be closed if necessary.
 
@@ -41,6 +44,7 @@ An error tuple is returned when the listener could not be suspended.
 
 == Changelog
 
+* *2.5*: A fixed-port DTLS listener keeps its UDP socket open across suspend.
 * *1.6*: Function introduced.
 
 == Examples
