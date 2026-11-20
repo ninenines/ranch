@@ -539,7 +539,8 @@ remove_connection(Ref, Pid) when is_pid(Pid) ->
 	{_, ConnsSupSup, _, _} = lists:keyfind(ranch_conns_sup_sup, 1,
 		supervisor:which_children(ListenerSup)),
 	_ = [ConnsSup ! {remove_connection, Ref, Pid} ||
-		{_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup)],
+		{_, ConnsSup, _, _} <- supervisor:which_children(ConnsSupSup),
+		is_pid(ConnsSup)],
 	ok.
 
 -spec get_status(ref()) -> running | suspended.

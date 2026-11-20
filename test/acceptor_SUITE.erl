@@ -302,7 +302,7 @@ misc_info(_) ->
 	ok.
 
 misc_procs_undefined_conns_sup(_) ->
-	doc("procs skips a connection supervisor that is not running."),
+	doc("procs and remove_connection skip a connection supervisor that is not running."),
 	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
 		ranch_tcp, #{num_acceptors => 1, num_conns_sups => 2},
@@ -324,6 +324,7 @@ misc_procs_undefined_conns_sup(_) ->
 		supervisor:which_children(ConnsSupSup)),
 	[{_, ConnPid, _, _}] = supervisor:which_children(LiveSup),
 	[ConnPid] = ranch:procs(Name, connections),
+	ok = ranch:remove_connection(Name, ConnPid),
 	ok = ranch:stop_listener(Name).
 
 misc_info_embedded(_) ->
