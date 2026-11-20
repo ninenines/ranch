@@ -260,10 +260,11 @@ handle_call({set_stats_counters, Ref, Counters}, _, State) ->
 	ets:insert(?TAB, {{stats_counters, Ref}, Counters}),
 	{reply, ok, State};
 handle_call({set_trans_opts, Ref, Opts}, _, State) ->
-	ets:insert(?TAB, [
-		{{trans_opts, Ref}, Opts},
-		{{proxy_opts, Ref}, proxy_opts(Opts)}
-	]),
+	%% update_element does not insert a row cleanup_listener_opts/1
+	%% has deleted. insert would put trusted_proxies back for the
+	%% next start_listener/5, which uses insert_new.
+	_ = ets:update_element(?TAB, {trans_opts, Ref}, {2, Opts}),
+	_ = ets:update_element(?TAB, {proxy_opts, Ref}, {2, proxy_opts(Opts)}),
 	{reply, ok, State};
 handle_call({set_proto_opts, Ref, Opts}, _, State) ->
 	ets:insert(?TAB, {{proto_opts, Ref}, Opts}),

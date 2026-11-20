@@ -117,6 +117,7 @@ groups() ->
 		misc_set_max_connections,
 		misc_set_max_connections_upgrade,
 		misc_stopped_listener_options,
+		misc_set_transport_options_deleted_rows,
 		misc_wait_for_connections,
 		misc_suspend_wait_stop,
 		misc_multiple_ip_local_socket_opts,
@@ -699,6 +700,30 @@ misc_stopped_listener_options(_) ->
 	11 = ranch:get_max_connections(Name),
 	[] = ranch:get_protocol_options(Name),
 	#{max_connections := 11} = ranch:get_transport_options(Name),
+	ok = ranch:stop_listener(Name).
+
+misc_set_transport_options_deleted_rows(_) ->
+	doc("set_transport_options does not recreate rows removed by cleanup."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{
+			num_acceptors => 1,
+			trusted_proxies => [{{127, 0, 0, 0}, 8}]
+		},
+		echo_protocol, []),
+	true = ets:delete(ranch_server, {trans_opts, Name}),
+	true = ets:delete(ranch_server, {proxy_opts, Name}),
+	ok = ranch:set_transport_options(Name, #{
+		num_acceptors => 1,
+		trusted_proxies => [{{10, 0, 0, 0}, 8}]
+	}),
+	[] = ets:lookup(ranch_server, {trans_opts, Name}),
+	[] = ets:lookup(ranch_server, {proxy_opts, Name}),
+	ok = ranch:stop_listener(Name),
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1},
+		echo_protocol, []),
+	false = maps:is_key(trusted_proxies, ranch:get_transport_options(Name)),
 	ok = ranch:stop_listener(Name).
 
 misc_wait_for_connections(_) ->
