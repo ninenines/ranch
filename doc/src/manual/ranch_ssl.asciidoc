@@ -78,6 +78,7 @@ ssl_opt() = {alpn_preferred_protocols, [binary()]}
           | {password, iodata() | fun(() -> iodata())}
           | {protocol, tls | dtls}
           | {psk_identity, string()}
+          | {reuseaddr, boolean()}
           | {reuse_session, fun()}
           | {reuse_sessions, boolean()}
           | {secure_renegotiate, boolean()}
@@ -272,6 +273,13 @@ psk_identity::
 Provide the given PSK identity hint to the client during the
 handshake.
 
+reuseaddr::
+
+Set `SO_REUSEADDR` on a DTLS socket. Ranch does not set this
+option for DTLS. TCP and TLS still force `{reuseaddr, true}`.
+`SO_REUSEADDR` on UDP lets another socket bind the same address
+and port and receive datagrams.
+
 reuse_session::
 
 Custom policy to decide whether a session should be reused.
@@ -355,6 +363,7 @@ The options `sni_fun` and `sni_hosts` are mutually exclusive.
 
 == Changelog
 
+* *2.5*: DTLS no longer forces `{reuseaddr, true}`. The option can be set for DTLS.
 * *2.0*: The `ssl_opt()` type was updated for OTP-23.0.
 
 == See also

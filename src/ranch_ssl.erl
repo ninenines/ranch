@@ -141,11 +141,226 @@ listen(TransOpts) ->
 			{error, no_cert}
 	end.
 
-do_listen(SocketOpts, Logger) ->
-	%% We set the port to 0 because it is given in the Opts directly.
-	%% The port in the options takes precedence over the one in the
-	%% first argument.
-	ssl:listen(0, prepare_socket_opts(SocketOpts, Logger)).
+do_listen(SocketOpts0, Logger) ->
+	SocketOpts = prepare_socket_opts(SocketOpts0, Logger),
+	case proplists:get_value(protocol, SocketOpts, tls) of
+		dtls ->
+			dtls_listen(SocketOpts);
+		tls ->
+			%% The port in the options takes precedence over the
+			%% first argument.
+			ssl:listen(0, SocketOpts)
+	end.
+
+%% OTP monitors the process that called ssl:listen/2. That process
+%% is ranch_acceptors_sup, and suspend stops it. A fixed-port DTLS
+%% socket is owned here instead, so the UDP port stays open for
+%% connections that are still up. The next listen closes and listens
+%% again: close drops acceptors that died with the previous
+%% supervisor, and the real port finds the demux that is still
+%% registered. The first argument stays 0 for a new socket so a
+%% second listen (num_listen_sockets) does not take the same demux.
+-define(DTLS_TAB, ranch_ssl_dtls).
+
+dtls_listen(SocketOpts) ->
+	case proplists:get_value(port, SocketOpts, 0) of
+		0 ->
+			ssl:listen(0, SocketOpts);
+		Port ->
+			IP = proplists:get_value(ip, SocketOpts, dtls_any_ip(SocketOpts)),
+			dtls_reuse_listen({IP, Port}, SocketOpts)
+	end.
+
+dtls_any_ip(SocketOpts) ->
+	case proplists:get_value(inet6, SocketOpts, false) of
+		true ->
+			{0, 0, 0, 0, 0, 0, 0, 0};
+		false ->
+			{0, 0, 0, 0}
+	end.
+
+dtls_reuse_listen(Key, SocketOpts) ->
+	case ets:lookup(dtls_tab(), Key) of
+		[{_, Holder}] ->
+			case dtls_claim(Holder, SocketOpts) of
+				{ok, _}=OK ->
+					OK;
+				again ->
+					%% The holder died and left its registration behind.
+					ets:delete_object(dtls_tab(), {Key, Holder}),
+					dtls_fresh(Key, SocketOpts);
+				busy ->
+					ssl:listen(0, SocketOpts)
+			end;
+		[] ->
+			dtls_fresh(Key, SocketOpts)
+	end.
+
+dtls_fresh(Key, SocketOpts) ->
+	Parent = self(),
+	Holder = spawn(fun() -> dtls_holder_init(Key, SocketOpts, Parent) end),
+	Mon = monitor(process, Holder),
+	receive
+		{Holder, {ok, Socket}} ->
+			demonitor(Mon, [flush]),
+			{ok, Socket};
+		{Holder, again} ->
+			demonitor(Mon, [flush]),
+			dtls_reuse_listen(Key, SocketOpts);
+		{Holder, Error} ->
+			demonitor(Mon, [flush]),
+			Error;
+		{'DOWN', Mon, process, _, _} ->
+			{error, closed}
+	after 5000 ->
+		demonitor(Mon, [flush]),
+		exit(Holder, kill),
+		{error, timeout}
+	end.
+
+dtls_claim(Holder, SocketOpts) ->
+	Ref = make_ref(),
+	Mon = monitor(process, Holder),
+	Holder ! {claim, self(), Ref, SocketOpts},
+	receive
+		{Ref, Reply} ->
+			demonitor(Mon, [flush]),
+			Reply;
+		{'DOWN', Mon, process, _, _} ->
+			again
+	after 5000 ->
+		demonitor(Mon, [flush]),
+		{error, timeout}
+	end.
+
+dtls_holder_init(Key, SocketOpts, User) ->
+	case dtls_open(SocketOpts) of
+		{ok, Socket} ->
+			case ets:insert_new(dtls_tab(), {Key, self()}) of
+				true ->
+					Parent = dtls_parent(User),
+					UserMon = monitor(process, User),
+					ParentMon = dtls_monitor(Parent),
+					User ! {self(), {ok, Socket}},
+					dtls_holder(Key, Socket, User, UserMon, Parent, ParentMon);
+				false ->
+					_ = ssl:close(Socket),
+					User ! {self(), again}
+			end;
+		Error ->
+			User ! {self(), Error}
+	end.
+
+%% Stop leaves the demux registered until this process closes it.
+dtls_open(SocketOpts) ->
+	dtls_open(fun() -> ssl:listen(0, SocketOpts) end, 20).
+
+dtls_open(Listen, 0) ->
+	Listen();
+dtls_open(Listen, N) ->
+	case Listen() of
+		{error, already_listening} ->
+			receive after 10 -> ok end,
+			dtls_open(Listen, N - 1);
+		Other ->
+			Other
+	end.
+
+dtls_reclaim(Socket, SocketOpts) ->
+	_ = ssl:close(Socket),
+	Port = proplists:get_value(port, SocketOpts, 0),
+	dtls_open(fun() -> ssl:listen(Port, SocketOpts) end, 20).
+
+dtls_holder(Key, Socket, User, UserMon, Parent, ParentMon) ->
+	receive
+		{claim, From, Ref, SocketOpts} ->
+			case dtls_alive(User) of
+				true ->
+					From ! {Ref, busy},
+					dtls_holder(Key, Socket, User, UserMon, Parent, ParentMon);
+				false ->
+					%% The acceptors supervisor is already gone. Its
+					%% DOWN may still be sitting in the mailbox.
+					_ = dtls_demonitor(UserMon),
+					dtls_holder_claim(Key, Socket, From, Ref, SocketOpts,
+						Parent, ParentMon)
+			end;
+		{'DOWN', UserMon, process, User, _} ->
+			case dtls_alive(Parent) of
+				true ->
+					dtls_holder(Key, Socket, undefined, UserMon, Parent, ParentMon);
+				false ->
+					dtls_holder_stop(Key, Socket)
+			end;
+		{'DOWN', ParentMon, process, Parent, _} when User =:= undefined ->
+			dtls_holder_stop(Key, Socket);
+		{'DOWN', ParentMon, process, Parent, _} ->
+			dtls_holder(Key, Socket, User, UserMon, undefined, undefined)
+	end.
+
+dtls_holder_claim(Key, Socket, From, Ref, SocketOpts, Parent, ParentMon) ->
+	case dtls_reclaim(Socket, SocketOpts) of
+		{ok, Socket1} ->
+			From ! {Ref, {ok, Socket1}},
+			Parent1 = dtls_parent(From),
+			ParentMon1 = case Parent1 of
+				Parent ->
+					ParentMon;
+				_ ->
+					_ = dtls_demonitor(ParentMon),
+					dtls_monitor(Parent1)
+			end,
+			dtls_holder(Key, Socket1, From, monitor(process, From),
+				Parent1, ParentMon1);
+		Error ->
+			ets:delete(dtls_tab(), Key),
+			From ! {Ref, Error}
+	end.
+
+dtls_demonitor(undefined) ->
+	ok;
+dtls_demonitor(Mon) ->
+	demonitor(Mon, [flush]).
+
+dtls_holder_stop(Key, Socket) ->
+	ets:delete(dtls_tab(), Key),
+	_ = ssl:close(Socket),
+	ok.
+
+dtls_parent(User) ->
+	case process_info(User, parent) of
+		{parent, Pid} when is_pid(Pid) ->
+			Pid;
+		_ ->
+			undefined
+	end.
+
+dtls_monitor(undefined) ->
+	undefined;
+dtls_monitor(Pid) ->
+	monitor(process, Pid).
+
+dtls_alive(undefined) ->
+	false;
+dtls_alive(Pid) ->
+	is_process_alive(Pid).
+
+dtls_tab() ->
+	case ets:whereis(?DTLS_TAB) of
+		undefined ->
+			Heir = case whereis(ranch_server) of
+				undefined ->
+					[];
+				Pid ->
+					[{heir, Pid, undefined}]
+			end,
+			try ets:new(?DTLS_TAB, [named_table, public, set|Heir])
+			catch error:badarg ->
+				?DTLS_TAB
+			end;
+		Tab ->
+			Tab
+	end.
 
 prepare_socket_opts([Backend = {inet_backend, _}|SocketOpts], Logger) ->
 	%% ssl conses non-emulated socket options. Before ssl 11.6

@@ -123,10 +123,12 @@ by calling `ranch:get_status/1` with the listener name as argument.
 
 === Default transport options
 
-By default the socket will be set to return `binary` data, with the
-options `{active, false}` and `{reuseaddr, true}` set.
+By default the socket will be set to return `binary` data, with
+`{active, false}` set. TCP and TLS also set `{reuseaddr, true}`.
 These values can't be overridden when starting the listener, but
 they can be overridden using `Transport:setopts/2` in the protocol.
+DTLS does not set `{reuseaddr, true}` and the option can be given
+at listener startup.
 
 It will also set `{backlog, 1024}`, `{nodelay, true}`,
 `{send_timeout, 30000}` and `{send_timeout_close, true}`, which

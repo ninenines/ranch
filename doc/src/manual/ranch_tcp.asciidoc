@@ -160,8 +160,8 @@ reuseport (false)::
 Allow multiple sockets to listen on the same address
 and port. `num_listen_sockets` above 1 requires this
 option. On Windows the inet driver sets `SO_REUSEADDR`
-only when `reuseport` is also true. Ranch already
-forces `{reuseaddr, true}`.
+only when `reuseport` is also true. Ranch forces
+`{reuseaddr, true}` for TCP and TLS. DTLS does not.
 
 send_timeout (30000)::
 
