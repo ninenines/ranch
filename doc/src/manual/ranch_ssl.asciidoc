@@ -353,6 +353,19 @@ greater control over the client certificate validation.
 
 The options `sni_fun` and `sni_hosts` are mutually exclusive.
 
+Ranch forces `{reuseaddr, true}` for DTLS as well. The UDP
+socket is shared by all connections of the listener and stays
+bound while they are alive, so restarting the listener after
+a crash would otherwise fail with `already_listening`. On Linux,
+`SO_REUSEADDR` allows another local process to bind the same
+port and receive the unicast traffic intended for the listener.
+DTLS limits the impact to packet loss or denial of service,
+but clients that do not verify the server certificate may
+complete a handshake with that process. Ranch does not force
+`{reuseport, true}`: its semantics differ between platforms,
+and on Linux traffic is also distributed to the socket kept
+alive by the old connections. It can be set explicitly.
+
 == Changelog
 
 * *2.0*: The `ssl_opt()` type was updated for OTP-23.0.

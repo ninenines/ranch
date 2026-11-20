@@ -133,6 +133,13 @@ It will also set `{backlog, 1024}`, `{nodelay, true}`,
 can be overridden at listener startup. These four options are not
 applied for DTLS.
 
+The `{reuseaddr, true}` option is also forced for DTLS so that
+the listener can be restarted while connections are still
+using its UDP socket. This allows other local processes to
+bind the same port. Clients should therefore verify the
+server certificate. Refer to the
+link:man:ranch_ssl(3)[ranch_ssl(3)] manual for details.
+
 === Listening on a random port
 
 You do not have to specify a specific port to listen on. If you give
