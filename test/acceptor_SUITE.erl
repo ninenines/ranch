@@ -2390,7 +2390,7 @@ supervisor_failed_start_clears_opts(_) ->
 	ok = gen_tcp:close(Probe).
 
 supervisor_upgrade_marks_embedded(_) ->
-	doc("The 2.4.1 upgrade marks running listeners and the downgrade removes the marks."),
+	doc("The 2.5.0 upgrade marks running listeners and the downgrade removes the marks."),
 	Name = ?FUNCTION_NAME,
 	Emb = {Name, embedded},
 	Opts = #{max_connections => 10},
