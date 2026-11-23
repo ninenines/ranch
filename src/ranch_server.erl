@@ -89,7 +89,7 @@ cleanup_listener_opts(Ref) ->
 	%% we could end up with the pid still being returned, when we
 	%% expected a crash (because the listener was stopped).
 	%% Deleting it explicitly here removes any possible confusion.
-	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
+	_ = ets:select_delete(?TAB, [conns_sup_ms(Ref, [true])]),
 	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	%% Ditto for the listener supervisor.
 	_ = ets:delete(?TAB, {listener_sup, Ref}),
@@ -97,7 +97,7 @@ cleanup_listener_opts(Ref) ->
 
 -spec cleanup_connections_sups(ranch:ref()) -> ok.
 cleanup_connections_sups(Ref) ->
-	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
+	_ = ets:select_delete(?TAB, [conns_sup_ms(Ref, [true])]),
 	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	ok.
 
@@ -115,7 +115,7 @@ get_connections_sup(Ref, Id) ->
 -spec get_connections_sups(ranch:ref()) -> [{pos_integer(), pid()}].
 get_connections_sups(Ref) ->
 	[{Id, Pid} ||
-		[Id, Pid] <- ets:match(?TAB, {{conns_sup, Ref, '$1'}, '$2'})].
+		[Id, Pid] <- ets:select(?TAB, [conns_sup_ms(Ref, [['$2', '$3']])])].
 
 -spec get_connections_sups() -> [{ranch:ref(), pos_integer(), pid()}].
 get_connections_sups() ->
@@ -318,6 +318,13 @@ code_change(_OldVsn, State, Extra) ->
 	{ok, State}.
 
 %% Internal.
+
+%% '_' and '$N' are wildcards at any depth, and a map is a
+%% partial pattern. The guard compares the name as a term.
+conns_sup_ms(Ref, Body) ->
+	{{{conns_sup, '$1', '$2'}, '$3'},
+		[{'=:=', '$1', {const, Ref}}],
+		Body}.
 
 %% A normal listener keeps its rows until stop_listener/1.
 %% Embedded listeners don't call stop_listener/1, so their
