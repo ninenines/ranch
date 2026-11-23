@@ -9,6 +9,14 @@ ranch - Socket acceptor pool
 The module `ranch` provides functions for starting and
 manipulating Ranch listeners.
 
+Functions that modify a listener, for example to start,
+stop, suspend or resume it or to change its options, must
+not be called at the same time for the same listener. This
+includes stopping the supervisor of an embedded listener.
+Listeners are normally started once and rarely modified
+afterwards. Different listeners can be modified at the
+same time.
+
 == Exports
 
 Start/stop:

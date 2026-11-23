@@ -22,6 +22,9 @@ the listener.
 
 Nothing is done when the listener is already running.
 
+NOTE: Do not call this function at the same time as other
+functions that modify the same listener, including this one.
+
 == Arguments
 
 Ref::

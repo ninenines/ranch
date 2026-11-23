@@ -38,6 +38,9 @@ Changes to the following options will take effect...
 ** `num_conns_sups`
 ** `logger`
 
+NOTE: Do not call this function at the same time as other
+functions that modify the same listener, including this one.
+
 == Arguments
 
 Ref::
