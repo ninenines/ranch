@@ -32,22 +32,21 @@ init({Ref, Transport, Protocol, Logger}) ->
 	proc_lib:set_label({ranch_conns_sup_sup, Ref}),
 	TransOpts = ranch_server:get_transport_options(Ref),
 	%% A supervisor upgrade calls init/1 again and does not restart
-	%% connection supervisors. They already hold this ref, which has
-	%% 2 counters per running connection supervisor. start_link/4
-	%% deletes it before the first init, which is when the count is fixed.
+	%% connection supervisors, so their number and stats counters are
+	%% already set. start_link/4 deletes both before the first init,
+	%% which is when they are created.
 	NumConnsSups =
-	try ranch_server:get_stats_counters(Ref) of
-		StatsCounters ->
-			maps:get(size, counters:info(StatsCounters)) div 2
+	try
+		ranch_server:get_num_connections_sups(Ref)
 	catch
 		error:badarg ->
 			NumAcceptors = maps:get(num_acceptors, TransOpts, 10),
 			NumConnsSups0 = maps:get(num_conns_sups, TransOpts, NumAcceptors),
 			ok = ranch_server:set_stats_counters(Ref,
 				counters:new(2*NumConnsSups0, [])),
+			ok = ranch_server:set_num_connections_sups(Ref, NumConnsSups0),
 			NumConnsSups0
 	end,
-	ok = ranch_server:set_num_connections_sups(Ref, NumConnsSups),
 	%% The supervisor logs this MFA. connection_type is fixed until the
 	%% listener restarts. Other options are read from ranch_server.
 	ConnType = maps:get(connection_type, TransOpts, worker),

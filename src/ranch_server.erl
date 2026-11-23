@@ -95,6 +95,7 @@ cleanup_listener_opts(Ref) ->
 -spec cleanup_connections_sups(ranch:ref()) -> ok.
 cleanup_connections_sups(Ref) ->
 	_ = ets:match_delete(?TAB, {{conns_sup, Ref, '_'}, '_'}),
+	_ = ets:delete(?TAB, {num_connections_sups, Ref}),
 	_ = ets:delete(?TAB, {stats_counters, Ref}),
 	ok.
 
@@ -305,6 +306,11 @@ code_change({down, _}, State, _Extra) ->
 	true = ets:match_delete(?TAB, {{proxy_opts, '_'}, '_'}),
 	{ok, State};
 code_change(_OldVsn, State, _Extra) ->
+	CSIdsByRef = maps:groups_from_list(fun({Ref, _, _}) -> Ref end,
+					   fun({_, Id, _}) -> Id end,
+					   get_connections_sups()),
+	true = ets:insert(?TAB, [{{num_connections_sups, Ref}, lists:max(Ns)}
+				 || Ref := Ns <- CSIdsByRef]),
 	{ok, State}.
 
 %% Internal.

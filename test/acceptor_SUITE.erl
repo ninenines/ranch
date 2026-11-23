@@ -470,13 +470,16 @@ misc_conns_sup_sup_upgrade(_) ->
 		supervisor:which_children(ListenerSup)),
 	try
 		ok = ranch:set_transport_options(Name, #{num_acceptors => 4}),
+		%% There is no row yet when upgrading from 2.4.0 and after a downgrade.
+		true = ets:delete(ranch_server, {num_connections_sups, Name}),
 		%% Same steps as the appup.
 		ok = ranch:stop_all_acceptors(),
 		_ = [begin
-			ok = sys:suspend(Sup),
-			ok = sys:change_code(Sup, Mod, undefined, []),
-			ok = sys:resume(Sup)
-		     end || {Sup, Mod} <- [{AcceptorsSup, ranch_acceptors_sup},
+			ok = sys:suspend(Pid),
+			ok = sys:change_code(Pid, Mod, undefined, []),
+			ok = sys:resume(Pid)
+		     end || {Pid, Mod} <- [{AcceptorsSup, ranch_acceptors_sup},
+					   {whereis(ranch_server), ranch_server},
 					   {ConnsSupSup, ranch_conns_sup_sup}]],
 		ok = ranch:restart_all_acceptors(),
 		Counters = ranch_server:get_stats_counters(Name),
