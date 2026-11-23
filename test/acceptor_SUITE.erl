@@ -124,6 +124,7 @@ groups() ->
 		misc_cleanup_local_socket,
 		misc_connection_alarms,
 		misc_stop_unknown_listener,
+		misc_pattern_ref,
 		misc_repeated_start_stop,
 		misc_listen_error,
 		misc_listen_error_secrets,
@@ -972,6 +973,45 @@ do_flush_connection_alarms(Name) ->
 misc_stop_unknown_listener(_) ->
 	doc("Ensure that stopping an unknown listener returns an error."),
 	{error, not_found} = ranch:stop_listener(make_ref()),
+	ok.
+
+misc_pattern_ref(_) ->
+	doc("Match a listener name as a term, including ETS pattern tokens."),
+	%% A normal listener, a larger map, and a tuple that keeps an element.
+	{ok, _} = ranch:start_listener(alpha, ranch_tcp,
+		#{num_acceptors => 1}, echo_protocol, []),
+	{ok, _} = ranch:start_listener(#{a => 1, b => 2}, ranch_tcp,
+		#{num_acceptors => 1}, echo_protocol, []),
+	{ok, _} = ranch:start_listener({tuple, kept}, ranch_tcp,
+		#{num_acceptors => 1}, echo_protocol, []),
+	Alpha = ranch_server:get_connections_sups(alpha),
+	Map = ranch_server:get_connections_sups(#{a => 1, b => 2}),
+	Tuple = ranch_server:get_connections_sups({tuple, kept}),
+	[{1, _}] = Alpha,
+	[{1, _}] = Map,
+	[{1, _}] = Tuple,
+	Server = whereis(ranch_server),
+	%% Stopping a name that is only an ETS pattern must not touch them.
+	{error, not_found} = ranch:stop_listener('_'),
+	{error, not_found} = ranch:stop_listener('$1'),
+	{error, not_found} = ranch:stop_listener({tuple, '_'}),
+	{error, not_found} = ranch:stop_listener(#{a => 1}),
+	{error, not_found} = ranch:stop_listener(#{'_' => 1}),
+	Alpha = ranch_server:get_connections_sups(alpha),
+	Map = ranch_server:get_connections_sups(#{a => 1, b => 2}),
+	Tuple = ranch_server:get_connections_sups({tuple, kept}),
+	Server = whereis(ranch_server),
+	%% Those names can be listeners.
+	Names = ['_', '$1', {tuple, '_'}, #{'_' => 1}],
+	_ = [begin
+		{ok, _} = ranch:start_listener(Name, ranch_tcp,
+			#{num_acceptors => 1}, echo_protocol, []),
+		[{1, _}] = ranch_server:get_connections_sups(Name)
+	end || Name <- Names],
+	Alpha = ranch_server:get_connections_sups(alpha),
+	Map = ranch_server:get_connections_sups(#{a => 1, b => 2}),
+	Tuple = ranch_server:get_connections_sups({tuple, kept}),
+	Server = whereis(ranch_server),
 	ok.
 
 misc_repeated_start_stop(_) ->
