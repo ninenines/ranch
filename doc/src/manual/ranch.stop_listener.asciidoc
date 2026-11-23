@@ -30,6 +30,9 @@ can be used.
 This function does not return until the listener is
 completely stopped.
 
+NOTE: Do not call this function at the same time as other
+functions that modify the same listener, including this one.
+
 == Arguments
 
 Ref::

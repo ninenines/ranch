@@ -27,8 +27,8 @@ supervisor specification. A restart of the listener supervisor
 uses the current options, including changes made after the
 listener was started.
 
-Do not call this function more than once at the same time
-for the same listener name.
+NOTE: Do not call this function at the same time as other
+functions that modify the same listener, including this one.
 
 == Arguments
 

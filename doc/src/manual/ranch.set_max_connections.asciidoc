@@ -20,6 +20,9 @@ smaller than the previous one, Ranch will wait for the extra
 connections to terminate and will not accept new connections
 until the number of connections goes below the limit.
 
+NOTE: Do not call this function at the same time as other
+functions that modify the same listener, including this one.
+
 == Arguments
 
 Ref::

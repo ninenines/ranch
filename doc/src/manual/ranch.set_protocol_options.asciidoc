@@ -23,6 +23,9 @@ of the options, it is recommended to get the current protocol options using
 link:man:ranch:get_protocol_options(3)[ranch:get_protocol_options(3)], update
 them and then set them back using this function.
 
+NOTE: Do not call this function at the same time as other
+functions that modify the same listener, including this one.
+
 == Arguments
 
 Ref::
