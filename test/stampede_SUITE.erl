@@ -111,7 +111,7 @@ stampede_ssl(_) ->
 	%% Start a TCP listener.
 	Name = ?FUNCTION_NAME,
 	{ok, _} = ranch:start_listener(Name,
-		ranch_ssl, ct_helper:get_certs_from_ets(),
+		ranch_ssl, ct_helper:get_certs_from_ets() ++ [{verify, verify_none}],
 		echo_protocol, []),
 	%% Set restart frequencies of ranch_sup and ssl_sup.
 	do_set_sup_frequencies([ranch_sup, ssl_sup], 999999, 1),
@@ -167,11 +167,16 @@ do_set_sup_frequencies(Sups, Intensity, Period) ->
 	_ = [sys:replace_state(Sup, StateFun) || Sup <- Sups],
 	ok.
 
-do_connect(0, _, _, _) ->
-	ok;
+do_connect(N, ranch_ssl, Port, Timeout) ->
+	do_connect(N, ranch_ssl, [{active, false}, {verify, verify_none}], Port, Timeout);
 do_connect(N, Transport, Port, Timeout) ->
-	{ok, _} = Transport:connect("localhost", Port, [{active, false}], Timeout),
-	do_connect(N - 1, Transport, Port, Timeout).
+	do_connect(N, Transport, [{active, false}], Port, Timeout).
+
+do_connect(0, _, _, _, _) ->
+	ok;
+do_connect(N, Transport, TransportOpts, Port, Timeout) ->
+	{ok, _} = Transport:connect("localhost", Port, TransportOpts, Timeout),
+	do_connect(N - 1, Transport, TransportOpts, Port, Timeout).
 
 do_log(Pid) when is_pid(Pid) ->
 	ct:log(info, "~p: ~p~n", [Pid, erlang:process_info(Pid)]),
