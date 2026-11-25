@@ -172,7 +172,7 @@ ssl_preserves_socket_opt_order() ->
 	Ns >= [11, 6].
 
 set_default_options(SocketOpts0) ->
-	case proplists:get_value(protocol, SocketOpts0, tls) of
+	SocketOpts = case proplists:get_value(protocol, SocketOpts0, tls) of
 		tls ->
 			SocketOpts1 = ranch:set_option_default(SocketOpts0, backlog, 1024),
 			SocketOpts2 = ranch:set_option_default(SocketOpts1, nodelay, true),
@@ -180,6 +180,12 @@ set_default_options(SocketOpts0) ->
 			ranch:set_option_default(SocketOpts3, send_timeout_close, true);
 		dtls ->
 			SocketOpts0
+	end,
+	case lists:member(client_renegotiation, unsupported_tls_options(SocketOpts)) of
+		true ->
+			SocketOpts;
+		false ->
+			ranch:set_option_default(SocketOpts, client_renegotiation, false)
 	end.
 
 %% 'binary' and 'list' are disallowed but they are handled
@@ -193,6 +199,10 @@ disallowed_listen_options() ->
 unsupported_tls_options(SocketOpts) ->
 	unsupported_tls_version_options(lists:usort(get_tls_versions(SocketOpts))).
 
+unsupported_tls_version_options(['dtlsv1'|_]) ->
+	[beast_mitigation, padding_check];
+unsupported_tls_version_options(['dtlsv1.2'|_]) ->
+	[beast_mitigation, padding_check];
 unsupported_tls_version_options([tlsv1|_]) ->
 	[];
 unsupported_tls_version_options(['tlsv1.1'|_]) ->
@@ -388,7 +398,12 @@ get_tls_versions(SocketOpts) ->
 		{versions, Versions} ->
 			Versions;
 		false ->
-			get_tls_versions_env()
+			case lists:keyfind(protocol, 1, lists:reverse(SocketOpts)) of
+				{protocol, dtls} ->
+					get_dtls_versions_env();
+				_ ->
+					get_tls_versions_env()
+			end
 	end.
 
 get_tls_versions_env() ->
@@ -397,6 +412,18 @@ get_tls_versions_env() ->
 			Versions;
 		undefined ->
 			get_tls_versions_app()
+	end.
+
+get_dtls_versions_env() ->
+	case application:get_env(ssl, dtls_protocol_version) of
+		{ok, Version} when is_atom(Version) ->
+			[Version];
+		{ok, []} ->
+			['dtlsv1.2'];
+		{ok, Versions} ->
+			Versions;
+		undefined ->
+			['dtlsv1.2']
 	end.
 
 get_tls_versions_app() ->

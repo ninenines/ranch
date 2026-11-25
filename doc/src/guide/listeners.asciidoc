@@ -131,7 +131,9 @@ they can be overridden using `Transport:setopts/2` in the protocol.
 It will also set `{backlog, 1024}`, `{nodelay, true}`,
 `{send_timeout, 30000}` and `{send_timeout_close, true}`, which
 can be overridden at listener startup. These four options are not
-applied for DTLS.
+applied for DTLS. `{client_renegotiation, false}` is also set,
+including for DTLS. It is left unset when the lowest enabled
+version is TLS 1.3.
 
 The `{reuseaddr, true}` option is also forced for DTLS so that
 the listener can be restarted while connections are still

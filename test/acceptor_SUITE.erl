@@ -97,6 +97,8 @@ groups() ->
 		ssl_error_eaddrinuse,
 		ssl_error_no_cert,
 		ssl_error_eacces,
+		ssl_client_renegotiation,
+		ssl_client_renegotiation_tls13,
 		ssl_unsupported_tlsv13_options
 	]}, {misc, [
 		misc_bad_transport,
@@ -1706,6 +1708,50 @@ ssl_error_eacces(_) ->
 				active_echo_protocol, []),
 			ok
 	end.
+
+ssl_client_renegotiation(_) ->
+	doc("A normal TLS listener disables client renegotiation."),
+	Name = ?FUNCTION_NAME,
+	Opts = ct_helper:get_certs_from_ets() ++ [{verify, verify_none}],
+	{error, renegotiation_rejected} =
+		do_ssl_listen_client_renegotiation(Name, Opts),
+	ok = ranch:stop_listener(Name).
+
+ssl_client_renegotiation_tls13(_) ->
+	doc("TLS 1.3 does not get client_renegotiation forced in."),
+	Name = ?FUNCTION_NAME,
+	Self = self(),
+	logger:add_primary_filter(Name, {fun (Event, _Args) ->
+		Self ! {Name, Event},
+		ignore
+	end, undefined}),
+	Opts = ct_helper:get_certs_from_ets() ++ [{versions, ['tlsv1.3']}],
+	try
+		{ok, _} = ranch:start_listener(Name,
+			ranch_ssl, #{socket_opts => Opts},
+			echo_protocol, []),
+		receive
+			{Name, #{msg := {_, [{client_renegotiation, _}]}}} ->
+				error(forced_client_renegotiation)
+		after 0 ->
+			ok
+		end
+	after
+		logger:remove_primary_filter(Name),
+		_ = ranch:stop_listener(Name)
+	end.
+
+do_ssl_listen_client_renegotiation(Name, Opts) ->
+	{ok, _} = ranch:start_listener(Name,
+		ranch_ssl, #{socket_opts => Opts},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	{ok, Socket} = ssl:connect("localhost", Port, [
+		binary, {active, false}, {packet, raw},
+		{verify, verify_none}, {versions, ['tlsv1.2']}]),
+	Result = ssl:renegotiate(Socket),
+	ok = ssl:close(Socket),
+	Result.
 
 ssl_unsupported_tlsv13_options(_) ->
 	{available, Versions} = lists:keyfind(available, 1, ssl:versions()),
