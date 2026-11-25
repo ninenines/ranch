@@ -72,7 +72,8 @@ groups() ->
 		tcp_10_acceptors_10_listen_sockets,
 		tcp_many_listen_sockets_no_reuseport,
 		tcp_error_eaddrinuse,
-		tcp_error_eacces
+		tcp_error_eacces,
+		tcp_closed_listen_socket
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_active_echo,
@@ -1931,6 +1932,46 @@ do_tcp_local_echo() ->
 		file:delete(SockFile)
 	end.
 
+tcp_closed_listen_socket(_) ->
+	doc("Closing a socket-backend listen socket restarts the acceptors."),
+	case os:type() of
+		{win32, nt} ->
+			{skip, "No socket backend support"};
+		_ ->
+			Name = ?FUNCTION_NAME,
+			{ok, ListenerSup} = ranch:start_listener(Name,
+				ranch_tcp, #{
+					num_acceptors => 1,
+					socket_opts => [{inet_backend, socket}]
+				},
+				echo_protocol, []),
+			Port = ranch:get_port(Name),
+			{ok, Socket} = gen_tcp:connect("localhost", Port,
+				[binary, {active, false}, {packet, raw}]),
+			ok = gen_tcp:send(Socket, <<"Hello!">>),
+			{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 6, 1000),
+			ok = gen_tcp:close(Socket),
+			{ranch_acceptors_sup, AcceptorsSup, supervisor, _} =
+				lists:keyfind(ranch_acceptors_sup, 1,
+					supervisor:which_children(ListenerSup)),
+			{dictionary, Dict} = process_info(AcceptorsSup, dictionary),
+			{lsockets, [{1, LSock}]} = lists:keyfind(lsockets, 1, Dict),
+			Monitor = monitor(process, AcceptorsSup),
+			%% The acceptor is in accept. Closing the listen socket wakes
+			%% it with {error, closed}. The restart then accepts on the
+			%% dead socket, which returns {error, einval}.
+			ok = gen_tcp:close(LSock),
+			receive
+				{'DOWN', Monitor, process, AcceptorsSup, _} ->
+					ok
+			after 1000 ->
+				error(still_accepting)
+			end,
+			%% The new acceptors supervisor listens on a new port.
+			ok = do_tcp_connect_echo(Name, 50),
+			ok = ranch:stop_listener(Name)
+	end.
+
 tcp_graceful(Config) ->
 	doc("Ensure suspending and resuming of listeners does not kill active connections."),
 	Name = ?FUNCTION_NAME,
@@ -3117,6 +3158,20 @@ do_conns_count_children(Name) ->
 		[supervisor:count_children(ConnsSup) ||
 			{_, ConnsSup} <- ranch_server:get_connections_sups(Name)]
 	).
+
+do_tcp_connect_echo(_Name, 0) ->
+	error(connect_failed);
+do_tcp_connect_echo(Name, N) ->
+	Port = ranch:get_port(Name),
+	case gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]) of
+		{ok, Socket} ->
+			ok = gen_tcp:send(Socket, <<"Hello!">>),
+			{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 6, 1000),
+			gen_tcp:close(Socket);
+		{error, econnrefused} ->
+			timer:sleep(20),
+			do_tcp_connect_echo(Name, N - 1)
+	end.
 
 do_tcp_connect_refused(_, 0) ->
 	error(connect_not_refused);

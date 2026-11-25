@@ -87,8 +87,10 @@ loop(State0=#state{lsocket=LSocket, transport=Transport, logger=Logger,
 			receive after 100 -> ok end,
 			State0;
 		%% Exit if the listening socket got closed.
-		{error, closed} ->
-			exit(closed);
+		%% The socket backend returns einval once its
+		%% socket process has stopped.
+		{error, Reason} when Reason =:= closed; Reason =:= einval ->
+			exit(Reason);
 		%% Continue otherwise.
 		{error, _} ->
 			State0
