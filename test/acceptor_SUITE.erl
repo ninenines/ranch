@@ -1754,17 +1754,6 @@ do_ssl_listen_client_renegotiation(Name, Opts) ->
 	Result.
 
 ssl_unsupported_tlsv13_options(_) ->
-	{available, Versions} = lists:keyfind(available, 1, ssl:versions()),
-	case {lists:member('tlsv1.3', Versions), do_get_ssl_version() >= {10, 0, 0}} of
-		{true, true} ->
-			do_ssl_unsupported_tlsv13_options();
-		{false, _} ->
-			{skip, "No TLSv1.3 support."};
-		{_, false} ->
-			{skip, "No TLSv1.3 option dependency checking."}
-	end.
-
-do_ssl_unsupported_tlsv13_options() ->
 	doc("Ensure that a listener can be started when TLSv1.3 is "
 	    "the only protocol and unsupported options are present."),
 	CheckOpts = [
