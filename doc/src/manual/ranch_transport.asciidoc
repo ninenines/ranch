@@ -140,6 +140,11 @@ from a transport to another depending on the capabilities
 of the transports. For example a `ranch_tcp` socket may
 be upgraded to a `ranch_ssl` one using this function.
 
+NOTE: When upgrading a TCP socket to TLS, `client_renegotiation`
+defaults to `true` for TLS 1.2 and earlier and should be disabled.
+Client-initiated renegotiation lets a peer start a new handshake
+on an existing connection.
+
 === handshake_continue
 
 [source,erlang]
