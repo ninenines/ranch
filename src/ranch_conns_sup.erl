@@ -66,10 +66,9 @@ start_link(Ref, Id, Transport, ConnType, Protocol, Logger) when is_atom(ConnType
 
 %% We can safely assume we are on the same node as the supervisor.
 %%
-%% We can also safely avoid having a monitor and a timeout here
-%% because only three things can happen:
-%%  *  The supervisor died; rest_for_one strategy killed all acceptors
-%%     so this very calling process is going to di--
+%% We do not need a timeout here because only three things can happen:
+%%  *  The supervisor died. The monitor tells us and we return an
+%%     error, so that the acceptor can switch to the restarted one.
 %%  *  There's too many connections, the supervisor will resume the
 %%     acceptor only when we get below the limit again.
 %%  *  The supervisor is overloaded, there's either too many acceptors
@@ -80,14 +79,14 @@ start_link(Ref, Id, Transport, ConnType, Protocol, Logger) when is_atom(ConnType
 %% We do not need the reply, we only need the ok from the supervisor
 %% to continue. The supervisor sends its own pid when the acceptor can
 %% continue.
--spec start_protocol(pid(), reference(), inet:socket()) -> ok.
+-spec start_protocol(pid(), reference(), inet:socket()) -> ok | {error, term()}.
 start_protocol(SupPid, MonitorRef, Socket) ->
 	SupPid ! {?MODULE, start_protocol, self(), Socket},
 	receive
 		SupPid ->
 			ok;
 		{'DOWN', MonitorRef, process, SupPid, Reason} ->
-			error(Reason)
+			{error, Reason}
 	end.
 
 %% We can't make the above assumptions here. This function might be

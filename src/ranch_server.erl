@@ -223,7 +223,9 @@ init([]) ->
 	{ok, #state{monitors=ConnMonitors++ListenerMonitors}}.
 
 -spec handle_call(term(), {pid(), reference()}, #state{}) -> {reply, ok | ignore, #state{}}.
-handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts, ProtoOpts, StartArgs}, _, State) ->
+handle_call({set_new_listener_opts, Ref, MaxConns, TransOpts0, ProtoOpts, StartArgs0}, _, State) ->
+	TransOpts = ensure_num_conns_sups(TransOpts0),
+	StartArgs = set_start_args_opts(StartArgs0, TransOpts),
 	ets:insert_new(?TAB, {{max_conns, Ref}, MaxConns}),
 	ets:insert_new(?TAB, {{trans_opts, Ref}, TransOpts}),
 	ets:insert_new(?TAB, {{proxy_opts, Ref}, proxy_opts(TransOpts)}),
@@ -256,7 +258,8 @@ handle_call({set_max_conns, Ref, MaxConns}, _, State) ->
 handle_call({set_stats_counters, Ref, Counters}, _, State) ->
 	ets:insert(?TAB, {{stats_counters, Ref}, Counters}),
 	{reply, ok, State};
-handle_call({set_trans_opts, Ref, Opts}, _, State) ->
+handle_call({set_trans_opts, Ref, Opts0}, _, State) ->
+	Opts = ensure_num_conns_sups(Opts0, Ref),
 	ets:insert(?TAB, [
 		{{trans_opts, Ref}, Opts},
 		{{proxy_opts, Ref}, proxy_opts(Opts)}
@@ -353,6 +356,28 @@ sync_max_conns(_Extra) ->
 %% options, including socket options, stay on {trans_opts, Ref}.
 proxy_opts(Opts) ->
 	maps:with([trusted_proxies, logger], Opts).
+
+%% Acceptors divide their id by this count. Supervisors are not
+%% resized when num_acceptors changes, so the stored options must
+%% contain the count they were started with. A map that omits the
+%% key keeps the stored count. Before the key was stored, that
+%% count was num_acceptors.
+ensure_num_conns_sups(Opts) ->
+	Opts#{num_conns_sups => num_conns_sups(Opts)}.
+
+ensure_num_conns_sups(Opts, Ref) ->
+	case maps:is_key(num_conns_sups, Opts) of
+		true ->
+			Opts;
+		false ->
+			Opts#{num_conns_sups => num_conns_sups(get_transport_options(Ref))}
+	end.
+
+num_conns_sups(Opts) ->
+	maps:get(num_conns_sups, Opts, maps:get(num_acceptors, Opts, 10)).
+
+set_start_args_opts([Ref, Transport, _, Protocol, ProtoOpts], TransOpts) ->
+	[Ref, Transport, TransOpts, Protocol, ProtoOpts].
 
 set_monitored_process(Key, Pid, State=#state{monitors=Monitors0}) ->
 	%% First we cleanup the monitor if a residual one exists.

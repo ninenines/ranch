@@ -72,7 +72,8 @@ groups() ->
 		tcp_10_acceptors_10_listen_sockets,
 		tcp_many_listen_sockets_no_reuseport,
 		tcp_error_eaddrinuse,
-		tcp_error_eacces
+		tcp_error_eacces,
+		tcp_closed_listen_socket
 	]}, {ssl, [
 		ssl_accept_error,
 		ssl_active_echo,
@@ -154,6 +155,12 @@ groups() ->
 		supervisor_restart_acceptors,
 		supervisor_suspended_acceptors,
 		supervisor_conns_alive,
+		supervisor_conns_sup_crash,
+		supervisor_conns_sup_crash_shared,
+		supervisor_conns_sup_crash_sleeping_acceptors,
+		supervisor_conns_sup_crash_keep_connection,
+		supervisor_acceptor_restart_keeps_slot,
+		supervisor_num_acceptors_keeps_conns_sups,
 		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
@@ -1043,7 +1050,7 @@ misc_listen_error(_) ->
 			FormattedMsg = lists:flatten(io_lib:format(Format, Args)),
 			NormalizedMsg = re:replace(FormattedMsg, "\\s", "", [global, {return, list}]),
 			"FailedtostartRanchlistenermisc_listen_error"
-			"inranch_listen_error_transport:listen(#{socket_opts=>[]})"
+			"inranch_listen_error_transport:listen(#{num_conns_sups=>10,socket_opts=>[]})"
 			"forreason{ranch_listen_error_transport,listen_error}"
 			"(Therewasanerrorinranch_listen_error_transport:listen_error)" = NormalizedMsg
 	after 1000 ->
@@ -1926,6 +1933,46 @@ do_tcp_local_echo() ->
 		file:delete(SockFile)
 	end.
 
+tcp_closed_listen_socket(_) ->
+	doc("Closing a socket-backend listen socket restarts the acceptors."),
+	case os:type() of
+		{win32, nt} ->
+			{skip, "No socket backend support"};
+		_ ->
+			Name = ?FUNCTION_NAME,
+			{ok, ListenerSup} = ranch:start_listener(Name,
+				ranch_tcp, #{
+					num_acceptors => 1,
+					socket_opts => [{inet_backend, socket}]
+				},
+				echo_protocol, []),
+			Port = ranch:get_port(Name),
+			{ok, Socket} = gen_tcp:connect("localhost", Port,
+				[binary, {active, false}, {packet, raw}]),
+			ok = gen_tcp:send(Socket, <<"Hello!">>),
+			{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 6, 1000),
+			ok = gen_tcp:close(Socket),
+			{ranch_acceptors_sup, AcceptorsSup, supervisor, _} =
+				lists:keyfind(ranch_acceptors_sup, 1,
+					supervisor:which_children(ListenerSup)),
+			{dictionary, Dict} = process_info(AcceptorsSup, dictionary),
+			{lsockets, [{1, LSock}]} = lists:keyfind(lsockets, 1, Dict),
+			Monitor = monitor(process, AcceptorsSup),
+			%% The acceptor is in accept. Closing the listen socket wakes
+			%% it with {error, closed}. The restart then accepts on the
+			%% dead socket, which returns {error, einval}.
+			ok = gen_tcp:close(LSock),
+			receive
+				{'DOWN', Monitor, process, AcceptorsSup, _} ->
+					ok
+			after 1000 ->
+				error(still_accepting)
+			end,
+			%% The new acceptors supervisor listens on a new port.
+			ok = do_tcp_connect_echo(Name, 50),
+			ok = ranch:stop_listener(Name)
+	end.
+
 tcp_graceful(Config) ->
 	doc("Ensure suspending and resuming of listeners does not kill active connections."),
 	Name = ?FUNCTION_NAME,
@@ -2707,6 +2754,256 @@ supervisor_conns_alive(_) ->
 	ok = clean_traces(),
 	ok = ranch:stop_listener(Name).
 
+supervisor_acceptor_restart_keeps_slot(_) ->
+	doc("An acceptor restarted while a connections supervisor is down "
+		"keeps the slot from the configured count."),
+	Name = ?FUNCTION_NAME,
+	{ok, ListenerSup} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 4, num_conns_sups => 4},
+		echo_protocol, []),
+	{ranch_conns_sup_sup, ConnsSupSup, supervisor, _} =
+		lists:keyfind(ranch_conns_sup_sup, 1,
+			supervisor:which_children(ListenerSup)),
+	AcceptorsSup = do_get_acceptors_sup(ListenerSup),
+	ConnsSups = ranch_server:get_connections_sups(Name),
+	%% Acceptor 4 belongs to supervisor 1. With supervisor 4
+	%% missing, length/1 is 3 and the same acceptor would
+	%% take supervisor 2.
+	{1, ConnsSup1} = lists:keyfind(1, 1, ConnsSups),
+	{4, ConnsSup4} = lists:keyfind(4, 1, ConnsSups),
+	{4, Acceptor4} = lists:keyfind(4, 1, do_acceptor_ids(AcceptorsSup)),
+	%% Hold the restart so the row stays missing while the
+	%% acceptor starts.
+	ok = sys:suspend(ConnsSupSup),
+	try
+		exit(ConnsSup4, kill),
+		ok = do_wait_conns_sup_id_gone(Name, 4, 50),
+		exit(Acceptor4, kill),
+		NewAcceptor4 = do_wait_new_acceptor(AcceptorsSup, 4, Acceptor4, 50),
+		%% start_link returns before init monitors.
+		ok = do_wait_acceptors_monitor([NewAcceptor4], ConnsSup1, 1, 50)
+	after
+		ok = sys:resume(ConnsSupSup)
+	end,
+	ok = ranch:stop_listener(Name).
+
+supervisor_num_acceptors_keeps_conns_sups(_) ->
+	doc("Raising num_acceptors keeps the stored connection supervisor count."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 4},
+		echo_protocol, []),
+	#{num_conns_sups := 4} = ranch:get_transport_options(Name),
+	4 = length(ranch_server:get_connections_sups(Name)),
+	%% A replacement that omits the key must not follow the new
+	%% acceptor count. The supervisors are not resized.
+	ok = ranch:suspend_listener(Name),
+	ok = ranch:set_transport_options(Name, #{num_acceptors => 8}),
+	#{num_conns_sups := 4, num_acceptors := 8} =
+		ranch:get_transport_options(Name),
+	ok = ranch:resume_listener(Name),
+	8 = length(ranch:procs(Name, acceptors)),
+	ConnsSups = lists:sort(ranch_server:get_connections_sups(Name)),
+	[{1, S1}, {2, S2}, {3, S3}, {4, S4}] = ConnsSups,
+	Acceptors = ranch:procs(Name, acceptors),
+	ok = do_wait_acceptors_monitor(Acceptors, S1, 2, 50),
+	ok = do_wait_acceptors_monitor(Acceptors, S2, 2, 50),
+	ok = do_wait_acceptors_monitor(Acceptors, S3, 2, 50),
+	ok = do_wait_acceptors_monitor(Acceptors, S4, 2, 50),
+	%% An explicit count is stored as given.
+	ok = ranch:set_transport_options(Name, #{
+		num_acceptors => 8,
+		num_conns_sups => 2
+	}),
+	#{num_conns_sups := 2} = ranch:get_transport_options(Name),
+	ok = ranch:stop_listener(Name).
+
+supervisor_conns_sup_crash(_) ->
+	doc("Ensure that an acceptor recovers after its connections "
+		"supervisor crashed while it was waiting in accept."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1, num_conns_sups => 1},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	ok = do_echo(Port),
+	[{1, ConnsSup0}] = ranch_server:get_connections_sups(Name),
+	exit(ConnsSup0, kill),
+	ok = do_wait_new_conns_sup(Name, ConnsSup0, 50),
+	%% The acceptor notices the crash on the next connection,
+	%% which is lost. All later connections work.
+	_ = do_echo(Port),
+	ok = do_echo(Port),
+	ok = do_echo(Port),
+	ok = ranch:stop_listener(Name).
+
+supervisor_conns_sup_crash_shared(_) ->
+	doc("Ensure that acceptors sharing a connections supervisor recover "
+		"after it crashed, without being restarted themselves."),
+	Name = ?FUNCTION_NAME,
+	NumAcc = 10,
+	{ok, ListenerSup} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => NumAcc, num_conns_sups => 1},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	AcceptorsSup = do_get_acceptors_sup(ListenerSup),
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	ok = do_echo(Port),
+	[{1, ConnsSup0}] = ranch_server:get_connections_sups(Name),
+	exit(ConnsSup0, kill),
+	ok = do_wait_new_conns_sup(Name, ConnsSup0, 50),
+	[{1, ConnsSup}] = ranch_server:get_connections_sups(Name),
+	%% Each acceptor notices the crash on its next connection,
+	%% which is lost. All later connections work.
+	ok = do_echo_until_failures(Port, NumAcc, 10 * NumAcc),
+	ok = do_wait_acceptors_monitor(Acceptors, ConnsSup, NumAcc, 50),
+	[ok = do_echo(Port) || _ <- lists:seq(1, 20)],
+	%% Neither the acceptors nor the listen socket were restarted.
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	AcceptorsSup = do_get_acceptors_sup(ListenerSup),
+	Port = ranch:get_port(Name),
+	ok = ranch:stop_listener(Name).
+
+supervisor_conns_sup_crash_sleeping_acceptors(_) ->
+	doc("Ensure that acceptors waiting for the connections supervisor "
+		"because of max_connections recover after it crashed."),
+	Name = ?FUNCTION_NAME,
+	NumAcc = 10,
+	NumSleeping = 6,
+	{ok, ListenerSup} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => NumAcc, num_conns_sups => 1,
+			max_connections => 1},
+		echo_protocol, []),
+	Port = ranch:get_port(Name),
+	AcceptorsSup = do_get_acceptors_sup(ListenerSup),
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	%% Every accepted connection is started, but its acceptor then
+	%% waits in ranch_conns_sup:start_protocol/3.
+	Sockets = [begin
+			{ok, S} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+			S
+	           end || _ <- lists:seq(1, NumSleeping)],
+	ok = ranch:wait_for_connections(Name, '==', NumSleeping, 10),
+	[{1, ConnsSup0}] = ranch_server:get_connections_sups(Name),
+	exit(ConnsSup0, kill),
+	ok = do_wait_new_conns_sup(Name, ConnsSup0, 50),
+	[{1, ConnsSup}] = ranch_server:get_connections_sups(Name),
+	%% The waiting acceptors recover right away.
+	ok = do_wait_acceptors_monitor(Acceptors, ConnsSup, NumSleeping, 50),
+	_ = [gen_tcp:close(S) || S <- Sockets],
+	%% The others lose one connection each.
+	ok = do_echo_until_failures(Port, NumAcc - NumSleeping, 10 * NumAcc),
+	ok = do_wait_acceptors_monitor(Acceptors, ConnsSup, NumAcc, 50),
+	[ok = do_echo(Port) || _ <- lists:seq(1, 20)],
+	%% Neither the acceptors nor the listen socket were restarted.
+	Acceptors = lists:sort(ranch:procs(Name, acceptors)),
+	AcceptorsSup = do_get_acceptors_sup(ListenerSup),
+	Port = ranch:get_port(Name),
+	ok = ranch:stop_listener(Name).
+
+supervisor_conns_sup_crash_keep_connection(_) ->
+	doc("Ensure that a connection which survives the crash of its "
+		"connections supervisor is not closed by the waiting acceptor."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 1, num_conns_sups => 1,
+			max_connections => 1},
+		trap_exit_protocol, []),
+	Port = ranch:get_port(Name),
+	[Acceptor] = ranch:procs(Name, acceptors),
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+	%% Once the echo works, the acceptor waits because of max_connections.
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	[{1, ConnsSup0}] = ranch_server:get_connections_sups(Name),
+	exit(ConnsSup0, kill),
+	ok = do_wait_new_conns_sup(Name, ConnsSup0, 50),
+	[{1, ConnsSup}] = ranch_server:get_connections_sups(Name),
+	ok = do_wait_acceptors_monitor([Acceptor], ConnsSup, 1, 50),
+	%% The connection process traps exits and is still running.
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	{ok, <<"TCP Ranch is working!">>} = gen_tcp:recv(Socket, 21, 1000),
+	ok = gen_tcp:close(Socket),
+	ok = ranch:stop_listener(Name).
+
+do_acceptor_ids(AcceptorsSup) ->
+	[{Id, Pid} || {{acceptor, _, Id}, Pid, _, _} <-
+		supervisor:which_children(AcceptorsSup)].
+
+do_wait_conns_sup_id_gone(_, _, 0) ->
+	error(conns_sup_still_registered);
+do_wait_conns_sup_id_gone(Name, Id, N) ->
+	case lists:keyfind(Id, 1, ranch_server:get_connections_sups(Name)) of
+		false ->
+			ok;
+		_ ->
+			receive after 100 -> ok end,
+			do_wait_conns_sup_id_gone(Name, Id, N - 1)
+	end.
+
+do_wait_new_acceptor(_, _, _, 0) ->
+	error(acceptor_not_restarted);
+do_wait_new_acceptor(AcceptorsSup, Id, OldPid, N) ->
+	case lists:keyfind(Id, 1, do_acceptor_ids(AcceptorsSup)) of
+		{Id, Pid} when is_pid(Pid), Pid =/= OldPid ->
+			Pid;
+		_ ->
+			receive after 100 -> ok end,
+			do_wait_new_acceptor(AcceptorsSup, Id, OldPid, N - 1)
+	end.
+
+do_get_acceptors_sup(ListenerSup) ->
+	{ranch_acceptors_sup, AcceptorsSup, supervisor, _} =
+		lists:keyfind(ranch_acceptors_sup, 1, supervisor:which_children(ListenerSup)),
+	AcceptorsSup.
+
+%% Connect until the given number of connections failed.
+do_echo_until_failures(_, 0, _) ->
+	ok;
+do_echo_until_failures(_, _, 0) ->
+	error(not_enough_failures);
+do_echo_until_failures(Port, Failures, N) ->
+	case do_echo(Port) of
+		ok -> do_echo_until_failures(Port, Failures, N - 1);
+		_ -> do_echo_until_failures(Port, Failures - 1, N - 1)
+	end.
+
+%% Wait until the given number of acceptors monitor the connections supervisor.
+do_wait_acceptors_monitor(_, _, _, 0) ->
+	error(acceptors_not_monitoring);
+do_wait_acceptors_monitor(Acceptors, ConnsSup, Expected, N) ->
+	Monitoring = [A || A <- Acceptors,
+		{monitors, Monitors} <- [erlang:process_info(A, monitors)],
+		lists:member({process, ConnsSup}, Monitors)],
+	case length(Monitoring) of
+		Expected ->
+			ok;
+		_ ->
+			receive after 100 -> ok end,
+			do_wait_acceptors_monitor(Acceptors, ConnsSup, Expected, N - 1)
+	end.
+
+do_wait_new_conns_sup(_, _, 0) ->
+	error(no_new_conns_sup);
+do_wait_new_conns_sup(Name, ConnsSup0, N) ->
+	case ranch_server:get_connections_sups(Name) of
+		[{1, ConnsSup}] when ConnsSup =/= ConnsSup0 ->
+			ok;
+		_ ->
+			receive after 100 -> ok end,
+			do_wait_new_conns_sup(Name, ConnsSup0, N - 1)
+	end.
+
+do_echo(Port) ->
+	{ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]),
+	ok = gen_tcp:send(Socket, <<"TCP Ranch is working!">>),
+	Res = case gen_tcp:recv(Socket, 21, 1000) of
+		{ok, <<"TCP Ranch is working!">>} -> ok;
+		Error -> Error
+	end,
+	ok = gen_tcp:close(Socket),
+	Res.
+
 supervisor_embedded_ranch_server_crash(_) ->
 	doc("Ensure that restarting ranch_server also restarts embedded listeners."),
 	Name = ?FUNCTION_NAME,
@@ -2893,6 +3190,20 @@ do_conns_count_children(Name) ->
 		[supervisor:count_children(ConnsSup) ||
 			{_, ConnsSup} <- ranch_server:get_connections_sups(Name)]
 	).
+
+do_tcp_connect_echo(_Name, 0) ->
+	error(connect_failed);
+do_tcp_connect_echo(Name, N) ->
+	Port = ranch:get_port(Name),
+	case gen_tcp:connect("localhost", Port, [binary, {active, false}, {packet, raw}]) of
+		{ok, Socket} ->
+			ok = gen_tcp:send(Socket, <<"Hello!">>),
+			{ok, <<"Hello!">>} = gen_tcp:recv(Socket, 6, 1000),
+			gen_tcp:close(Socket);
+		{error, econnrefused} ->
+			timer:sleep(20),
+			do_tcp_connect_echo(Name, N - 1)
+	end.
 
 do_tcp_connect_refused(_, 0) ->
 	error(connect_not_refused);

@@ -198,6 +198,8 @@ num_conns_sups - see below::
 
 Number of processes that supervise connection processes.
 If not specified, defaults to be equal to `num_acceptors`.
+Ranch stores that value. Changing `num_acceptors` does not
+change it.
 
 num_listen_sockets (1)::
 
@@ -248,6 +250,8 @@ documentation of the transport module you are using for more details.
 
 == Changelog
 
+* *2.5*: The `num_conns_sups` option is stored when omitted.
+         It defaults to `num_acceptors`.
 * *2.4*: The `trusted_proxies` transport option was added.
 * *2.4*: The `num_listen_sockets` transport option was documented.
 * *2.1*: The `post_listen_callback` transport option was added.
