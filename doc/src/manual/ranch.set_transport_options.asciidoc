@@ -20,6 +20,9 @@ transport options, it is recommended to get the current transport options using
 link:man:ranch:get_transport_options(3)[ranch:get_transport_options(3)], update
 them and then set them back using this function.
 
+When `num_conns_sups` is omitted, the value already stored for the listener
+is kept.
+
 Changes to the following options will take effect...
 
 * immediately:
@@ -60,6 +63,7 @@ or when the given transport options contain invalid values.
 
 == Changelog
 
+* *2.5*: Omitting `num_conns_sups` keeps the stored value.
 * *2.5*: A listener started with `start_listener/5` keeps these
          options when its supervisor restarts.
 * *2.5*: The function returns `{error, not_found}` when the listener does not exist.

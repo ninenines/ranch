@@ -160,6 +160,7 @@ groups() ->
 		supervisor_conns_sup_crash_sleeping_acceptors,
 		supervisor_conns_sup_crash_keep_connection,
 		supervisor_acceptor_restart_keeps_slot,
+		supervisor_num_acceptors_keeps_conns_sups,
 		supervisor_embedded_ranch_server_crash,
 		supervisor_protocol_start_link_crash,
 		supervisor_server_recover_state,
@@ -1049,7 +1050,7 @@ misc_listen_error(_) ->
 			FormattedMsg = lists:flatten(io_lib:format(Format, Args)),
 			NormalizedMsg = re:replace(FormattedMsg, "\\s", "", [global, {return, list}]),
 			"FailedtostartRanchlistenermisc_listen_error"
-			"inranch_listen_error_transport:listen(#{socket_opts=>[]})"
+			"inranch_listen_error_transport:listen(#{num_conns_sups=>10,socket_opts=>[]})"
 			"forreason{ranch_listen_error_transport,listen_error}"
 			"(Therewasanerrorinranch_listen_error_transport:listen_error)" = NormalizedMsg
 	after 1000 ->
@@ -2784,6 +2785,37 @@ supervisor_acceptor_restart_keeps_slot(_) ->
 	after
 		ok = sys:resume(ConnsSupSup)
 	end,
+	ok = ranch:stop_listener(Name).
+
+supervisor_num_acceptors_keeps_conns_sups(_) ->
+	doc("Raising num_acceptors keeps the stored connection supervisor count."),
+	Name = ?FUNCTION_NAME,
+	{ok, _} = ranch:start_listener(Name,
+		ranch_tcp, #{num_acceptors => 4},
+		echo_protocol, []),
+	#{num_conns_sups := 4} = ranch:get_transport_options(Name),
+	4 = length(ranch_server:get_connections_sups(Name)),
+	%% A replacement that omits the key must not follow the new
+	%% acceptor count. The supervisors are not resized.
+	ok = ranch:suspend_listener(Name),
+	ok = ranch:set_transport_options(Name, #{num_acceptors => 8}),
+	#{num_conns_sups := 4, num_acceptors := 8} =
+		ranch:get_transport_options(Name),
+	ok = ranch:resume_listener(Name),
+	8 = length(ranch:procs(Name, acceptors)),
+	ConnsSups = lists:sort(ranch_server:get_connections_sups(Name)),
+	[{1, S1}, {2, S2}, {3, S3}, {4, S4}] = ConnsSups,
+	Acceptors = ranch:procs(Name, acceptors),
+	ok = do_wait_acceptors_monitor(Acceptors, S1, 2, 50),
+	ok = do_wait_acceptors_monitor(Acceptors, S2, 2, 50),
+	ok = do_wait_acceptors_monitor(Acceptors, S3, 2, 50),
+	ok = do_wait_acceptors_monitor(Acceptors, S4, 2, 50),
+	%% An explicit count is stored as given.
+	ok = ranch:set_transport_options(Name, #{
+		num_acceptors => 8,
+		num_conns_sups => 2
+	}),
+	#{num_conns_sups := 2} = ranch:get_transport_options(Name),
 	ok = ranch:stop_listener(Name).
 
 supervisor_conns_sup_crash(_) ->
